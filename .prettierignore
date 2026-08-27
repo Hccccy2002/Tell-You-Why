@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+src-tauri/target
+package-lock.json
+Tell You Why - MVP设计方案.md
+

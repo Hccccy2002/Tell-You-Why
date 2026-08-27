@@ -1,0 +1,20 @@
+[
+  {
+    "id": "replace-with-stable-id",
+    "schemaVersion": 1,
+    "language": "zh-CN",
+    "topicId": "natural_science",
+    "topicLabel": "自然科学",
+    "tags": ["示例标签", "待复核"],
+    "question": "请把这里替换成一个聚焦单一现象的知识问题？",
+    "shortAnswer": "请把这里替换成四十到一百二十个字符的直接回答，并确保它先清楚回答问题本身，再给出最必要的原因和适用边界。",
+    "explanation": "请把这里替换成一百八十到五百个字符的详细解释。解释需要说明关键机制、概念之间的关系、适用边界和可能的例外，并使用普通读者能够理解的语言。请避免夸张表达，也不要把存在争议的解释写成唯一事实。如果结论依赖某些条件，需要把条件直接写清楚；如果不同来源存在合理分歧，应当诚实说明分歧，而不是强行得出确定答案。这个模板内容本身没有经过事实审核，因此可信状态必须保持为演示内容，不能直接改成已核验后发布。只有实际打开并核对来源、完成双人复核后，审核负责人才能改为已核验。",
+    "whyItMatters": "可选：说明这条知识为什么值得知道。",
+    "difficulty": "beginner",
+    "estimatedReadSeconds": 45,
+    "sourceRefs": [],
+    "trustStatus": "demo_unreviewed",
+    "contentFingerprint": "",
+    "createdAt": "2026-08-26T00:00:00Z"
+  }
+]

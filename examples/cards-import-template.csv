@@ -1,0 +1,2 @@
+id,schema_version,language,topic_id,topic_label,tags,question,short_answer,explanation,why_it_matters,difficulty,estimated_read_seconds,source_titles,source_urls,trust_status,created_at
+,1,zh-CN,natural_science,自然科学,示例标签|待复核,请把这里替换成一个聚焦单一现象的知识问题？,请把这里替换成四十到一百二十个字符的直接回答并确保先回答问题再说明必要原因和边界,请把这里替换成一百八十到五百个字符的详细解释。解释需要说明关键机制概念关系适用边界和可能例外，并使用普通读者能够理解的语言。请避免夸张表达，也不要把存在争议的解释写成唯一事实。如果结论依赖某些条件，需要把条件直接写清楚；如果不同来源存在合理分歧，应当诚实说明分歧，而不是强行得出确定答案。这个模板内容本身没有经过事实审核，因此可信状态必须保持为演示内容，不能直接改成已核验后发布。只有实际打开并核对来源完成双人复核后，审核负责人才能改为已核验。,可选说明这条知识为什么值得知道,general,45,,,demo_unreviewed,

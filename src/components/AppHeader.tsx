@@ -1,0 +1,77 @@
+import { useEffect, useRef } from "react";
+
+export type AppView = "home" | "interests" | "models" | "library" | "settings";
+
+interface Props {
+  view: AppView;
+  menuOpen: boolean;
+  onMenuToggle: () => void;
+  onNavigate: (view: AppView) => void;
+}
+
+const menuItems: Array<[AppView, string, string]> = [
+  ["home", "知识小窗", "⌂"],
+  ["interests", "兴趣设置", "◇"],
+  ["models", "模型设置", "◎"],
+  ["library", "收藏与历史", "☆"],
+  ["settings", "通用设置", "⚙"],
+];
+
+export function AppHeader({ view, menuOpen, onMenuToggle, onNavigate }: Props) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [menuOpen]);
+
+  return (
+    <header className="app-header">
+      <button
+        className="brand-button"
+        onClick={() => onNavigate("home")}
+        aria-label="返回知识小窗"
+      >
+        <span className="brand-mark" aria-hidden="true">
+          T
+        </span>
+        <span>Tell You Why</span>
+      </button>
+      <div className="header-actions">
+        <button
+          className="icon-button"
+          type="button"
+          aria-label={menuOpen ? "关闭菜单" : "打开菜单"}
+          aria-expanded={menuOpen}
+          aria-controls="main-menu"
+          onClick={onMenuToggle}
+        >
+          <span aria-hidden="true">•••</span>
+        </button>
+      </div>
+      {menuOpen ? (
+        <div className="menu-scrim" onClick={onMenuToggle} role="presentation">
+          <nav
+            id="main-menu"
+            className="main-menu"
+            ref={menuRef}
+            aria-label="主要页面"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {menuItems.map(([target, label, icon]) => (
+              <button
+                key={target}
+                className={target === view ? "menu-item active" : "menu-item"}
+                onClick={() => onNavigate(target)}
+                aria-current={target === view ? "page" : undefined}
+              >
+                <span aria-hidden="true">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      ) : null}
+    </header>
+  );
+}

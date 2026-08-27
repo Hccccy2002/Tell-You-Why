@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "主窗口只拥有核心 IPC 和知识卡导入所需的文件选择权限。",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}
