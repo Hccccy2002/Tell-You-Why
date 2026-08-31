@@ -213,6 +213,18 @@ impl Database {
             )?;
             transaction.commit()?;
         }
+        if version < 5 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(
+                "CREATE TABLE pending_credential_deletions (
+                    credential_ref TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL
+                );
+                INSERT INTO schema_migrations(version, applied_at)
+                VALUES (5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));",
+            )?;
+            transaction.commit()?;
+        }
         connection.execute(
             "UPDATE card_user_state
              SET hidden = 1
@@ -320,7 +332,11 @@ impl Database {
         u32::try_from(count).map_err(|_| DbError::Validation("可展示知识卡数量超出支持范围".into()))
     }
 
-    pub fn next_card(&self, current_id: Option<&str>) -> Result<KnowledgeCard, DbError> {
+    fn select_next_card(
+        &self,
+        current_id: Option<&str>,
+        record_shown: bool,
+    ) -> Result<KnowledgeCard, DbError> {
         let connection = self.connect()?;
         let selected_count: i64 = connection.query_row(
             "SELECT COUNT(*) FROM topic_preferences WHERE selected = 1 AND enabled = 1",
@@ -398,8 +414,18 @@ impl Database {
                     .flatten()
             })
             .ok_or(DbError::NoCards)?;
-        self.record_interaction(&card.id, "shown")?;
+        if record_shown {
+            self.record_interaction(&card.id, "shown")?;
+        }
         Ok(card)
+    }
+
+    pub fn next_card(&self, current_id: Option<&str>) -> Result<KnowledgeCard, DbError> {
+        self.select_next_card(current_id, true)
+    }
+
+    pub fn preview_card(&self) -> Result<KnowledgeCard, DbError> {
+        self.select_next_card(None, false)
     }
 
     pub fn card_by_id(&self, card_id: &str) -> Result<KnowledgeCard, DbError> {
@@ -881,6 +907,13 @@ impl Database {
 
     pub fn save_provider_profile(&self, profile: &ProviderProfileRecord) -> Result<(), DbError> {
         let connection = self.connect()?;
+        Self::save_provider_profile_with_connection(&connection, profile)
+    }
+
+    fn save_provider_profile_with_connection(
+        connection: &Connection,
+        profile: &ProviderProfileRecord,
+    ) -> Result<(), DbError> {
         connection.execute(
             "INSERT INTO provider_profiles(
                 provider_id, region, model, credential_ref, key_last4,
@@ -906,6 +939,109 @@ impl Database {
         Ok(())
     }
 
+    pub fn queue_credential_deletion(&self, credential_ref: &str) -> Result<(), DbError> {
+        let connection = self.connect()?;
+        Self::queue_credential_deletion_with_connection(&connection, credential_ref)
+    }
+
+    fn queue_credential_deletion_with_connection(
+        connection: &Connection,
+        credential_ref: &str,
+    ) -> Result<(), DbError> {
+        connection.execute(
+            "INSERT OR IGNORE INTO pending_credential_deletions(credential_ref, created_at)
+             VALUES (?1, ?2)",
+            params![credential_ref, chrono::Utc::now().to_rfc3339()],
+        )?;
+        Ok(())
+    }
+
+    pub fn activate_provider_profile_credential(
+        &self,
+        profile: &ProviderProfileRecord,
+        expected_previous_credential_ref: Option<&str>,
+    ) -> Result<(), DbError> {
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction()?;
+        let current_credential_ref = transaction
+            .query_row(
+                "SELECT credential_ref FROM provider_profiles
+                 WHERE provider_id = ?1 AND region = ?2",
+                params![profile.provider_id, profile.region],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if current_credential_ref.as_deref() != expected_previous_credential_ref {
+            return Err(DbError::Validation(
+                "模型凭据配置已发生变化，请重新确认后再试".into(),
+            ));
+        }
+
+        Self::save_provider_profile_with_connection(&transaction, profile)?;
+        transaction.execute(
+            "DELETE FROM pending_credential_deletions WHERE credential_ref = ?1",
+            [&profile.credential_ref],
+        )?;
+        if let Some(previous) = current_credential_ref
+            .as_deref()
+            .filter(|previous| *previous != profile.credential_ref)
+        {
+            Self::queue_credential_deletion_with_connection(&transaction, previous)?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn detach_provider_profile_and_queue_credential(
+        &self,
+        provider_id: &str,
+        region: &str,
+    ) -> Result<(), DbError> {
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction()?;
+        let credential_ref = transaction
+            .query_row(
+                "SELECT credential_ref FROM provider_profiles
+                 WHERE provider_id = ?1 AND region = ?2",
+                params![provider_id, region],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if let Some(credential_ref) = credential_ref {
+            Self::queue_credential_deletion_with_connection(&transaction, &credential_ref)?;
+            transaction.execute(
+                "DELETE FROM provider_profiles WHERE provider_id = ?1 AND region = ?2",
+                params![provider_id, region],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn pending_credential_deletions(&self) -> Result<Vec<String>, DbError> {
+        let connection = self.connect()?;
+        let mut statement = connection.prepare(
+            "SELECT pending.credential_ref
+             FROM pending_credential_deletions pending
+             WHERE NOT EXISTS (
+               SELECT 1 FROM provider_profiles profile
+               WHERE profile.credential_ref = pending.credential_ref
+             )
+             ORDER BY pending.created_at, pending.credential_ref",
+        )?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(DbError::from)
+    }
+
+    pub fn complete_credential_deletion(&self, credential_ref: &str) -> Result<(), DbError> {
+        let connection = self.connect()?;
+        connection.execute(
+            "DELETE FROM pending_credential_deletions WHERE credential_ref = ?1",
+            [credential_ref],
+        )?;
+        Ok(())
+    }
+
     pub fn set_provider_verified(
         &self,
         provider_id: &str,
@@ -925,15 +1061,6 @@ impl Database {
                 verified,
                 chrono::Utc::now().to_rfc3339()
             ],
-        )?;
-        Ok(())
-    }
-
-    pub fn delete_provider_profile(&self, provider_id: &str, region: &str) -> Result<(), DbError> {
-        let connection = self.connect()?;
-        connection.execute(
-            "DELETE FROM provider_profiles WHERE provider_id = ?1 AND region = ?2",
-            params![provider_id, region],
         )?;
         Ok(())
     }
@@ -982,9 +1109,29 @@ impl Database {
         if cache_managed {
             transaction.execute(
                 "DELETE FROM cards
-                 WHERE cache_managed = 1 AND id NOT IN (
-                    SELECT id FROM cards WHERE cache_managed = 1
-                    ORDER BY created_at DESC LIMIT 30
+                 WHERE cache_managed = 1
+                   AND NOT EXISTS (
+                     SELECT 1 FROM card_user_state state
+                     WHERE state.card_id = cards.id
+                   )
+                   AND NOT EXISTS (
+                     SELECT 1 FROM interactions interaction
+                     WHERE interaction.card_id = cards.id
+                   )
+                   AND id NOT IN (
+                    SELECT cached.id
+                    FROM cards cached
+                    WHERE cached.cache_managed = 1
+                      AND NOT EXISTS (
+                        SELECT 1 FROM card_user_state state
+                        WHERE state.card_id = cached.id
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1 FROM interactions interaction
+                        WHERE interaction.card_id = cached.id
+                      )
+                    ORDER BY cached.created_at DESC, cached.rowid DESC
+                    LIMIT 30
                  )",
                 [],
             )?;
@@ -1011,6 +1158,13 @@ impl Database {
                 )?;
             }
             "all" => {
+                transaction.execute(
+                    "INSERT OR IGNORE INTO pending_credential_deletions(
+                        credential_ref, created_at
+                     )
+                     SELECT credential_ref, ?1 FROM provider_profiles",
+                    [chrono::Utc::now().to_rfc3339()],
+                )?;
                 transaction.execute("DELETE FROM interactions", [])?;
                 transaction.execute("DELETE FROM card_user_state", [])?;
                 transaction.execute("DELETE FROM generation_jobs", [])?;
@@ -1298,6 +1452,27 @@ mod tests {
         (directory, database)
     }
 
+    fn make_import_cards(prefix: &str, count: usize) -> Vec<KnowledgeCard> {
+        let template = serde_json::from_str::<Vec<KnowledgeCard>>(include_str!(
+            "../resources/demo-cards.json"
+        ))
+        .expect("demo cards")
+        .remove(0);
+        (0..count)
+            .map(|index| {
+                let mut card = template.clone();
+                card.id = format!("{prefix}-{index}");
+                card.question = format!(
+                    "{prefix}{:08X} 的结构为何会呈现这种独特变化过程？",
+                    index.wrapping_mul(2_654_435_761)
+                );
+                card.content_fingerprint =
+                    crate::content::fingerprint(&card.question, &card.short_answer);
+                card
+            })
+            .collect()
+    }
+
     #[test]
     fn migrations_seed_offline_content_and_defaults() {
         let (_directory, database) = test_database();
@@ -1324,6 +1499,122 @@ mod tests {
                 .expect("saved generation provider"),
             "kimi"
         );
+    }
+
+    #[test]
+    fn preview_card_does_not_create_reading_history() {
+        let (_directory, database) = test_database();
+        let preview = database.preview_card().expect("preview card");
+        assert!(!preview.question.is_empty());
+        assert!(database
+            .list_library("history", None, true)
+            .expect("history after preview")
+            .is_empty());
+
+        database.next_card(None).expect("shown card");
+        assert_eq!(
+            database
+                .list_library("history", None, true)
+                .expect("history after shown")
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn reading_history_retains_only_the_latest_five_hundred_shown_events() {
+        let (_directory, database) = test_database();
+        let card = database.preview_card().expect("preview card");
+        let mut connection = database.connect().expect("connection");
+        let transaction = connection.transaction().expect("transaction");
+        for index in 0..500 {
+            transaction
+                .execute(
+                    "INSERT INTO interactions(card_id, kind, created_at)
+                     VALUES (?1, 'shown', ?2)",
+                    params![card.id, format!("2020-01-01T00:00:{index:03}Z")],
+                )
+                .expect("seed shown interaction");
+        }
+        let oldest_id: i64 = transaction
+            .query_row(
+                "SELECT MIN(id) FROM interactions WHERE kind = 'shown'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("oldest shown interaction");
+        transaction.commit().expect("commit seeded history");
+        drop(connection);
+
+        database
+            .record_interaction(&card.id, "shown")
+            .expect("record newest shown interaction");
+
+        let connection = database.connect().expect("connection");
+        let retained: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM interactions WHERE kind = 'shown'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("retained history count");
+        let oldest_retained: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM interactions WHERE id = ?1",
+                [oldest_id],
+                |row| row.get(0),
+            )
+            .expect("oldest history state");
+        assert_eq!(retained, 500);
+        assert_eq!(oldest_retained, 0);
+    }
+
+    #[test]
+    fn failed_profile_deletion_rolls_back_credential_cleanup_intent() {
+        let (_directory, database) = test_database();
+        database
+            .save_provider_profile(&ProviderProfileRecord {
+                provider_id: "deepseek".into(),
+                region: "default".into(),
+                model: "deepseek-v4-flash".into(),
+                credential_ref: "deepseek:default:active".into(),
+                key_last4: Some("tive".into()),
+                connection_verified: true,
+            })
+            .expect("provider profile");
+        let connection = database.connect().expect("connection");
+        connection
+            .execute_batch(
+                "CREATE TRIGGER fail_provider_profile_delete
+                 BEFORE DELETE ON provider_profiles
+                 BEGIN
+                   SELECT RAISE(ABORT, 'simulated provider delete failure');
+                 END;",
+            )
+            .expect("failure trigger");
+        drop(connection);
+
+        assert!(database
+            .detach_provider_profile_and_queue_credential("deepseek", "default")
+            .is_err());
+        assert!(database
+            .provider_profile("deepseek", "default")
+            .expect("profile lookup")
+            .is_some());
+        assert!(database
+            .pending_credential_deletions()
+            .expect("pending credentials")
+            .is_empty());
+
+        assert!(database.clear_data("all").is_err());
+        assert!(database
+            .provider_profile("deepseek", "default")
+            .expect("profile after failed clear")
+            .is_some());
+        assert!(database
+            .pending_credential_deletions()
+            .expect("pending credentials after failed clear")
+            .is_empty());
     }
 
     #[test]
@@ -1617,29 +1908,8 @@ mod tests {
     #[test]
     fn reviewed_imports_are_not_evicted_with_the_ai_cache() {
         let (_directory, database) = test_database();
-        let template = serde_json::from_str::<Vec<KnowledgeCard>>(include_str!(
-            "../resources/demo-cards.json"
-        ))
-        .expect("demo cards")
-        .remove(0);
-        let make_cards = |prefix: &str, count: usize| {
-            (0..count)
-                .map(|index| {
-                    let mut card = template.clone();
-                    card.id = format!("{prefix}-{index}");
-                    card.question = format!(
-                        "{prefix}{:08X} 的结构为何会呈现这种独特变化过程？",
-                        index.wrapping_mul(2_654_435_761)
-                    );
-                    card.content_fingerprint =
-                        crate::content::fingerprint(&card.question, &card.short_answer);
-                    card
-                })
-                .collect::<Vec<_>>()
-        };
-
-        let reviewed = make_cards("reviewed", 4);
-        let generated = make_cards("generated", 31);
+        let reviewed = make_import_cards("reviewed", 4);
+        let generated = make_import_cards("generated", 31);
         assert_eq!(
             database
                 .insert_cards(&reviewed, false, false)
@@ -1669,6 +1939,102 @@ mod tests {
             .expect("cache count");
         assert_eq!(reviewed_count, 4);
         assert_eq!(cache_count, 30);
+    }
+
+    #[test]
+    fn ai_cache_pruning_preserves_user_touched_cards_and_caps_untouched_cache() {
+        let (_directory, database) = test_database();
+        let protected = make_import_cards("protected-cache", 2);
+        database
+            .insert_cards(&protected, false, true)
+            .expect("initial generated cache");
+
+        database
+            .record_interaction(&protected[0].id, "favorited")
+            .expect("favorite protected card");
+        database
+            .record_interaction(&protected[1].id, "shown")
+            .expect("view protected card");
+
+        let connection = database.connect().expect("connection");
+        connection
+            .execute(
+                "DELETE FROM interactions WHERE card_id = ?1",
+                [&protected[0].id],
+            )
+            .expect("leave favorite state only");
+        connection
+            .execute(
+                "DELETE FROM card_user_state WHERE card_id = ?1",
+                [&protected[1].id],
+            )
+            .expect("leave reading interaction only");
+        drop(connection);
+
+        let untouched = make_import_cards("untouched-cache", 31);
+        database
+            .insert_cards(&untouched, false, true)
+            .expect("overflow generated cache");
+
+        assert_eq!(
+            database
+                .card_by_id(&protected[0].id)
+                .expect("favorite state survives pruning")
+                .id,
+            protected[0].id
+        );
+        assert_eq!(
+            database
+                .card_by_id(&protected[1].id)
+                .expect("reading interaction survives pruning")
+                .id,
+            protected[1].id
+        );
+
+        let connection = database.connect().expect("connection");
+        let favorite: i64 = connection
+            .query_row(
+                "SELECT favorite FROM card_user_state WHERE card_id = ?1",
+                [&protected[0].id],
+                |row| row.get(0),
+            )
+            .expect("favorite state");
+        let reading_interactions: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM interactions WHERE card_id = ?1 AND kind = 'shown'",
+                [&protected[1].id],
+                |row| row.get(0),
+            )
+            .expect("reading interaction");
+        let untouched_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM cards cached
+                 WHERE cached.cache_managed = 1
+                   AND NOT EXISTS (
+                     SELECT 1 FROM card_user_state state
+                     WHERE state.card_id = cached.id
+                   )
+                   AND NOT EXISTS (
+                     SELECT 1 FROM interactions interaction
+                     WHERE interaction.card_id = cached.id
+                   )",
+                [],
+                |row| row.get(0),
+            )
+            .expect("untouched cache count");
+        let cache_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM cards WHERE cache_managed = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("total cache count");
+
+        assert_eq!(favorite, 1);
+        assert_eq!(reading_interactions, 1);
+        assert_eq!(untouched_count, 30);
+        assert_eq!(cache_count, 32);
     }
 
     #[test]

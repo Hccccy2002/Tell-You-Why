@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type PointerEvent } from "react";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import { friendlyError, saveInterests } from "../lib/api";
 import type { TopicPreference } from "../types";
 
@@ -34,6 +35,10 @@ export function InterestSettingsScreen({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [dropAfter, setDropAfter] = useState(false);
+  const [topicToDelete, setTopicToDelete] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
   const pointerDrag = useRef<{
     pointerId: number;
     sourceId: string;
@@ -282,11 +287,7 @@ export function InterestSettingsScreen({
                     aria-label={`删除 ${topic.label}`}
                     disabled={busy}
                     onClick={() =>
-                      setTopics((items) =>
-                        applyOrder(
-                          items.filter((item) => item.id !== topic.id),
-                        ),
-                      )
+                      setTopicToDelete({ id: topic.id, label: topic.label })
                     }
                   >
                     删除
@@ -342,6 +343,28 @@ export function InterestSettingsScreen({
       >
         {busy ? "正在保存…" : "保存兴趣设置"}
       </button>
+      {topicToDelete ? (
+        <ConfirmationDialog
+          id="custom-interest-delete-confirmation"
+          eyebrow="兴趣删除确认"
+          title={`确认删除“${topicToDelete.label}”吗？`}
+          confirmLabel="确认删除兴趣"
+          busyLabel="正在删除…"
+          busy={busy}
+          onCancel={() => setTopicToDelete(null)}
+          onConfirm={() => {
+            setTopics((items) =>
+              applyOrder(items.filter((item) => item.id !== topicToDelete.id)),
+            );
+            setMessage(null);
+            setTopicToDelete(null);
+          }}
+        >
+          <p>
+            该自定义兴趣会从当前列表移除；只有点击“保存兴趣设置”后，删除才会写入本机。
+          </p>
+        </ConfirmationDialog>
+      ) : null}
     </main>
   );
 }

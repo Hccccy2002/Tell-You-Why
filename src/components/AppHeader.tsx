@@ -5,6 +5,7 @@ export type AppView = "home" | "interests" | "models" | "library" | "settings";
 interface Props {
   view: AppView;
   menuOpen: boolean;
+  navigationLocked: boolean;
   onMenuToggle: () => void;
   onNavigate: (view: AppView) => void;
 }
@@ -17,7 +18,13 @@ const menuItems: Array<[AppView, string, string]> = [
   ["settings", "通用设置", "⚙"],
 ];
 
-export function AppHeader({ view, menuOpen, onMenuToggle, onNavigate }: Props) {
+export function AppHeader({
+  view,
+  menuOpen,
+  navigationLocked,
+  onMenuToggle,
+  onNavigate,
+}: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,6 +38,8 @@ export function AppHeader({ view, menuOpen, onMenuToggle, onNavigate }: Props) {
         className="brand-button"
         onClick={() => onNavigate("home")}
         aria-label="返回知识小窗"
+        disabled={navigationLocked}
+        title={navigationLocked ? "当前操作完成后可返回知识小窗" : undefined}
       >
         <span className="brand-mark" aria-hidden="true">
           T
@@ -58,12 +67,19 @@ export function AppHeader({ view, menuOpen, onMenuToggle, onNavigate }: Props) {
             aria-label="主要页面"
             onClick={(event) => event.stopPropagation()}
           >
+            {navigationLocked ? (
+              <p className="menu-lock-note" role="status">
+                当前操作正在进行，完成后可切换页面。
+              </p>
+            ) : null}
             {menuItems.map(([target, label, icon]) => (
               <button
                 key={target}
                 className={target === view ? "menu-item active" : "menu-item"}
                 onClick={() => onNavigate(target)}
                 aria-current={target === view ? "page" : undefined}
+                disabled={navigationLocked}
+                title={navigationLocked ? "请等待当前操作完成" : undefined}
               >
                 <span aria-hidden="true">{icon}</span>
                 {label}

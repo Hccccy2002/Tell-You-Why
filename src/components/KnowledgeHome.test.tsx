@@ -66,6 +66,7 @@ describe("KnowledgeHome", () => {
         onGenerate={onGenerate}
         onGenerateRandom={onGenerateRandom}
         onContinueGeneration={vi.fn().mockResolvedValue(undefined)}
+        onOpenModelSettings={vi.fn()}
         onGenerationProviderChange={onGenerationProviderChange}
       />,
     );
@@ -138,6 +139,7 @@ describe("KnowledgeHome", () => {
         onGenerate={vi.fn().mockResolvedValue(undefined)}
         onGenerateRandom={vi.fn().mockResolvedValue(undefined)}
         onContinueGeneration={onContinueGeneration}
+        onOpenModelSettings={vi.fn()}
         onGenerationProviderChange={vi.fn().mockResolvedValue(undefined)}
       />,
     );
@@ -145,5 +147,80 @@ describe("KnowledgeHome", () => {
     expect(screen.getByText("已生成 4/6 条")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "继续生成剩余 2 条" }));
     expect(onContinueGeneration).toHaveBeenCalledOnce();
+  });
+
+  it("opens model settings for the selected provider when it is not ready", async () => {
+    const user = userEvent.setup();
+    const onOpenModelSettings = vi.fn();
+    const commonProps = {
+      topics,
+      availableCardCount: 3,
+      maxGenerationCount: 10,
+      pendingGeneration: null,
+      onBrowse: vi.fn().mockResolvedValue(undefined),
+      onGenerate: vi.fn().mockResolvedValue(undefined),
+      onGenerateRandom: vi.fn().mockResolvedValue(undefined),
+      onContinueGeneration: vi.fn().mockResolvedValue(undefined),
+      onOpenModelSettings,
+      onGenerationProviderChange: vi.fn().mockResolvedValue(undefined),
+    };
+    const { rerender } = render(
+      <KnowledgeHome
+        {...commonProps}
+        providers={providers}
+        generationProviderId="kimi"
+        busy={false}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "选择生成模型" })).toHaveValue(
+      "kimi",
+    );
+    const configure = screen.getByRole("button", { name: /去配置/ });
+    expect(configure).toBeEnabled();
+    await user.click(configure);
+    expect(onOpenModelSettings).toHaveBeenCalledOnce();
+
+    rerender(
+      <KnowledgeHome
+        {...commonProps}
+        providers={providers}
+        generationProviderId="kimi"
+        busy={true}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /去配置/ })).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: "选择生成模型" }),
+    ).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /去配置/ }));
+    expect(onOpenModelSettings).toHaveBeenCalledOnce();
+
+    const needsVerification = providers.map((provider) =>
+      provider.id === "kimi"
+        ? { ...provider, keyConfigured: true, keyLast4: "5678" }
+        : provider,
+    );
+    rerender(
+      <KnowledgeHome
+        {...commonProps}
+        providers={needsVerification}
+        generationProviderId="kimi"
+        busy={false}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /去测试/ })).toBeEnabled();
+
+    rerender(
+      <KnowledgeHome
+        {...commonProps}
+        providers={providers}
+        generationProviderId="deepseek"
+        busy={false}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /去配置|去测试/ }),
+    ).not.toBeInTheDocument();
   });
 });

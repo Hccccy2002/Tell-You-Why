@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { AppHeader, type AppView } from "./components/AppHeader";
 import { KnowledgeCardView } from "./components/KnowledgeCardView";
@@ -15,6 +15,7 @@ import {
   generateTopicBatch,
   isDesktop,
   nextCard,
+  recordCardShown,
   recordInteraction,
   saveGenerationProvider,
   saveOnboarding,
@@ -37,6 +38,9 @@ import type {
 } from "./types";
 
 const NO_MORE_CARDS_NOTICE = "当前没有知识点啦，快去生成吧~";
+const FOLLOW_UP_NAVIGATION_NOTICE =
+  "AI 正在回答，请等待完成后再离开当前知识卡。";
+const BUSY_NAVIGATION_NOTICE = "当前操作正在进行，请等待完成后再切换页面。";
 
 interface PendingGeneration {
   topicId: string;
@@ -66,6 +70,7 @@ export default function App() {
   const [homeMode, setHomeMode] = useState<"landing" | "card">("landing");
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [cardFollowUpBusy, setCardFollowUpBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [libraryRefresh, setLibraryRefresh] = useState(0);
   const [online, setOnline] = useState(navigator.onLine);
@@ -80,10 +85,23 @@ export default function App() {
     id: number;
     text: string;
   } | null>(null);
+  const busyRef = useRef(false);
+  const cardFollowUpBusyRef = useRef(false);
+  const cardNavigationLocked =
+    cardFollowUpBusy && view === "home" && homeMode === "card";
+  const navigationLocked = busy || cardNavigationLocked;
+  const updateCardFollowUpBusy = useCallback((value: boolean) => {
+    cardFollowUpBusyRef.current = value;
+    setCardFollowUpBusy(value);
+  }, []);
+
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
 
   useEffect(() => {
     let active = true;
-    void bootstrapApp()
+    void bootstrapApp({ recordShown: false })
       .then((bootstrap) => {
         if (active) {
           setData(bootstrap);
@@ -116,15 +134,23 @@ export default function App() {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
       if (event.key === "Escape") {
         if (menuOpen) setMenuOpen(false);
-        else if (view !== "home") setView("home");
+        else if (navigationLocked) {
+          event.preventDefault();
+          setMessage(
+            cardNavigationLocked
+              ? FOLLOW_UP_NAVIGATION_NOTICE
+              : BUSY_NAVIGATION_NOTICE,
+          );
+        } else if (view !== "home") setView("home");
         else if (homeMode === "card") setHomeMode("landing");
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [homeMode, menuOpen, view]);
+  }, [cardNavigationLocked, homeMode, menuOpen, navigationLocked, view]);
 
   useEffect(() => {
     if (!message) return;
@@ -143,10 +169,26 @@ export default function App() {
     const cleanups = Promise.all([
       listen("desktop-notice", (event) => setMessage(String(event.payload))),
       listen("open-settings", () => {
+        if (busyRef.current || cardFollowUpBusyRef.current) {
+          setMessage(
+            cardFollowUpBusyRef.current
+              ? FOLLOW_UP_NAVIGATION_NOTICE
+              : BUSY_NAVIGATION_NOTICE,
+          );
+          return;
+        }
         setView("settings");
         setMenuOpen(false);
       }),
       listen("request-next-card", () => {
+        if (busyRef.current || cardFollowUpBusyRef.current) {
+          setMessage(
+            cardFollowUpBusyRef.current
+              ? FOLLOW_UP_NAVIGATION_NOTICE
+              : BUSY_NAVIGATION_NOTICE,
+          );
+          return;
+        }
         setData((current) => {
           if (!current?.card) return current;
           void nextCard(current.card.id)
@@ -169,6 +211,16 @@ export default function App() {
   }, []);
 
   function navigate(target: AppView) {
+    if (busyRef.current) {
+      setMessage(BUSY_NAVIGATION_NOTICE);
+      setMenuOpen(false);
+      return;
+    }
+    if (cardFollowUpBusyRef.current && view === "home" && homeMode === "card") {
+      setMessage(FOLLOW_UP_NAVIGATION_NOTICE);
+      setMenuOpen(false);
+      return;
+    }
     setView(target);
     if (target === "home") setHomeMode("landing");
     setMenuOpen(false);
@@ -198,7 +250,16 @@ export default function App() {
       !data.card.hiddenFromFeed &&
       !dismissedCardIds.has(data.card.id)
     ) {
-      setHomeMode("card");
+      setBusy(true);
+      try {
+        await recordCardShown(data.card.id);
+        setHomeMode("card");
+        setLibraryRefresh((value) => value + 1);
+      } catch (error) {
+        setMessage(friendlyError(error));
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     setBusy(true);
@@ -394,7 +455,9 @@ export default function App() {
       if (card) setMessage(successMessage);
       else setHomeMode("landing");
     } catch (error) {
-      setMessage(friendlyError(error));
+      const text = friendlyError(error);
+      setMessage(text);
+      throw new Error(text);
     } finally {
       setBusy(false);
     }
@@ -709,18 +772,28 @@ export default function App() {
     setData({ ...data, providers });
   }
 
-  function dataCleared(scope: DataClearScope) {
+  async function dataCleared(
+    scope: DataClearScope,
+    warning: string | null = null,
+  ) {
     setLibraryRefresh((value) => value + 1);
+    if (scope === "history" || scope === "all") {
+      setBackStack([]);
+      setForwardStack([]);
+    }
     if (scope === "all") {
       setView("home");
       setHomeMode("landing");
-      setBackStack([]);
-      setForwardStack([]);
       setDismissedCardIds(new Set());
-      void bootstrapApp()
-        .then(setData)
-        .catch((error: unknown) => setMessage(friendlyError(error)));
     }
+    if (scope === "preferences" || scope === "all") {
+      try {
+        setData(await bootstrapApp({ recordShown: false }));
+      } catch (error) {
+        setMessage(friendlyError(error));
+      }
+    }
+    if (warning) setMessage(warning);
   }
 
   if (!data) {
@@ -758,6 +831,7 @@ export default function App() {
       <AppHeader
         view={view}
         menuOpen={menuOpen}
+        navigationLocked={navigationLocked}
         onMenuToggle={() => setMenuOpen((value) => !value)}
         onNavigate={navigate}
       />
@@ -776,8 +850,11 @@ export default function App() {
             (card) => !dismissedCardIds.has(card.id),
           )}
           onAskFollowUp={askCurrentCardFollowUp}
+          onFollowUpBusyChange={updateCardFollowUpBusy}
           onInteraction={interaction}
-          onReturnHome={() => setHomeMode("landing")}
+          onReturnHome={() => {
+            if (!cardFollowUpBusyRef.current) setHomeMode("landing");
+          }}
           onPrevious={previous}
           onNext={advance}
           onDismiss={dismissCurrent}
@@ -798,6 +875,7 @@ export default function App() {
           onBrowse={browseAvailableCard}
           onGenerate={generateFromSelectedTopic}
           onGenerateRandom={generateBatchFromRandomTopic}
+          onOpenModelSettings={() => navigate("models")}
           onGenerationProviderChange={selectGenerationProvider}
           onContinueGeneration={async () => {
             if (!pendingGeneration) return;
@@ -816,6 +894,7 @@ export default function App() {
           refreshToken={libraryRefresh}
           onOpenCard={openCard}
           onCardDeleted={cardDeleted}
+          onHistoryCleared={() => void dataCleared("history")}
         />
       ) : null}
       {view === "interests" ? (

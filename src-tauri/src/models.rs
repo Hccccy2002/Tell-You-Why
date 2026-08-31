@@ -203,6 +203,8 @@ pub struct SaveProviderInput {
     pub region: String,
     pub model: String,
     pub api_key: Option<String>,
+    #[serde(default)]
+    pub replace_existing_key: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -262,4 +264,32 @@ pub struct WindowState {
     pub width: u32,
     pub height: u32,
     pub monitor_name: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SaveProviderInput;
+    use serde_json::json;
+
+    #[test]
+    fn provider_key_replacement_confirmation_defaults_to_false_and_uses_camel_case() {
+        let defaulted: SaveProviderInput = serde_json::from_value(json!({
+            "providerId": "deepseek",
+            "region": "default",
+            "model": "deepseek-v4-flash",
+            "apiKey": "sk-new"
+        }))
+        .expect("provider input without confirmation flag");
+        assert!(!defaulted.replace_existing_key);
+
+        let confirmed: SaveProviderInput = serde_json::from_value(json!({
+            "providerId": "deepseek",
+            "region": "default",
+            "model": "deepseek-v4-flash",
+            "apiKey": "sk-new",
+            "replaceExistingKey": true
+        }))
+        .expect("provider input with confirmation flag");
+        assert!(confirmed.replace_existing_key);
+    }
 }

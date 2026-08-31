@@ -67,9 +67,11 @@ fn create_tray(app: &App) -> tauri::Result<()> {
                 let _ = app.emit("open-settings", ());
             }
             "exit" => {
-                app.state::<AppState>()
-                    .exiting
-                    .store(true, Ordering::SeqCst);
+                let state = app.state::<AppState>();
+                let Ok(_permit) = state.persistence_gate.try_operation() else {
+                    return;
+                };
+                state.exiting.store(true, Ordering::SeqCst);
                 app.exit(0);
             }
             _ => {}
@@ -113,6 +115,9 @@ fn show_window(app: &AppHandle) {
 
 fn pause_from_tray(app: &AppHandle, today: bool) {
     let state = app.state::<AppState>();
+    let Ok(_permit) = state.persistence_gate.try_operation() else {
+        return;
+    };
     if let Ok(mut settings) = state.database.settings() {
         let until = if today {
             let tomorrow = Local::now().date_naive().succ_opt();
@@ -136,26 +141,37 @@ pub fn handle_close_requested(window: &WebviewWindow, api: &tauri::CloseRequestA
         return;
     }
     api.prevent_close();
-    let _ = save_window_state(window);
-    let _ = window.hide();
-    if !state.database.close_tip_shown().unwrap_or(true) {
-        let shortcut = state
-            .database
-            .settings()
-            .map(|settings| settings.global_shortcut)
-            .unwrap_or_else(|_| "Alt+Shift+Y".to_string());
-        let _ = window
-            .app_handle()
-            .notification()
-            .builder()
-            .title("Tell You Why")
-            .body(format!("应用已收至系统托盘，可用 {shortcut} 再次打开。"))
-            .show();
-        let _ = state.database.mark_close_tip_shown();
+    if let Ok(_permit) = state.persistence_gate.try_operation() {
+        let _ = save_window_state_under_permit(window);
+        if !state.database.close_tip_shown().unwrap_or(true) {
+            let shortcut = state
+                .database
+                .settings()
+                .map(|settings| settings.global_shortcut)
+                .unwrap_or_else(|_| "Alt+Shift+Y".to_string());
+            let _ = window
+                .app_handle()
+                .notification()
+                .builder()
+                .title("Tell You Why")
+                .body(format!("应用已收至系统托盘，可用 {shortcut} 再次打开。"))
+                .show();
+            let _ = state.database.mark_close_tip_shown();
+        }
     }
+    let _ = window.hide();
 }
 
 pub fn save_window_state(window: &WebviewWindow) -> Result<(), String> {
+    let state = window.state::<AppState>();
+    let _permit = state
+        .persistence_gate
+        .try_operation()
+        .map_err(|error| error.to_string())?;
+    save_window_state_under_permit(window)
+}
+
+fn save_window_state_under_permit(window: &WebviewWindow) -> Result<(), String> {
     let position = window.outer_position().map_err(|error| error.to_string())?;
     let size = window.outer_size().map_err(|error| error.to_string())?;
     let monitor_name = window
@@ -227,6 +243,9 @@ fn start_reminder_scheduler(app: AppHandle) {
         if state.exiting.load(Ordering::SeqCst) {
             break;
         }
+        let Ok(_permit) = state.persistence_gate.try_operation() else {
+            continue;
+        };
         let settings = match state.database.settings() {
             Ok(settings) => settings,
             Err(_) => continue,

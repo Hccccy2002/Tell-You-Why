@@ -8,14 +8,54 @@ import {
   pauseReminders,
   saveSettings,
 } from "../lib/api";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import type { AppSettings, DataClearScope } from "../types";
 import type { ReminderPreset } from "../types";
 
 interface Props {
   initialSettings: AppSettings;
   onSaved: (settings: AppSettings) => void;
-  onDataCleared: (scope: DataClearScope) => void;
+  onDataCleared: (
+    scope: DataClearScope,
+    warning: string | null,
+  ) => void | Promise<void>;
 }
+
+const dataClearConfirmations: Record<
+  DataClearScope,
+  {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    busyLabel: string;
+    successMessage: string;
+  }
+> = {
+  history: {
+    title: "清除所有阅读记录？",
+    description:
+      "将删除阅读、揭晓和展开记录；收藏、知识卡内容和模型配置会保留。",
+    confirmLabel: "清除阅读记录",
+    busyLabel: "正在清除阅读记录…",
+    successMessage: "阅读记录已清除，收藏已保留。",
+  },
+  preferences: {
+    title: "清除推荐偏好？",
+    description:
+      "将清零兴趣权重并删除所有自定义兴趣；内置兴趣的选择、启停和排序会保留。阅读记录、收藏和模型配置不受影响。",
+    confirmLabel: "清除偏好",
+    busyLabel: "正在清除偏好…",
+    successMessage: "推荐偏好已重置。",
+  },
+  all: {
+    title: "清除全部本地数据？",
+    description:
+      "将删除阅读记录、收藏、偏好、应用内设置、生成或导入的知识卡及 API Key，并回到首次使用状态；内置示例内容会保留。此操作无法撤销。",
+    confirmLabel: "清除全部本地数据",
+    busyLabel: "正在清除全部本地数据…",
+    successMessage: "全部本地数据已清除。",
+  },
+};
 
 export function GeneralSettingsScreen({
   initialSettings,
@@ -26,6 +66,8 @@ export function GeneralSettingsScreen({
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [generatedToday, setGeneratedToday] = useState(0);
+  const [clearConfirmation, setClearConfirmation] =
+    useState<DataClearScope | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -124,17 +166,12 @@ export function GeneralSettingsScreen({
   }
 
   async function clear(scope: DataClearScope) {
-    const labels: Record<DataClearScope, string> = {
-      history: "清除阅读记录？收藏不会被删除。",
-      preferences: "清除兴趣权重和自定义兴趣？",
-      all: "清除全部本地数据和系统凭据？应用将回到首次使用状态。",
-    };
-    if (!window.confirm(labels[scope])) return;
     setBusy(`clear-${scope}`);
     try {
-      await clearData(scope);
-      onDataCleared(scope);
-      setMessage("清除完成。");
+      const warning = await clearData(scope);
+      await onDataCleared(scope, warning);
+      setClearConfirmation(null);
+      setMessage(warning ?? dataClearConfirmations[scope].successMessage);
     } catch (error) {
       setMessage(friendlyError(error));
     } finally {
@@ -344,18 +381,24 @@ export function GeneralSettingsScreen({
         <button
           className="settings-action"
           disabled={busy != null}
-          onClick={() => void clear("history")}
+          onClick={() => {
+            setMessage(null);
+            setClearConfirmation("history");
+          }}
         >
           <span>
             <strong>清除阅读记录</strong>
-            <small>不会删除收藏</small>
+            <small>本机最多保留最近 500 条；清除不会删除收藏</small>
           </span>
           <span>›</span>
         </button>
         <button
           className="settings-action"
           disabled={busy != null}
-          onClick={() => void clear("preferences")}
+          onClick={() => {
+            setMessage(null);
+            setClearConfirmation("preferences");
+          }}
         >
           <span>
             <strong>清除偏好</strong>
@@ -366,7 +409,10 @@ export function GeneralSettingsScreen({
         <button
           className="settings-action danger"
           disabled={busy != null}
-          onClick={() => void clear("all")}
+          onClick={() => {
+            setMessage(null);
+            setClearConfirmation("all");
+          }}
         >
           <span>
             <strong>清除全部本地数据</strong>
@@ -375,7 +421,7 @@ export function GeneralSettingsScreen({
           <span>›</span>
         </button>
       </section>
-      {message ? (
+      {message && !clearConfirmation ? (
         <p className="form-message" role="status">
           {message}
         </p>
@@ -393,6 +439,25 @@ export function GeneralSettingsScreen({
       <p className="privacy-footnote">
         兴趣、历史和反馈默认只保存在本机。不读取屏幕、浏览器记录、工作文件或剪贴板。
       </p>
+      {clearConfirmation ? (
+        <ConfirmationDialog
+          id={`clear-${clearConfirmation}-confirmation`}
+          eyebrow="清除确认"
+          title={dataClearConfirmations[clearConfirmation].title}
+          confirmLabel={dataClearConfirmations[clearConfirmation].confirmLabel}
+          busyLabel={dataClearConfirmations[clearConfirmation].busyLabel}
+          busy={busy === `clear-${clearConfirmation}`}
+          onCancel={() => setClearConfirmation(null)}
+          onConfirm={() => void clear(clearConfirmation)}
+        >
+          <p>{dataClearConfirmations[clearConfirmation].description}</p>
+          {message ? (
+            <p className="inline-error" role="alert">
+              {message}
+            </p>
+          ) : null}
+        </ConfirmationDialog>
+      ) : null}
     </main>
   );
 }

@@ -26,6 +26,9 @@ type CommandResult<T> = Result<T, String>;
 const MAX_FOLLOW_UP_QUESTION_CHARS: usize = 500;
 const MAX_FOLLOW_UP_HISTORY_TURNS: usize = 6;
 const MAX_FOLLOW_UP_ANSWER_HISTORY_CHARS: usize = 4_000;
+const MODEL_OPERATION_IN_PROGRESS_ERROR: &str = "已有模型请求或敏感设置操作正在进行，请稍后重试";
+const PROVIDER_KEY_REPLACEMENT_CONFIRMATION_REQUIRED: &str =
+    "目标服务通道已有 API Key，请确认覆盖后重试";
 
 struct GenerationLock<'a>(&'a AtomicBool);
 
@@ -33,7 +36,7 @@ impl<'a> GenerationLock<'a> {
     fn acquire(flag: &'a AtomicBool) -> CommandResult<Self> {
         flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .map(|_| Self(flag))
-            .map_err(|_| "已有内容生成任务正在进行".into())
+            .map_err(|_| MODEL_OPERATION_IN_PROGRESS_ERROR.into())
     }
 }
 
@@ -43,9 +46,21 @@ impl Drop for GenerationLock<'_> {
     }
 }
 
-#[tauri::command]
-pub fn bootstrap_app(state: State<'_, AppState>) -> CommandResult<BootstrapData> {
-    let card = match state.database.next_card(None) {
+#[tauri::command(rename_all = "camelCase")]
+pub fn bootstrap_app(
+    record_shown: Option<bool>,
+    state: State<'_, AppState>,
+) -> CommandResult<BootstrapData> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
+    let selected = if record_shown.unwrap_or(true) {
+        state.database.next_card(None)
+    } else {
+        state.database.preview_card()
+    };
+    let card = match selected {
         Ok(card) => Some(card),
         Err(DbError::NoCards) => None,
         Err(error) => return Err(error.to_string()),
@@ -84,6 +99,10 @@ pub fn save_generation_provider(
     provider_id: String,
     state: State<'_, AppState>,
 ) -> CommandResult<String> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     if !matches!(provider_id.as_str(), "deepseek" | "kimi") {
         return Err("只能选择 DeepSeek 或 Kimi".into());
     }
@@ -96,6 +115,10 @@ pub fn save_generation_provider(
 
 #[tauri::command(rename_all = "camelCase")]
 pub fn next_card(current_id: String, state: State<'_, AppState>) -> CommandResult<KnowledgeCard> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     state
         .database
         .next_card(Some(&current_id))
@@ -104,6 +127,10 @@ pub fn next_card(current_id: String, state: State<'_, AppState>) -> CommandResul
 
 #[tauri::command]
 pub fn available_card_count(state: State<'_, AppState>) -> CommandResult<u32> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     state
         .database
         .available_card_count()
@@ -116,6 +143,10 @@ pub fn record_interaction(
     kind: String,
     state: State<'_, AppState>,
 ) -> CommandResult<()> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     state
         .database
         .record_interaction(&card_id, &kind)
@@ -127,6 +158,10 @@ pub fn save_onboarding(
     input: OnboardingInput,
     state: State<'_, AppState>,
 ) -> CommandResult<Vec<TopicPreference>> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     state
         .database
         .save_onboarding(&input)
@@ -139,6 +174,10 @@ pub fn save_interests(
     personalization_enabled: bool,
     state: State<'_, AppState>,
 ) -> CommandResult<Vec<TopicPreference>> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     state
         .database
         .save_interests(&topics, personalization_enabled)
@@ -152,6 +191,10 @@ pub fn list_library(
     sort: String,
     state: State<'_, AppState>,
 ) -> CommandResult<Vec<LibraryItem>> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     state
         .database
         .list_library(&mode, topic_id.as_deref(), sort != "oldest")
@@ -160,6 +203,10 @@ pub fn list_library(
 
 #[tauri::command(rename_all = "camelCase")]
 pub fn delete_library_card(card_id: String, state: State<'_, AppState>) -> CommandResult<()> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     state
         .database
         .delete_library_card(&card_id)
@@ -172,6 +219,10 @@ pub fn save_settings(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> CommandResult<AppSettings> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     if settings.global_shortcut.trim().is_empty() {
         return Err("全局快捷键不能为空".into());
     }
@@ -241,6 +292,10 @@ pub fn save_settings(
 
 #[tauri::command]
 pub fn generation_usage(state: State<'_, AppState>) -> CommandResult<GenerationUsage> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let settings = state
         .database
         .settings()
@@ -256,6 +311,10 @@ pub fn generation_usage(state: State<'_, AppState>) -> CommandResult<GenerationU
 
 #[tauri::command(rename_all = "camelCase")]
 pub fn pause_reminders(mode: String, state: State<'_, AppState>) -> CommandResult<String> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let until = match mode.as_str() {
         "thirty_minutes" => Utc::now() + Duration::minutes(30),
         "today" => {
@@ -288,6 +347,58 @@ pub fn save_provider_profile(
     input: SaveProviderInput,
     state: State<'_, AppState>,
 ) -> CommandResult<ProviderSpec> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
+    let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
+    let _ = cleanup_pending_credentials(&state);
+    save_provider_profile_inner(input, &state)
+}
+
+fn require_provider_key_replacement_confirmation(
+    profile_exists: bool,
+    has_new_key: bool,
+    replacement_confirmed: bool,
+) -> CommandResult<()> {
+    if profile_exists && has_new_key && !replacement_confirmed {
+        return Err(PROVIDER_KEY_REPLACEMENT_CONFIRMATION_REQUIRED.into());
+    }
+    Ok(())
+}
+
+fn cleanup_pending_credentials(state: &AppState) -> CommandResult<()> {
+    let pending = state
+        .database
+        .pending_credential_deletions()
+        .map_err(|error| error.to_string())?;
+    let mut failures = 0usize;
+    for credential_ref in pending {
+        if state.secrets.delete(&credential_ref).is_err() {
+            failures += 1;
+            continue;
+        }
+        if state
+            .database
+            .complete_credential_deletion(&credential_ref)
+            .is_err()
+        {
+            failures += 1;
+        }
+    }
+    if failures == 0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "{failures} 条系统凭据暂未清理，已登记并会在后续凭据操作时重试"
+        ))
+    }
+}
+
+fn save_provider_profile_inner(
+    input: SaveProviderInput,
+    state: &AppState,
+) -> CommandResult<ProviderSpec> {
     let endpoint = ProviderRegistry::endpoint(&input.provider_id, &input.region)
         .map_err(|error| error.to_string())?;
     ProviderRegistry::validate_model(&endpoint, &input.model).map_err(|error| error.to_string())?;
@@ -295,42 +406,76 @@ pub fn save_provider_profile(
         .database
         .provider_profile(&input.provider_id, &input.region)
         .map_err(|error| error.to_string())?;
-    let credential =
-        credential_ref(&input.provider_id, &input.region).map_err(|error| error.to_string())?;
-    let mut key_last4 = existing
-        .as_ref()
-        .and_then(|profile| profile.key_last4.clone());
-    let has_new_key = input
+    let new_api_key = input
         .api_key
-        .as_ref()
-        .is_some_and(|value| !value.trim().is_empty());
-    if let Some(api_key) = input
-        .api_key
-        .as_ref()
+        .as_deref()
         .filter(|value| !value.trim().is_empty())
-    {
-        state
-            .secrets
-            .save(&credential, api_key)
-            .map_err(|error| error.to_string())?;
-        key_last4 = Some(last_four(api_key));
-    } else if existing.is_none() {
-        return Err("请输入完整 API Key".into());
-    }
+        .map(str::to_owned);
+    let has_new_key = new_api_key.is_some();
+    require_provider_key_replacement_confirmation(
+        existing.is_some(),
+        has_new_key,
+        input.replace_existing_key,
+    )?;
+
+    let credential_base =
+        credential_ref(&input.provider_id, &input.region).map_err(|error| error.to_string())?;
+    let credential = if has_new_key {
+        format!("{credential_base}:{}", Uuid::new_v4().simple())
+    } else {
+        existing
+            .as_ref()
+            .map(|profile| profile.credential_ref.clone())
+            .ok_or_else(|| "请输入完整 API Key".to_string())?
+    };
+    let key_last4 = new_api_key.as_deref().map(last_four).or_else(|| {
+        existing
+            .as_ref()
+            .and_then(|profile| profile.key_last4.clone())
+    });
     let remains_verified = existing.as_ref().is_some_and(|profile| {
         profile.connection_verified && profile.model == input.model && !has_new_key
     });
-    state
-        .database
-        .save_provider_profile(&ProviderProfileRecord {
-            provider_id: input.provider_id.clone(),
-            region: input.region.clone(),
-            model: input.model,
-            credential_ref: credential,
-            key_last4,
-            connection_verified: remains_verified,
-        })
-        .map_err(|error| error.to_string())?;
+    let profile = ProviderProfileRecord {
+        provider_id: input.provider_id.clone(),
+        region: input.region.clone(),
+        model: input.model,
+        credential_ref: credential,
+        key_last4,
+        connection_verified: remains_verified,
+    };
+    if let Some(api_key) = new_api_key.as_deref() {
+        state
+            .database
+            .queue_credential_deletion(&profile.credential_ref)
+            .map_err(|error| error.to_string())?;
+        if let Err(error) = state.secrets.save(&profile.credential_ref, api_key) {
+            let cleanup = cleanup_pending_credentials(state).err();
+            return Err(match cleanup {
+                Some(cleanup) => format!("{error}；{cleanup}"),
+                None => error.to_string(),
+            });
+        }
+        if let Err(error) = state.database.activate_provider_profile_credential(
+            &profile,
+            existing
+                .as_ref()
+                .map(|previous| previous.credential_ref.as_str()),
+        ) {
+            let cleanup = cleanup_pending_credentials(state).err();
+            return Err(match cleanup {
+                Some(cleanup) => format!("{error}；{cleanup}"),
+                None => error.to_string(),
+            });
+        }
+        let _ = cleanup_pending_credentials(state);
+    } else {
+        state
+            .database
+            .save_provider_profile(&profile)
+            .map_err(|error| error.to_string())?;
+    }
+
     ProviderRegistry::specs(&state.database)
         .map_err(|error| error.to_string())?
         .into_iter()
@@ -344,20 +489,16 @@ pub fn delete_provider_key(
     region: String,
     state: State<'_, AppState>,
 ) -> CommandResult<()> {
-    if let Some(profile) = state
-        .database
-        .provider_profile(&provider_id, &region)
-        .map_err(|error| error.to_string())?
-    {
-        state
-            .secrets
-            .delete(&profile.credential_ref)
-            .map_err(|error| error.to_string())?;
-    }
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
+    let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     state
         .database
-        .delete_provider_profile(&provider_id, &region)
-        .map_err(|error| error.to_string())
+        .detach_provider_profile_and_queue_credential(&provider_id, &region)
+        .map_err(|error| error.to_string())?;
+    cleanup_pending_credentials(&state)
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -366,6 +507,12 @@ pub async fn test_provider_connection(
     region: String,
     state: State<'_, AppState>,
 ) -> CommandResult<String> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
+    let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
+    let _ = cleanup_pending_credentials(&state);
     let profile = required_profile(&state, &provider_id, &region)?;
     let secret = state
         .secrets
@@ -399,6 +546,10 @@ pub async fn generate_same_topic(
     card_id: String,
     state: State<'_, AppState>,
 ) -> CommandResult<KnowledgeCard> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     generate_same_topic_inner(&state, &card_id).await
 }
@@ -410,6 +561,10 @@ pub async fn generate_topic_batch(
     count: u32,
     state: State<'_, AppState>,
 ) -> CommandResult<GenerationBatchResult> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     let requested = usize::try_from(count).map_err(|_| "生成数量无效".to_string())?;
     let (topic_id, topic_label) = state
@@ -424,6 +579,10 @@ pub async fn generate_random_topic_batch(
     count: u32,
     state: State<'_, AppState>,
 ) -> CommandResult<GenerationBatchResult> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     let requested = usize::try_from(count).map_err(|_| "生成数量无效".to_string())?;
     let (topic_id, topic_label) = state
@@ -435,6 +594,10 @@ pub async fn generate_random_topic_batch(
 
 #[tauri::command]
 pub async fn generate_random_topic(state: State<'_, AppState>) -> CommandResult<KnowledgeCard> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     let (topic_id, topic_label) = state
         .database
@@ -450,6 +613,10 @@ pub async fn ask_follow_up(
     history: Vec<FollowUpTurn>,
     state: State<'_, AppState>,
 ) -> CommandResult<FollowUpResponse> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     ask_follow_up_inner(&state, &card_id, question, history).await
 }
@@ -889,6 +1056,10 @@ async fn generate_and_store(
 
 #[tauri::command(rename_all = "camelCase")]
 pub fn import_cards_file(path: String, state: State<'_, AppState>) -> CommandResult<ImportResult> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
     let path = Path::new(&path);
     let extension = path
         .extension()
@@ -910,23 +1081,64 @@ pub fn import_cards_file(path: String, state: State<'_, AppState>) -> CommandRes
 }
 
 #[tauri::command]
-pub fn clear_data(scope: String, state: State<'_, AppState>) -> CommandResult<()> {
-    if scope == "all" {
-        for profile in state
-            .database
-            .provider_profiles()
-            .map_err(|error| error.to_string())?
-        {
-            state
-                .secrets
-                .delete(&profile.credential_ref)
-                .map_err(|error| error.to_string())?;
-        }
-    }
+pub fn clear_data(
+    scope: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<Option<String>> {
+    let _reset = state.persistence_gate.try_reset().map_err(str::to_owned)?;
+    let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     state
         .database
         .clear_data(&scope)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    if scope == "all" {
+        let system_result = restore_default_system_integrations(&app);
+        let credential_result = cleanup_pending_credentials(&state);
+        return Ok(match (system_result, credential_result) {
+            (Ok(()), Ok(())) => None,
+            (Err(system), Ok(())) => Some(system),
+            (Ok(()), Err(credentials)) => Some(format!("本地数据已清除，但{credentials}")),
+            (Err(system), Err(credentials)) => Some(format!("{system}；同时{credentials}")),
+        });
+    }
+    Ok(None)
+}
+
+fn restore_default_system_integrations(app: &AppHandle) -> CommandResult<()> {
+    let defaults = AppSettings::default();
+    let mut failures = Vec::new();
+
+    if app.autolaunch().disable().is_err() {
+        failures.push("关闭开机启动");
+    }
+
+    if app.global_shortcut().unregister_all().is_err() {
+        failures.push("取消旧全局快捷键");
+    } else if app
+        .global_shortcut()
+        .register(defaults.global_shortcut.as_str())
+        .is_err()
+    {
+        failures.push("注册默认全局快捷键");
+    }
+
+    match app.get_webview_window("main") {
+        Some(window) if window.set_always_on_top(false).is_err() => {
+            failures.push("关闭窗口置顶");
+        }
+        None => failures.push("恢复主窗口置顶状态"),
+        _ => {}
+    }
+
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "本地数据已清除，但以下系统设置未能恢复默认值：{}",
+            failures.join("、")
+        ))
+    }
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -946,6 +1158,9 @@ pub fn open_source_url(url: String, app: AppHandle) -> CommandResult<()> {
 
 #[tauri::command]
 pub fn exit_application(app: AppHandle, state: State<'_, AppState>) {
+    let Ok(_operation) = state.persistence_gate.try_operation() else {
+        return;
+    };
     state
         .exiting
         .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -967,20 +1182,85 @@ fn required_profile(
 #[cfg(test)]
 mod tests {
     use super::{
-        ask_follow_up_inner, generate_topic_batch_inner, generation_batch_sizes,
-        ordered_ready_profiles,
+        ask_follow_up_inner, cleanup_pending_credentials, generate_topic_batch_inner,
+        generation_batch_sizes, ordered_ready_profiles,
+        require_provider_key_replacement_confirmation, save_provider_profile_inner, GenerationLock,
+        MODEL_OPERATION_IN_PROGRESS_ERROR, PROVIDER_KEY_REPLACEMENT_CONFIRMATION_REQUIRED,
     };
     use crate::db::ProviderProfileRecord;
-    use crate::models::{FollowUpRole, FollowUpTurn};
+    use crate::models::{FollowUpRole, FollowUpTurn, SaveProviderInput};
     use crate::providers::{ProviderError, ProviderTransport, TransportResponse};
     use crate::secret_store::tests_support::MemorySecretStore;
-    use crate::secret_store::{SecretStore, SecretValue};
+    use crate::secret_store::{SecretError, SecretStore, SecretValue};
     use crate::AppState;
     use serde_json::{json, Value};
+    use std::collections::VecDeque;
     use std::sync::atomic::AtomicBool;
     use std::sync::{Arc, Mutex};
     use std::time::Duration as StdDuration;
     use url::Url;
+
+    #[derive(Clone, Copy)]
+    enum DeleteBehavior {
+        Succeed,
+        FailBeforeDelete,
+        FailAfterDelete,
+    }
+
+    struct FaultInjectingSecretStore {
+        inner: MemorySecretStore,
+        delete_behaviors: Mutex<VecDeque<DeleteBehavior>>,
+    }
+
+    impl FaultInjectingSecretStore {
+        fn new(delete_behaviors: impl IntoIterator<Item = DeleteBehavior>) -> Self {
+            Self {
+                inner: MemorySecretStore::default(),
+                delete_behaviors: Mutex::new(delete_behaviors.into_iter().collect()),
+            }
+        }
+    }
+
+    impl SecretStore for FaultInjectingSecretStore {
+        fn save(&self, credential_ref: &str, secret: &str) -> Result<(), SecretError> {
+            self.inner.save(credential_ref, secret)
+        }
+
+        fn get(&self, credential_ref: &str) -> Result<SecretValue, SecretError> {
+            self.inner.get(credential_ref)
+        }
+
+        fn delete(&self, credential_ref: &str) -> Result<(), SecretError> {
+            let behavior = self
+                .delete_behaviors
+                .lock()
+                .map_err(|_| SecretError::Unavailable)?
+                .pop_front()
+                .unwrap_or(DeleteBehavior::Succeed);
+            match behavior {
+                DeleteBehavior::Succeed => self.inner.delete(credential_ref),
+                DeleteBehavior::FailBeforeDelete => Err(SecretError::Unavailable),
+                DeleteBehavior::FailAfterDelete => {
+                    self.inner.delete(credential_ref)?;
+                    Err(SecretError::Unavailable)
+                }
+            }
+        }
+    }
+
+    fn test_state(database: crate::db::Database, secrets: Arc<dyn SecretStore>) -> AppState {
+        AppState {
+            database,
+            secrets,
+            http: Arc::new(FailoverTransport {
+                hosts: Mutex::new(Vec::new()),
+                bodies: Mutex::new(Vec::new()),
+            }),
+            exiting: AtomicBool::new(false),
+            generation_in_progress: AtomicBool::new(false),
+            persistence_gate: Default::default(),
+        }
+    }
 
     #[test]
     fn generation_count_is_split_by_provider_batch_limit() {
@@ -988,6 +1268,32 @@ mod tests {
         assert_eq!(generation_batch_sizes(6, 2), vec![2, 2, 2]);
         assert_eq!(generation_batch_sizes(1, 5), vec![1]);
         assert!(generation_batch_sizes(0, 5).is_empty());
+    }
+
+    #[test]
+    fn model_operations_share_one_exclusive_lock() {
+        let flag = AtomicBool::new(false);
+        let lock = GenerationLock::acquire(&flag).expect("first model operation lock");
+        assert_eq!(
+            GenerationLock::acquire(&flag)
+                .err()
+                .expect("concurrent operation is rejected"),
+            MODEL_OPERATION_IN_PROGRESS_ERROR
+        );
+        drop(lock);
+        assert!(GenerationLock::acquire(&flag).is_ok());
+    }
+
+    #[test]
+    fn provider_key_replacement_requires_explicit_confirmation() {
+        assert_eq!(
+            require_provider_key_replacement_confirmation(true, true, false)
+                .expect_err("replacement without confirmation is rejected"),
+            PROVIDER_KEY_REPLACEMENT_CONFIRMATION_REQUIRED
+        );
+        assert!(require_provider_key_replacement_confirmation(true, true, true).is_ok());
+        assert!(require_provider_key_replacement_confirmation(false, true, false).is_ok());
+        assert!(require_provider_key_replacement_confirmation(true, false, false).is_ok());
     }
 
     #[test]
@@ -1080,6 +1386,360 @@ mod tests {
     }
 
     #[test]
+    fn confirmed_provider_key_replacement_switches_refs_before_removing_the_old_secret() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database = crate::db::Database::new(directory.path().join("key-replacement.db"));
+        database.initialize().expect("database");
+        let old_credential_ref = "deepseek:default:old";
+        database
+            .save_provider_profile(&ProviderProfileRecord {
+                provider_id: "deepseek".into(),
+                region: "default".into(),
+                model: "deepseek-v4-flash".into(),
+                credential_ref: old_credential_ref.into(),
+                key_last4: Some("-old".into()),
+                connection_verified: true,
+            })
+            .expect("old provider profile");
+        let secrets = Arc::new(MemorySecretStore::default());
+        secrets
+            .save(old_credential_ref, "sk-secret-old")
+            .expect("old secret");
+        let state = AppState {
+            database,
+            secrets: secrets.clone(),
+            http: Arc::new(FailoverTransport {
+                hosts: Mutex::new(Vec::new()),
+                bodies: Mutex::new(Vec::new()),
+            }),
+            exiting: AtomicBool::new(false),
+            generation_in_progress: AtomicBool::new(false),
+            persistence_gate: Default::default(),
+        };
+        let input = |replace_existing_key| SaveProviderInput {
+            provider_id: "deepseek".into(),
+            region: "default".into(),
+            model: "deepseek-v4-flash".into(),
+            api_key: Some("sk-secret-new".into()),
+            replace_existing_key,
+        };
+
+        assert_eq!(
+            save_provider_profile_inner(input(false), &state).expect_err("unconfirmed replacement"),
+            PROVIDER_KEY_REPLACEMENT_CONFIRMATION_REQUIRED
+        );
+        assert_eq!(
+            state
+                .database
+                .provider_profile("deepseek", "default")
+                .expect("profile lookup")
+                .expect("existing profile")
+                .credential_ref,
+            old_credential_ref
+        );
+        assert_eq!(
+            secrets
+                .get(old_credential_ref)
+                .expect("old secret is untouched")
+                .expose(),
+            "sk-secret-old"
+        );
+
+        save_provider_profile_inner(input(true), &state).expect("confirmed replacement");
+        let replaced = state
+            .database
+            .provider_profile("deepseek", "default")
+            .expect("profile lookup")
+            .expect("replaced profile");
+        assert_ne!(replaced.credential_ref, old_credential_ref);
+        assert!(replaced.credential_ref.starts_with("deepseek:default:"));
+        assert_eq!(
+            secrets
+                .get(&replaced.credential_ref)
+                .expect("new secret")
+                .expose(),
+            "sk-secret-new"
+        );
+        assert!(matches!(
+            secrets.get(old_credential_ref),
+            Err(SecretError::NotFound)
+        ));
+        assert!(state
+            .database
+            .pending_credential_deletions()
+            .expect("cleanup queue")
+            .is_empty());
+    }
+
+    #[test]
+    fn ambiguous_old_key_deletion_keeps_new_key_active_and_retriable() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database = crate::db::Database::new(directory.path().join("ambiguous-delete.db"));
+        database.initialize().expect("database");
+        let old_credential_ref = "deepseek:default:old";
+        database
+            .save_provider_profile(&ProviderProfileRecord {
+                provider_id: "deepseek".into(),
+                region: "default".into(),
+                model: "deepseek-v4-flash".into(),
+                credential_ref: old_credential_ref.into(),
+                key_last4: Some("-old".into()),
+                connection_verified: true,
+            })
+            .expect("old profile");
+        let secrets = Arc::new(FaultInjectingSecretStore::new([
+            DeleteBehavior::FailAfterDelete,
+        ]));
+        secrets
+            .save(old_credential_ref, "sk-secret-old")
+            .expect("old secret");
+        let state = test_state(database, secrets.clone());
+
+        save_provider_profile_inner(
+            SaveProviderInput {
+                provider_id: "deepseek".into(),
+                region: "default".into(),
+                model: "deepseek-v4-flash".into(),
+                api_key: Some("sk-secret-new".into()),
+                replace_existing_key: true,
+            },
+            &state,
+        )
+        .expect("replacement remains successful");
+
+        let active = state
+            .database
+            .provider_profile("deepseek", "default")
+            .expect("profile lookup")
+            .expect("active profile");
+        assert_ne!(active.credential_ref, old_credential_ref);
+        assert_eq!(
+            secrets
+                .get(&active.credential_ref)
+                .expect("new active secret")
+                .expose(),
+            "sk-secret-new"
+        );
+        assert!(matches!(
+            secrets.get(old_credential_ref),
+            Err(SecretError::NotFound)
+        ));
+        assert_eq!(
+            state
+                .database
+                .pending_credential_deletions()
+                .expect("pending cleanup"),
+            vec![old_credential_ref.to_string()]
+        );
+
+        cleanup_pending_credentials(&state).expect("retry observes missing old key as deleted");
+        assert!(state
+            .database
+            .pending_credential_deletions()
+            .expect("cleanup queue after retry")
+            .is_empty());
+        assert_eq!(
+            secrets
+                .get(&active.credential_ref)
+                .expect("new key remains active")
+                .expose(),
+            "sk-secret-new"
+        );
+    }
+
+    #[test]
+    fn failed_profile_activation_and_failed_temp_cleanup_preserve_old_key_and_queue_temp_ref() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database_path = directory.path().join("failed-activation.db");
+        let database = crate::db::Database::new(database_path.clone());
+        database.initialize().expect("database");
+        let old_credential_ref = "deepseek:default:old";
+        database
+            .save_provider_profile(&ProviderProfileRecord {
+                provider_id: "deepseek".into(),
+                region: "default".into(),
+                model: "deepseek-v4-flash".into(),
+                credential_ref: old_credential_ref.into(),
+                key_last4: Some("-old".into()),
+                connection_verified: true,
+            })
+            .expect("old profile");
+        let connection = rusqlite::Connection::open(&database_path).expect("failure connection");
+        connection
+            .execute_batch(
+                "CREATE TRIGGER fail_provider_profile_activation
+                 BEFORE UPDATE OF credential_ref ON provider_profiles
+                 BEGIN
+                   SELECT RAISE(ABORT, 'simulated profile activation failure');
+                 END;",
+            )
+            .expect("activation failure trigger");
+        drop(connection);
+        let secrets = Arc::new(FaultInjectingSecretStore::new([
+            DeleteBehavior::FailBeforeDelete,
+        ]));
+        secrets
+            .save(old_credential_ref, "sk-secret-old")
+            .expect("old secret");
+        let state = test_state(database, secrets.clone());
+
+        save_provider_profile_inner(
+            SaveProviderInput {
+                provider_id: "deepseek".into(),
+                region: "default".into(),
+                model: "deepseek-v4-flash".into(),
+                api_key: Some("sk-secret-new".into()),
+                replace_existing_key: true,
+            },
+            &state,
+        )
+        .expect_err("profile activation fails");
+
+        let active = state
+            .database
+            .provider_profile("deepseek", "default")
+            .expect("profile lookup")
+            .expect("old profile remains active");
+        assert_eq!(active.credential_ref, old_credential_ref);
+        assert_eq!(
+            secrets
+                .get(old_credential_ref)
+                .expect("old active key")
+                .expose(),
+            "sk-secret-old"
+        );
+        let pending = state
+            .database
+            .pending_credential_deletions()
+            .expect("temporary cleanup ref");
+        assert_eq!(pending.len(), 1);
+        assert_ne!(pending[0], old_credential_ref);
+        assert_eq!(
+            secrets
+                .get(&pending[0])
+                .expect("temporary key remains locatable")
+                .expose(),
+            "sk-secret-new"
+        );
+
+        cleanup_pending_credentials(&state).expect("later cleanup succeeds");
+        assert!(matches!(
+            secrets.get(&pending[0]),
+            Err(SecretError::NotFound)
+        ));
+        assert!(state
+            .database
+            .pending_credential_deletions()
+            .expect("queue after cleanup")
+            .is_empty());
+        assert_eq!(
+            secrets
+                .get(old_credential_ref)
+                .expect("old key remains after cleanup")
+                .expose(),
+            "sk-secret-old"
+        );
+    }
+
+    #[test]
+    fn delete_and_clear_keep_failed_secret_deletions_queued_without_dangling_profiles() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database = crate::db::Database::new(directory.path().join("queued-deletions.db"));
+        database.initialize().expect("database");
+        for (provider_id, region, credential_ref) in [
+            ("deepseek", "default", "cleanup:a"),
+            ("kimi", "cn", "cleanup:b"),
+        ] {
+            database
+                .save_provider_profile(&ProviderProfileRecord {
+                    provider_id: provider_id.into(),
+                    region: region.into(),
+                    model: "mock-model".into(),
+                    credential_ref: credential_ref.into(),
+                    key_last4: Some("mock".into()),
+                    connection_verified: true,
+                })
+                .expect("provider profile");
+        }
+        let secrets = Arc::new(FaultInjectingSecretStore::new([
+            DeleteBehavior::FailBeforeDelete,
+            DeleteBehavior::Succeed,
+            DeleteBehavior::FailBeforeDelete,
+        ]));
+        secrets
+            .save("cleanup:a", "sk-secret-a")
+            .expect("first secret");
+        secrets
+            .save("cleanup:b", "sk-secret-b")
+            .expect("second secret");
+        let state = test_state(database, secrets.clone());
+
+        state
+            .database
+            .detach_provider_profile_and_queue_credential("deepseek", "default")
+            .expect("profile detaches atomically");
+        cleanup_pending_credentials(&state).expect_err("single secret deletion is deferred");
+        assert!(state
+            .database
+            .provider_profile("deepseek", "default")
+            .expect("detached profile lookup")
+            .is_none());
+        assert_eq!(
+            secrets
+                .get("cleanup:a")
+                .expect("failed deletion leaves key for retry")
+                .expose(),
+            "sk-secret-a"
+        );
+        assert_eq!(
+            state
+                .database
+                .pending_credential_deletions()
+                .expect("single pending cleanup"),
+            vec!["cleanup:a".to_string()]
+        );
+
+        cleanup_pending_credentials(&state).expect("single deletion retry");
+        assert!(matches!(
+            secrets.get("cleanup:a"),
+            Err(SecretError::NotFound)
+        ));
+
+        state.database.clear_data("all").expect("database clear");
+        cleanup_pending_credentials(&state).expect_err("second clear deletion is deferred");
+        assert!(state
+            .database
+            .provider_profiles()
+            .expect("profiles after clear")
+            .is_empty());
+        assert_eq!(
+            secrets
+                .get("cleanup:b")
+                .expect("failed nth deletion remains for retry")
+                .expose(),
+            "sk-secret-b"
+        );
+        assert_eq!(
+            state
+                .database
+                .pending_credential_deletions()
+                .expect("pending nth deletion"),
+            vec!["cleanup:b".to_string()]
+        );
+
+        cleanup_pending_credentials(&state).expect("nth deletion retry");
+        assert!(matches!(
+            secrets.get("cleanup:b"),
+            Err(SecretError::NotFound)
+        ));
+        assert!(state
+            .database
+            .pending_credential_deletions()
+            .expect("empty cleanup queue")
+            .is_empty());
+    }
+
+    #[test]
     fn generation_falls_back_once_to_the_other_ready_provider() {
         let directory = tempfile::tempdir().expect("temp directory");
         let database = crate::db::Database::new(directory.path().join("failover.db"));
@@ -1126,6 +1786,7 @@ mod tests {
             http: transport.clone(),
             exiting: AtomicBool::new(false),
             generation_in_progress: AtomicBool::new(false),
+            persistence_gate: Default::default(),
         };
 
         let result = tauri::async_runtime::block_on(generate_topic_batch_inner(
@@ -1196,6 +1857,7 @@ mod tests {
             http: transport.clone(),
             exiting: AtomicBool::new(false),
             generation_in_progress: AtomicBool::new(false),
+            persistence_gate: Default::default(),
         };
         let history = (0..8)
             .map(|index| FollowUpTurn {

@@ -6,6 +6,7 @@ import {
   listLibrary,
 } from "../lib/api";
 import type { KnowledgeCard, LibraryItem, TopicPreference } from "../types";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 
 type DeleteConfirmation =
   | { kind: "card"; cardId: string; question: string }
@@ -17,6 +18,7 @@ interface Props {
   refreshToken: number;
   onOpenCard: (card: KnowledgeCard) => void;
   onCardDeleted: (cardId: string) => void;
+  onHistoryCleared: () => void;
 }
 
 export function LibraryScreen({
@@ -24,6 +26,7 @@ export function LibraryScreen({
   refreshToken,
   onOpenCard,
   onCardDeleted,
+  onHistoryCleared,
 }: Props) {
   const [mode, setMode] = useState<"favorites" | "history">("favorites");
   const [topicId, setTopicId] = useState("");
@@ -73,6 +76,7 @@ export function LibraryScreen({
     try {
       await clearData("history");
       setItems([]);
+      onHistoryCleared();
       setConfirmation(null);
     } catch (reason) {
       setError(friendlyError(reason));
@@ -141,13 +145,16 @@ export function LibraryScreen({
       </div>
       {mode === "history" ? (
         <div className="library-history-actions">
-          <span>{items.length} 条浏览记录</span>
+          <span>{items.length} 条浏览记录 · 最多保留最近 500 条</span>
           <button
             className="library-clear-all"
             disabled={loading || items.length === 0 || deleting}
-            onClick={() => setConfirmation({ kind: "history" })}
+            onClick={() => {
+              setError(null);
+              setConfirmation({ kind: "history" });
+            }}
           >
-            一键删除所有浏览记录
+            清除阅读记录
           </button>
         </div>
       ) : null}
@@ -156,7 +163,7 @@ export function LibraryScreen({
           正在读取本地记录…
         </div>
       ) : null}
-      {error ? (
+      {error && !confirmation ? (
         <div className="inline-error" role="alert">
           {error}
         </div>
@@ -193,13 +200,14 @@ export function LibraryScreen({
                 className="library-delete"
                 aria-label={"删除：" + card.question}
                 disabled={deleting}
-                onClick={() =>
+                onClick={() => {
+                  setError(null);
                   setConfirmation({
                     kind: "card",
                     cardId: card.id,
                     question: card.question,
-                  })
-                }
+                  });
+                }}
               >
                 {deletingId === card.id ? "删除中…" : "删除"}
               </button>
@@ -208,56 +216,46 @@ export function LibraryScreen({
         ))}
       </div>
       {confirmation ? (
-        <div className="confirmation-backdrop">
-          <section
-            className="confirmation-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-confirmation-title"
-          >
-            <span className="eyebrow">删除确认</span>
-            <h2 id="delete-confirmation-title">
-              {confirmation.kind === "card"
-                ? "确认彻底删除这条知识点吗？"
-                : "确认删除所有浏览记录吗？"}
-            </h2>
-            {confirmation.kind === "card" ? (
-              <>
-                <p className="confirmation-target">“{confirmation.question}”</p>
-                <p>删除后，这条知识点将无法在应用中恢复。</p>
-              </>
-            ) : (
-              <p>最近浏览将被清空，收藏和知识卡内容会保留。</p>
-            )}
-            <div className="confirmation-actions">
-              <button
-                className="confirmation-cancel"
-                disabled={deleting}
-                autoFocus
-                onClick={() => setConfirmation(null)}
-              >
-                取消
-              </button>
-              <button
-                className="confirmation-danger"
-                disabled={deleting}
-                onClick={() => {
-                  if (confirmation.kind === "card") {
-                    void removeCard(confirmation.cardId);
-                  } else {
-                    void clearHistory();
-                  }
-                }}
-              >
-                {deleting
-                  ? "正在删除…"
-                  : confirmation.kind === "card"
-                    ? "确认删除"
-                    : "确认清空"}
-              </button>
-            </div>
-          </section>
-        </div>
+        <ConfirmationDialog
+          id="library-delete-confirmation"
+          eyebrow="删除确认"
+          title={
+            confirmation.kind === "card"
+              ? "删除这条知识卡？"
+              : "清除所有阅读记录？"
+          }
+          confirmLabel={
+            confirmation.kind === "card" ? "删除知识卡" : "清除阅读记录"
+          }
+          busyLabel={
+            confirmation.kind === "card"
+              ? "正在删除知识卡…"
+              : "正在清除阅读记录…"
+          }
+          busy={deleting}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => {
+            if (confirmation.kind === "card") {
+              void removeCard(confirmation.cardId);
+            } else {
+              void clearHistory();
+            }
+          }}
+        >
+          {confirmation.kind === "card" ? (
+            <>
+              <p className="confirmation-target">“{confirmation.question}”</p>
+              <p>删除后，这条知识点将无法在应用中恢复。</p>
+            </>
+          ) : (
+            <p>最近浏览将被清空，收藏和知识卡内容会保留。</p>
+          )}
+          {error ? (
+            <p className="inline-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </ConfirmationDialog>
       ) : null}
     </main>
   );

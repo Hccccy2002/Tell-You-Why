@@ -22,6 +22,7 @@ describe("LibraryScreen", () => {
         refreshToken={0}
         onOpenCard={vi.fn()}
         onCardDeleted={onCardDeleted}
+        onHistoryCleared={vi.fn()}
       />,
     );
 
@@ -31,12 +32,14 @@ describe("LibraryScreen", () => {
       screen.getByRole("button", { name: "删除：" + card.question }),
     );
     const dialog = screen.getByRole("dialog", {
-      name: "确认彻底删除这条知识点吗？",
+      name: "删除这条知识卡？",
     });
     expect(screen.getByText(card.question)).toBeVisible();
     expect(onCardDeleted).not.toHaveBeenCalled();
 
-    await user.click(within(dialog).getByRole("button", { name: "确认删除" }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "删除知识卡" }),
+    );
     await waitFor(() => {
       expect(screen.queryByText(card.question)).not.toBeInTheDocument();
     });
@@ -48,6 +51,7 @@ describe("LibraryScreen", () => {
     const card = bootstrap.card;
     if (!card) throw new Error("expected fallback card");
     const onCardDeleted = vi.fn();
+    const onHistoryCleared = vi.fn();
     const user = userEvent.setup();
     render(
       <LibraryScreen
@@ -55,21 +59,24 @@ describe("LibraryScreen", () => {
         refreshToken={0}
         onOpenCard={vi.fn()}
         onCardDeleted={onCardDeleted}
+        onHistoryCleared={onHistoryCleared}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "最近浏览" }));
     expect(await screen.findByText(card.question)).toBeVisible();
-    await user.click(
-      screen.getByRole("button", { name: "一键删除所有浏览记录" }),
-    );
+    await user.click(screen.getByRole("button", { name: "清除阅读记录" }));
     const dialog = screen.getByRole("dialog", {
-      name: "确认删除所有浏览记录吗？",
+      name: "清除所有阅读记录？",
     });
     expect(screen.getByText(card.question)).toBeVisible();
+    expect(onHistoryCleared).not.toHaveBeenCalled();
 
-    await user.click(within(dialog).getByRole("button", { name: "确认清空" }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "清除阅读记录" }),
+    );
     expect(await screen.findByText("还没有浏览记录")).toBeVisible();
     expect(onCardDeleted).not.toHaveBeenCalled();
+    expect(onHistoryCleared).toHaveBeenCalledOnce();
   });
 });

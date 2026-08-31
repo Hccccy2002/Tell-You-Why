@@ -3,10 +3,12 @@ mod content;
 mod db;
 mod desktop;
 mod models;
+mod persistence_gate;
 mod providers;
 mod secret_store;
 
 use db::Database;
+use persistence_gate::PersistenceResetGate;
 use providers::{ProviderTransport, RestrictedHttpClient};
 use secret_store::{SecretStore, WindowsCredentialStore};
 use std::sync::atomic::AtomicBool;
@@ -21,6 +23,7 @@ pub struct AppState {
     pub http: Arc<dyn ProviderTransport>,
     pub exiting: AtomicBool,
     pub generation_in_progress: AtomicBool,
+    pub(crate) persistence_gate: PersistenceResetGate,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -56,6 +59,7 @@ pub fn run() {
                 http: Arc::new(http),
                 exiting: AtomicBool::new(false),
                 generation_in_progress: AtomicBool::new(false),
+                persistence_gate: PersistenceResetGate::default(),
             });
             desktop::setup(app)?;
             if std::env::args_os().any(|argument| argument == "--hidden") {

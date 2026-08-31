@@ -24,6 +24,7 @@ interface Props {
   ) => Promise<void>;
   onGenerateRandom: (count: number) => Promise<void>;
   onContinueGeneration: () => Promise<void>;
+  onOpenModelSettings: () => void;
   onGenerationProviderChange: (
     providerId: "deepseek" | "kimi",
   ) => Promise<void>;
@@ -41,6 +42,7 @@ export function KnowledgeHome({
   onGenerate,
   onGenerateRandom,
   onContinueGeneration,
+  onOpenModelSettings,
   onGenerationProviderChange,
 }: Props) {
   const enabledTopics = useMemo(
@@ -72,6 +74,9 @@ export function KnowledgeHome({
       : (selectedTopic?.label ?? "");
   const interestedTopics = enabledTopics.filter((topic) => topic.selected);
   const otherTopics = enabledTopics.filter((topic) => !topic.selected);
+  const selectedProvider = providers.find(
+    (provider) => provider.id === generationProviderId,
+  );
 
   return (
     <main className="feed-empty" aria-labelledby="feed-empty-title">
@@ -79,9 +84,23 @@ export function KnowledgeHome({
         <span className="eyebrow">知识小窗</span>
         <h1 id="feed-empty-title">想探索哪个领域？</h1>
         <p>浏览本地知识，或选择一个领域生成新的知识点。</p>
-        <label className="generation-provider-field">
-          <span>生成模型</span>
+        <div className="generation-provider-field">
+          <div className="generation-provider-heading">
+            <label htmlFor="generation-provider">生成模型</label>
+            {selectedProvider && !selectedProvider.connectionVerified ? (
+              <button
+                className="generation-provider-setup"
+                type="button"
+                disabled={busy}
+                onClick={onOpenModelSettings}
+              >
+                {selectedProvider.keyConfigured ? "去测试" : "去配置"}
+                <span aria-hidden="true"> →</span>
+              </button>
+            ) : null}
+          </div>
           <select
+            id="generation-provider"
             aria-label="选择生成模型"
             value={generationProviderId}
             disabled={busy}
@@ -109,7 +128,7 @@ export function KnowledgeHome({
             })}
           </select>
           <small>首选模型不可用时，将自动尝试另一已就绪模型。</small>
-        </label>
+        </div>
         {pendingGeneration ? (
           <section className="pending-generation" aria-label="未完成的生成任务">
             <span>

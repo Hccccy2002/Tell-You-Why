@@ -141,13 +141,15 @@ async function desktopOr<T>(
   return fallback();
 }
 
-export async function bootstrapApp(): Promise<BootstrapData> {
+export async function bootstrapApp(options?: {
+  recordShown?: boolean;
+}): Promise<BootstrapData> {
   const fallback = (notice: string) => {
     const firstVisible = fallbackCards.find(
       (card) => !memory.hidden.has(card.id) && !memory.deleted.has(card.id),
     );
     const card = firstVisible ? withFavorite(firstVisible) : null;
-    if (firstVisible && card) {
+    if (firstVisible && card && options?.recordShown !== false) {
       memory.cursor = fallbackCards.indexOf(firstVisible);
       addToHistory(card);
     }
@@ -173,7 +175,9 @@ export async function bootstrapApp(): Promise<BootstrapData> {
     return fallback("当前为浏览器预览模式；桌面能力会在 Tauri 中启用。");
   }
   try {
-    return await invoke<BootstrapData>("bootstrap_app");
+    return await invoke<BootstrapData>("bootstrap_app", {
+      recordShown: options?.recordShown,
+    });
   } catch {
     return fallback("本地数据库暂时不可用，已切换到只读演示内容。");
   }
@@ -213,6 +217,13 @@ export async function recordInteraction(
       ...item,
       card: withFavorite(item.card),
     }));
+  });
+}
+
+export async function recordCardShown(cardId: string): Promise<void> {
+  return desktopOr("record_interaction", { cardId, kind: "shown" }, () => {
+    const card = fallbackCards.find((item) => item.id === cardId);
+    if (card) addToHistory(card);
   });
 }
 
@@ -306,11 +317,15 @@ export async function pauseReminders(
   });
 }
 
+export const CREDENTIAL_REPLACEMENT_REQUIRED =
+  "目标服务通道已有 API Key，请确认覆盖后重试";
+
 export async function saveProviderProfile(input: {
   providerId: string;
   region: string;
   model: string;
   apiKey: string | null;
+  replaceExistingKey: boolean;
 }): Promise<ProviderSpec> {
   return desktopOr("save_provider_profile", { input }, () => {
     throw new Error("浏览器预览不保存 API Key。请在桌面应用中配置。 ");
@@ -403,10 +418,15 @@ export async function chooseAndImportCards(): Promise<ImportResult | null> {
   return invoke<ImportResult>("import_cards_file", { path });
 }
 
-export async function clearData(scope: DataClearScope): Promise<void> {
+export async function clearData(scope: DataClearScope): Promise<string | null> {
   return desktopOr("clear_data", { scope }, () => {
     if (scope === "history" || scope === "all") memory.history = [];
-    if (scope === "preferences" || scope === "all") {
+    if (scope === "preferences") {
+      memory.topics = memory.topics
+        .filter((topic) => !topic.custom)
+        .map((topic) => ({ ...topic, weight: 0 }));
+    }
+    if (scope === "all") {
       memory.topics = memory.topics
         .filter((topic) => !topic.custom)
         .map((topic) => ({
@@ -415,8 +435,6 @@ export async function clearData(scope: DataClearScope): Promise<void> {
           enabled: true,
           weight: 0,
         }));
-    }
-    if (scope === "all") {
       memory.favorites.clear();
       memory.hidden.clear();
       memory.deleted.clear();
@@ -424,6 +442,7 @@ export async function clearData(scope: DataClearScope): Promise<void> {
       memory.settings = { ...defaultSettings };
       memory.generationProviderId = "deepseek";
     }
+    return null;
   });
 }
 

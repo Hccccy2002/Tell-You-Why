@@ -8,6 +8,7 @@ import {
   listLibrary,
   nextCard,
   recordInteraction,
+  saveInterests,
 } from "./api";
 import { fallbackCards } from "../data/fallbackCards";
 
@@ -101,6 +102,59 @@ describe("browser fallback core", () => {
     }
     expect((await bootstrapApp()).card).toBeNull();
     await clearData("all");
+  });
+
+  it("clears learned preferences without changing built-in selections or order", async () => {
+    await clearData("all");
+    const bootstrap = await bootstrapApp({ recordShown: false });
+    const configured = bootstrap.topics.map((topic, index) => ({
+      ...topic,
+      selected: index < 3,
+      enabled: index !== 3,
+      rank: bootstrap.topics.length - index,
+      weight: index + 4,
+    }));
+    configured.push({
+      id: "custom-confirmation-test",
+      label: "自定义测试兴趣",
+      selected: true,
+      enabled: true,
+      custom: true,
+      rank: configured.length,
+      weight: 11,
+    });
+    await saveInterests(configured, true);
+
+    await clearData("preferences");
+    const refreshed = await bootstrapApp({ recordShown: false });
+
+    expect(
+      refreshed.topics.some((topic) => topic.id === "custom-confirmation-test"),
+    ).toBe(false);
+    expect(
+      refreshed.topics.map(({ id, selected, enabled, rank }) => ({
+        id,
+        selected,
+        enabled,
+        rank,
+      })),
+    ).toEqual(
+      configured
+        .filter((topic) => !topic.custom)
+        .map(({ id, selected, enabled, rank }) => ({
+          id,
+          selected,
+          enabled,
+          rank,
+        })),
+    );
+    expect(refreshed.topics.every((topic) => topic.weight === 0)).toBe(true);
+  });
+
+  it("does not recreate reading history during read-only bootstrap", async () => {
+    await clearData("all");
+    await bootstrapApp({ recordShown: false });
+    expect(await listLibrary("history", null, "newest")).toEqual([]);
   });
 
   it("normalizes unknown frontend errors", () => {

@@ -110,4 +110,55 @@ describe("InterestSettingsScreen", () => {
     ]);
     expect(saved.slice(0, 3).map((topic) => topic.rank)).toEqual([0, 1, 2]);
   });
+
+  it("removes a custom interest only after cancelling and confirming the reopened dialog", async () => {
+    const customInterest: TopicPreference = {
+      id: "custom-city-planning",
+      label: "城市规划",
+      selected: true,
+      enabled: true,
+      custom: true,
+      rank: topics.length,
+      weight: 0,
+    };
+    const onSaved = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <InterestSettingsScreen
+        initialTopics={[...topics, customInterest]}
+        personalizationEnabled={true}
+        onSaved={onSaved}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "兴趣权重排序" });
+    const deleteButton = within(list).getByRole("button", {
+      name: "删除 城市规划",
+    });
+    await user.click(deleteButton);
+    const firstDialog = screen.getByRole("dialog", {
+      name: "确认删除“城市规划”吗？",
+    });
+
+    expect(within(list).getByText("城市规划")).toBeVisible();
+    expect(onSaved).not.toHaveBeenCalled();
+    await user.click(within(firstDialog).getByRole("button", { name: "取消" }));
+    expect(within(list).getByText("城市规划")).toBeVisible();
+    expect(onSaved).not.toHaveBeenCalled();
+
+    await user.click(deleteButton);
+    const reopenedDialog = screen.getByRole("dialog", {
+      name: "确认删除“城市规划”吗？",
+    });
+    await user.click(
+      within(reopenedDialog).getByRole("button", { name: "确认删除兴趣" }),
+    );
+
+    expect(within(list).queryByText("城市规划")).not.toBeInTheDocument();
+    expect(onSaved).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "保存兴趣设置" }));
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    const saved = onSaved.mock.calls[0]?.[0] as TopicPreference[];
+    expect(saved.some((topic) => topic.id === customInterest.id)).toBe(false);
+  });
 });
