@@ -94,6 +94,7 @@ pub fn run() {
             commands::generate_topic_batch,
             commands::generate_random_topic,
             commands::generate_random_topic_batch,
+            commands::ask_follow_up,
             commands::import_cards_file,
             commands::clear_data,
             commands::open_source_url,

@@ -2,8 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { fallbackCards } from "./data/fallbackCards";
+import { clearData } from "./lib/api";
 
 describe("critical local user flow", () => {
+  beforeEach(async () => {
+    await clearData("all");
+  });
+
   it("supports reveal return, no-key prompt, previous, and immediate dismiss", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -122,5 +127,51 @@ describe("critical local user flow", () => {
     expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(
       firstQuestion ?? "",
     );
+  });
+
+  it("shows a hidden history card in favorites after it is favorited", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "选择我的兴趣" }),
+    );
+    await user.click(screen.getByRole("button", { name: "自然科学" }));
+    await user.click(screen.getByRole("button", { name: "历史与文明" }));
+    await user.click(screen.getByRole("button", { name: "计算机与互联网" }));
+    await user.click(screen.getByRole("button", { name: "继续" }));
+    await user.click(screen.getByRole("button", { name: "开始探索" }));
+    await user.click(screen.getByRole("button", { name: /浏览现有知识点/ }));
+
+    const hiddenQuestion =
+      screen.getByRole("heading", { level: 1 }).textContent ?? "";
+    expect(hiddenQuestion).not.toBe("");
+
+    await user.click(screen.getByRole("button", { name: "不感兴趣" }));
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(
+        hiddenQuestion,
+      );
+    });
+
+    await user.click(screen.getByRole("button", { name: "打开菜单" }));
+    await user.click(screen.getByRole("button", { name: "收藏与历史" }));
+    await user.click(screen.getByRole("button", { name: "最近浏览" }));
+    await user.click(await screen.findByText(hiddenQuestion));
+
+    await user.click(screen.getByRole("button", { name: "收藏" }));
+    expect(
+      await screen.findByRole("button", { name: "已收藏" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "打开菜单" }));
+    await user.click(screen.getByRole("button", { name: "收藏与历史" }));
+
+    const favoriteEntry = await screen.findByText(hiddenQuestion);
+    expect(favoriteEntry).toBeVisible();
+    await user.click(favoriteEntry);
+    expect(
+      await screen.findByRole("button", { name: "已收藏" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });

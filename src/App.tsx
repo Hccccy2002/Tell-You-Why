@@ -5,6 +5,7 @@ import { KnowledgeCardView } from "./components/KnowledgeCardView";
 import { KnowledgeHome } from "./components/KnowledgeHome";
 import { Onboarding } from "./components/Onboarding";
 import {
+  askFollowUp,
   availableCardCount,
   bootstrapApp,
   friendlyError,
@@ -26,6 +27,8 @@ import type {
   AppSettings,
   BootstrapData,
   DataClearScope,
+  FollowUpResult,
+  FollowUpTurn,
   GenerationBatchResult,
   InteractionKind,
   KnowledgeCard,
@@ -254,6 +257,14 @@ export default function App() {
     } catch (error) {
       setMessage(friendlyError(error));
     }
+  }
+
+  async function askCurrentCardFollowUp(
+    question: string,
+    history: FollowUpTurn[],
+  ): Promise<FollowUpResult> {
+    if (!data?.card) throw new Error("当前知识卡不可用，请切换后再试");
+    return askFollowUp(data.card.id, question, history);
   }
 
   async function advance() {
@@ -764,6 +775,7 @@ export default function App() {
           canGoPrevious={backStack.some(
             (card) => !dismissedCardIds.has(card.id),
           )}
+          onAskFollowUp={askCurrentCardFollowUp}
           onInteraction={interaction}
           onReturnHome={() => setHomeMode("landing")}
           onPrevious={previous}

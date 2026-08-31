@@ -74,6 +74,18 @@ export interface OnboardingInput {
 export type InteractionKind =
   "revealed" | "expanded" | "disliked" | "known" | "favorited" | "unfavorited";
 
+export interface FollowUpTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface FollowUpResult {
+  answer: string;
+  providerId: "deepseek" | "kimi";
+  model: string;
+  switchedFromProviderId: "deepseek" | "kimi" | null;
+}
+
 export interface LibraryItem {
   card: KnowledgeCard;
   viewedAt: string;

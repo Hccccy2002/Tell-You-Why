@@ -126,17 +126,6 @@ export function KnowledgeHome({
             </button>
           </section>
         ) : null}
-        {availableCardCount > 0 ? (
-          <button
-            className="browse-available-button"
-            disabled={busy}
-            onClick={() => void onBrowse()}
-          >
-            <span aria-hidden="true">▤</span>
-            浏览现有知识点
-            <small>{availableCardCount} 张可展示</small>
-          </button>
-        ) : null}
         <div className="choice-divider">
           <span>生成新知识</span>
         </div>
@@ -156,19 +145,6 @@ export function KnowledgeHome({
           />
           <span>条知识卡</span>
         </label>
-        <button
-          className="random-empty-button"
-          disabled={
-            busy || interestedTopics.length === 0 || generationCount === 0
-          }
-          onClick={() => void onGenerateRandom(generationCount)}
-        >
-          <span aria-hidden="true">✦</span>
-          {busy ? "正在生成…" : `按兴趣权重随机生成 · ${generationCount} 条`}
-        </button>
-        <div className="choice-divider">
-          <span>或指定领域</span>
-        </div>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -222,16 +198,46 @@ export function KnowledgeHome({
               />
             </label>
           ) : null}
-          <button
-            className="generate-topic-button"
-            type="submit"
-            disabled={busy || !topicLabel || generationCount === 0}
-          >
-            {busy
-              ? "正在生成…"
-              : `生成${topicLabel || "所选领域"}知识点 · ${generationCount} 条`}
-          </button>
+          <div className="generation-action-row">
+            <button
+              className="random-empty-button"
+              type="button"
+              disabled={
+                busy || interestedTopics.length === 0 || generationCount === 0
+              }
+              onClick={() => void onGenerateRandom(generationCount)}
+            >
+              <span aria-hidden="true">✦</span>
+              <span className="generation-action-copy">
+                <strong>{busy ? "正在生成…" : "按兴趣权重随机生成"}</strong>
+                <small>{generationCount} 条知识卡</small>
+              </span>
+            </button>
+            <button
+              className="generate-topic-button"
+              type="submit"
+              disabled={busy || !topicLabel || generationCount === 0}
+            >
+              <span className="generation-action-copy">
+                <strong>
+                  {busy ? "正在生成…" : `生成${topicLabel || "所选领域"}知识点`}
+                </strong>
+                <small>{generationCount} 条知识卡</small>
+              </span>
+            </button>
+          </div>
         </form>
+        {availableCardCount > 0 ? (
+          <button
+            className="browse-available-button"
+            disabled={busy}
+            onClick={() => void onBrowse()}
+          >
+            <span aria-hidden="true">▤</span>
+            浏览现有知识点
+            <small>{availableCardCount} 张可展示</small>
+          </button>
+        ) : null}
       </div>
     </main>
   );

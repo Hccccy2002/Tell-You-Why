@@ -83,15 +83,26 @@ describe("KnowledgeHome", () => {
     expect(onGenerationProviderChange).toHaveBeenCalledWith("kimi");
     await user.clear(generationCount);
     await user.type(generationCount, "3");
-    await user.click(screen.getByRole("button", { name: /浏览现有知识点/ }));
-    expect(onBrowse).toHaveBeenCalledOnce();
-    await user.click(
-      screen.getByRole("button", { name: /按兴趣权重随机生成/ }),
+    const browseButton = screen.getByRole("button", {
+      name: /浏览现有知识点/,
+    });
+    const randomButton = screen.getByRole("button", {
+      name: /按兴趣权重随机生成/,
+    });
+    const topicButton = screen.getByRole("button", {
+      name: /生成历史与文明知识点/,
+    });
+    expect(randomButton.closest(".generation-action-row")).toBe(
+      topicButton.closest(".generation-action-row"),
     );
+    expect(browseButton.closest(".feed-empty-card")?.lastElementChild).toBe(
+      browseButton,
+    );
+    await user.click(browseButton);
+    expect(onBrowse).toHaveBeenCalledOnce();
+    await user.click(randomButton);
     expect(onGenerateRandom).toHaveBeenCalledWith(3);
-    expect(
-      screen.getByRole("button", { name: /生成历史与文明知识点/ }),
-    ).toBeVisible();
+    expect(topicButton).toBeVisible();
     await user.selectOptions(
       screen.getByRole("combobox", { name: "选择知识领域" }),
       "__custom__",

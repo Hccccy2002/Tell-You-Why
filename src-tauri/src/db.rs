@@ -680,8 +680,7 @@ impl Database {
         }
         let connection = self.connect()?;
         let favorite_clause = if mode == "favorites" {
-            "AND COALESCE(s.favorite, 0) = 1
-             AND COALESCE(s.hidden, 0) = 0"
+            "AND COALESCE(s.favorite, 0) = 1"
         } else {
             ""
         };
@@ -1414,6 +1413,47 @@ mod tests {
             .find(|item| item.card.id == disliked.id)
             .expect("disliked card remains in history");
         assert!(retained.card.hidden_from_feed);
+    }
+
+    #[test]
+    fn hidden_history_card_appears_in_favorites_without_returning_to_the_feed() {
+        let (_directory, database) = test_database();
+        let initial_count = database
+            .available_card_count()
+            .expect("initial available count");
+        let card = database.next_card(None).expect("card");
+        database
+            .record_interaction(&card.id, "disliked")
+            .expect("dislike");
+        assert_eq!(
+            database.available_card_count().expect("available count"),
+            initial_count - 1
+        );
+
+        let history_card = database
+            .list_library("history", None, true)
+            .expect("history")
+            .into_iter()
+            .find(|item| item.card.id == card.id)
+            .expect("hidden card remains in history");
+        assert!(history_card.card.hidden_from_feed);
+
+        database
+            .record_interaction(&card.id, "favorited")
+            .expect("favorite from history");
+        let favorite = database
+            .list_library("favorites", None, true)
+            .expect("favorites")
+            .into_iter()
+            .find(|item| item.card.id == card.id)
+            .expect("hidden favorite is listed");
+
+        assert!(favorite.card.is_favorite);
+        assert!(favorite.card.hidden_from_feed);
+        assert_eq!(
+            database.available_card_count().expect("available count"),
+            initial_count - 1
+        );
     }
 
     #[test]

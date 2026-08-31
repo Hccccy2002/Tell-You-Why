@@ -1,11 +1,13 @@
 use crate::content::parse_import;
 use crate::db::{DbError, ProviderProfileRecord};
 use crate::models::{
-    AppSettings, BootstrapData, DesktopCapabilities, GenerationBatchResult, GenerationUsage,
-    ImportResult, KnowledgeCard, LibraryItem, OnboardingInput, ProviderSpec, ReminderPreset,
-    SaveProviderInput, TopicPreference,
+    AppSettings, BootstrapData, DesktopCapabilities, FollowUpResponse, FollowUpRole, FollowUpTurn,
+    GenerationBatchResult, GenerationUsage, ImportResult, KnowledgeCard, LibraryItem,
+    OnboardingInput, ProviderSpec, ReminderPreset, SaveProviderInput, TopicPreference,
 };
-use crate::providers::{adapter, GenerationRequest, ProviderContext, ProviderRegistry};
+use crate::providers::{
+    adapter, FollowUpRequest, GenerationRequest, ProviderContext, ProviderRegistry,
+};
 use crate::secret_store::{credential_ref, last_four};
 use crate::AppState;
 use chrono::{Duration, Local, TimeZone, Utc};
@@ -20,6 +22,10 @@ use url::Url;
 use uuid::Uuid;
 
 type CommandResult<T> = Result<T, String>;
+
+const MAX_FOLLOW_UP_QUESTION_CHARS: usize = 500;
+const MAX_FOLLOW_UP_HISTORY_TURNS: usize = 6;
+const MAX_FOLLOW_UP_ANSWER_HISTORY_CHARS: usize = 4_000;
 
 struct GenerationLock<'a>(&'a AtomicBool);
 
@@ -437,6 +443,138 @@ pub async fn generate_random_topic(state: State<'_, AppState>) -> CommandResult<
     generate_one_topic(&state, topic_id, topic_label).await
 }
 
+#[tauri::command(rename_all = "camelCase")]
+pub async fn ask_follow_up(
+    card_id: String,
+    question: String,
+    history: Vec<FollowUpTurn>,
+    state: State<'_, AppState>,
+) -> CommandResult<FollowUpResponse> {
+    let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
+    ask_follow_up_inner(&state, &card_id, question, history).await
+}
+
+async fn ask_follow_up_inner(
+    state: &AppState,
+    card_id: &str,
+    question: String,
+    history: Vec<FollowUpTurn>,
+) -> CommandResult<FollowUpResponse> {
+    let card_id = card_id.trim();
+    if card_id.is_empty() || card_id.chars().count() > 128 || contains_disallowed_control(card_id) {
+        return Err("当前知识卡不存在或已删除".into());
+    }
+    let question = normalize_follow_up_text(&question, "追问", MAX_FOLLOW_UP_QUESTION_CHARS)?;
+    let history = normalize_follow_up_history(history)?;
+    let card = match state.database.card_by_id(card_id) {
+        Ok(card) => card,
+        Err(DbError::NoCards) => return Err("当前知识卡不存在或已删除".into()),
+        Err(error) => return Err(error.to_string()),
+    };
+    let plan = generation_profiles(state)?;
+    let request = FollowUpRequest {
+        topic_label: card.topic_label,
+        card_question: card.question,
+        short_answer: card.short_answer,
+        explanation: card.explanation,
+        why_it_matters: card.why_it_matters,
+        question,
+        history,
+    };
+    let mut errors = Vec::new();
+    for profile in &plan.profiles {
+        match ask_follow_up_with_profile(state, profile, &request).await {
+            Ok(answer) => {
+                let switched_from_provider_id =
+                    (profile.provider_id != plan.preferred_id).then(|| plan.preferred_id.clone());
+                return Ok(FollowUpResponse {
+                    answer,
+                    provider_id: profile.provider_id.clone(),
+                    model: profile.model.clone(),
+                    switched_from_provider_id,
+                });
+            }
+            Err(error) => errors.push(format!(
+                "{}追问失败：{}",
+                provider_label(&profile.provider_id),
+                error
+            )),
+        }
+    }
+    Err(errors.join("；"))
+}
+
+fn normalize_follow_up_history(history: Vec<FollowUpTurn>) -> CommandResult<Vec<FollowUpTurn>> {
+    let skip = history.len().saturating_sub(MAX_FOLLOW_UP_HISTORY_TURNS);
+    history
+        .into_iter()
+        .skip(skip)
+        .map(|mut turn| {
+            let (label, max_chars) = match turn.role {
+                FollowUpRole::User => ("历史问题", MAX_FOLLOW_UP_QUESTION_CHARS),
+                FollowUpRole::Assistant => ("历史回答", MAX_FOLLOW_UP_ANSWER_HISTORY_CHARS),
+            };
+            turn.content = normalize_follow_up_text(&turn.content, label, max_chars)?;
+            Ok(turn)
+        })
+        .collect()
+}
+
+fn normalize_follow_up_text(value: &str, label: &str, max_chars: usize) -> CommandResult<String> {
+    let value = value.trim();
+    let length = value.chars().count();
+    if length == 0 {
+        return Err(format!("{label}不能为空"));
+    }
+    if length > max_chars {
+        return Err(format!("{label}不能超过 {max_chars} 个字符"));
+    }
+    if contains_disallowed_control(value) {
+        return Err(format!("{label}包含不支持的控制字符"));
+    }
+    Ok(value.to_string())
+}
+
+fn contains_disallowed_control(value: &str) -> bool {
+    value
+        .chars()
+        .any(|character| character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
+}
+
+async fn ask_follow_up_with_profile(
+    state: &AppState,
+    profile: &ProviderProfileRecord,
+    request: &FollowUpRequest,
+) -> CommandResult<String> {
+    if !profile.connection_verified {
+        return Err("请先完成连接测试".into());
+    }
+    let secret = state
+        .secrets
+        .get(&profile.credential_ref)
+        .map_err(|error| error.to_string())?;
+    let context =
+        ProviderContext::from_registry(&profile.provider_id, &profile.region, &profile.model)
+            .map_err(|error| error.to_string())?;
+    let provider = adapter(&profile.provider_id).map_err(|error| error.to_string())?;
+    match provider
+        .answer_follow_up(&context, &secret, request, state.http.as_ref())
+        .await
+    {
+        Ok(answer) => Ok(answer),
+        Err(error) => {
+            if error.code() == "invalid_key" {
+                let _ = state.database.set_provider_verified(
+                    &profile.provider_id,
+                    &profile.region,
+                    false,
+                );
+            }
+            Err(error.to_string())
+        }
+    }
+}
+
 async fn generate_same_topic_inner(
     state: &AppState,
     card_id: &str,
@@ -828,8 +966,12 @@ fn required_profile(
 
 #[cfg(test)]
 mod tests {
-    use super::{generate_topic_batch_inner, generation_batch_sizes, ordered_ready_profiles};
+    use super::{
+        ask_follow_up_inner, generate_topic_batch_inner, generation_batch_sizes,
+        ordered_ready_profiles,
+    };
     use crate::db::ProviderProfileRecord;
+    use crate::models::{FollowUpRole, FollowUpTurn};
     use crate::providers::{ProviderError, ProviderTransport, TransportResponse};
     use crate::secret_store::tests_support::MemorySecretStore;
     use crate::secret_store::{SecretStore, SecretValue};
@@ -881,6 +1023,7 @@ mod tests {
 
     struct FailoverTransport {
         hosts: Mutex<Vec<String>>,
+        bodies: Mutex<Vec<Value>>,
     }
 
     #[async_trait::async_trait]
@@ -889,13 +1032,26 @@ mod tests {
             &self,
             endpoint: &Url,
             _api_key: &SecretValue,
-            _body: &Value,
+            body: &Value,
             _timeout: StdDuration,
         ) -> Result<TransportResponse, ProviderError> {
             let host = endpoint.host_str().unwrap_or_default().to_string();
             self.hosts.lock().expect("host lock").push(host.clone());
+            self.bodies.lock().expect("body lock").push(body.clone());
             if host == "api.deepseek.com" {
                 return Err(ProviderError::Unavailable);
+            }
+            if body.get("response_format").is_none() {
+                return Ok(TransportResponse {
+                    status: 200,
+                    body: json!({
+                        "choices": [{
+                            "finish_reason": "stop",
+                            "message": { "content": "这是一个补充回答。" }
+                        }]
+                    })
+                    .to_string(),
+                });
             }
             let generated = json!({
                 "cards": [{
@@ -962,6 +1118,7 @@ mod tests {
             .expect("kimi secret");
         let transport = Arc::new(FailoverTransport {
             hosts: Mutex::new(Vec::new()),
+            bodies: Mutex::new(Vec::new()),
         });
         let state = AppState {
             database,
@@ -989,5 +1146,95 @@ mod tests {
             transport.hosts.lock().expect("host lock").as_slice(),
             ["api.deepseek.com", "api.moonshot.cn"]
         );
+    }
+
+    #[test]
+    fn follow_up_uses_card_context_and_falls_back_without_counting_generation() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database = crate::db::Database::new(directory.path().join("follow-up-failover.db"));
+        database.initialize().expect("database");
+        database
+            .save_generation_provider_id("deepseek")
+            .expect("preferred provider");
+        let card = database.next_card(None).expect("seed card");
+        for profile in [
+            ProviderProfileRecord {
+                provider_id: "deepseek".into(),
+                region: "default".into(),
+                model: "deepseek-v4-flash".into(),
+                credential_ref: "deepseek:default".into(),
+                key_last4: Some("mock".into()),
+                connection_verified: true,
+            },
+            ProviderProfileRecord {
+                provider_id: "kimi".into(),
+                region: "cn".into(),
+                model: "kimi-k3".into(),
+                credential_ref: "kimi:cn".into(),
+                key_last4: Some("mock".into()),
+                connection_verified: true,
+            },
+        ] {
+            database
+                .save_provider_profile(&profile)
+                .expect("provider profile");
+        }
+        let secrets = Arc::new(MemorySecretStore::default());
+        secrets
+            .save("deepseek:default", "sk-deepseek-mock")
+            .expect("deepseek secret");
+        secrets
+            .save("kimi:cn", "sk-kimi-mock")
+            .expect("kimi secret");
+        let transport = Arc::new(FailoverTransport {
+            hosts: Mutex::new(Vec::new()),
+            bodies: Mutex::new(Vec::new()),
+        });
+        let state = AppState {
+            database,
+            secrets,
+            http: transport.clone(),
+            exiting: AtomicBool::new(false),
+            generation_in_progress: AtomicBool::new(false),
+        };
+        let history = (0..8)
+            .map(|index| FollowUpTurn {
+                role: FollowUpRole::User,
+                content: format!("历史问题 {index}"),
+            })
+            .collect();
+
+        let result = tauri::async_runtime::block_on(ask_follow_up_inner(
+            &state,
+            &card.id,
+            "还能举个例子吗？".into(),
+            history,
+        ))
+        .expect("fallback follow-up");
+
+        assert_eq!(result.answer, "这是一个补充回答。");
+        assert_eq!(result.provider_id, "kimi");
+        assert_eq!(result.model, "kimi-k3");
+        assert_eq!(
+            result.switched_from_provider_id.as_deref(),
+            Some("deepseek")
+        );
+        assert_eq!(
+            transport.hosts.lock().expect("host lock").as_slice(),
+            ["api.deepseek.com", "api.moonshot.cn"]
+        );
+        assert_eq!(state.database.generated_today().expect("usage"), 0);
+        let bodies = transport.bodies.lock().expect("body lock");
+        let payload: Value = serde_json::from_str(
+            bodies[1]["messages"][1]["content"]
+                .as_str()
+                .expect("follow-up context"),
+        )
+        .expect("context JSON");
+        let retained = payload["recentHistory"].as_array().expect("history");
+        assert_eq!(retained.len(), 6);
+        assert_eq!(retained[0]["content"], "历史问题 2");
+        assert_eq!(payload["knowledgeCard"]["question"], card.question);
+        assert_eq!(payload["currentQuestion"], "还能举个例子吗？");
     }
 }

@@ -5,6 +5,8 @@ import type {
   AppSettings,
   BootstrapData,
   DataClearScope,
+  FollowUpResult,
+  FollowUpTurn,
   GenerationBatchResult,
   GenerationUsage,
   ImportResult,
@@ -259,7 +261,6 @@ export async function listLibrary(
     let result = memory.history.filter(
       (item) =>
         !memory.deleted.has(item.card.id) &&
-        (mode === "history" || !memory.hidden.has(item.card.id)) &&
         (!topicId || item.card.topicId === topicId) &&
         (mode === "history" || memory.favorites.has(item.card.id)),
     );
@@ -349,6 +350,16 @@ export async function generateSameTopic(
   cardId: string,
 ): Promise<KnowledgeCard> {
   return desktopOr("generate_same_topic", { cardId }, () => {
+    throw new Error("请先配置模型哦~");
+  });
+}
+
+export async function askFollowUp(
+  cardId: string,
+  question: string,
+  history: FollowUpTurn[],
+): Promise<FollowUpResult> {
+  return desktopOr("ask_follow_up", { cardId, question, history }, () => {
     throw new Error("请先配置模型哦~");
   });
 }

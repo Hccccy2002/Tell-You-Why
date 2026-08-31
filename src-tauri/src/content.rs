@@ -327,47 +327,76 @@ pub fn finalize_generated_cards(
         ));
     }
     let mut fingerprints = HashSet::new();
-    values
-        .into_iter()
-        .map(|value| {
-            let content_fingerprint = fingerprint(&value.question, &value.short_answer);
-            if !fingerprints.insert(content_fingerprint.clone()) {
-                return Err(ContentError::Validation("同一批内容存在重复".into()));
-            }
-            let card = KnowledgeCard {
-                id: Uuid::new_v4().to_string(),
-                schema_version: 1,
-                language: "zh-CN".into(),
-                topic_id: value.topic_id,
-                topic_label: value.topic_label,
-                tags: value.tags,
-                question: value.question,
-                short_answer: value.short_answer,
-                explanation: value.explanation,
-                why_it_matters: value.why_it_matters,
-                difficulty: value.difficulty,
-                estimated_read_seconds: value.estimated_read_seconds,
-                source_refs: Vec::new(),
-                trust_status: TrustStatus::AiUnverified,
-                content_fingerprint,
-                generated_by: Some(GeneratedBy {
-                    provider: provider.into(),
-                    model: model.into(),
-                    prompt_version: "knowledge-cards-v1".into(),
-                }),
-                created_at: chrono::Utc::now().to_rfc3339(),
-                is_favorite: false,
-                hidden_from_feed: false,
-            };
-            validate_card(&card)?;
-            Ok(card)
-        })
-        .collect()
+    let mut cards = Vec::with_capacity(values.len());
+    let mut first_error = None;
+
+    for value in values {
+        let content_fingerprint = fingerprint(&value.question, &value.short_answer);
+        let card = KnowledgeCard {
+            id: Uuid::new_v4().to_string(),
+            schema_version: 1,
+            language: "zh-CN".into(),
+            topic_id: value.topic_id,
+            topic_label: value.topic_label,
+            tags: value.tags,
+            question: value.question,
+            short_answer: value.short_answer,
+            explanation: value.explanation,
+            why_it_matters: value.why_it_matters,
+            difficulty: value.difficulty,
+            estimated_read_seconds: value.estimated_read_seconds,
+            source_refs: Vec::new(),
+            trust_status: TrustStatus::AiUnverified,
+            content_fingerprint: content_fingerprint.clone(),
+            generated_by: Some(GeneratedBy {
+                provider: provider.into(),
+                model: model.into(),
+                prompt_version: "knowledge-cards-v1".into(),
+            }),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            is_favorite: false,
+            hidden_from_feed: false,
+        };
+
+        if let Err(error) = validate_card(&card) {
+            first_error.get_or_insert(error);
+            continue;
+        }
+        if !fingerprints.insert(content_fingerprint) {
+            first_error
+                .get_or_insert_with(|| ContentError::Validation("同一批内容存在重复".into()));
+            continue;
+        }
+        cards.push(card);
+    }
+
+    if cards.is_empty() {
+        Err(first_error
+            .unwrap_or_else(|| ContentError::Validation("模型内容没有可用的知识卡".into())))
+    } else {
+        Ok(cards)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn valid_generated_card() -> GeneratedCardInput {
+        GeneratedCardInput {
+            topic_id: "natural_science".into(),
+            topic_label: "自然科学".into(),
+            tags: vec!["水".into()],
+            question: "为什么水结冰以后体积反而会变得更大？".into(),
+            short_answer:
+                "水分子在结冰时形成带有空隙的规则晶体结构，所以同样质量会占据更大体积，密度也因此低于液态水，冰通常会浮在水面。"
+                    .into(),
+            explanation: "液态水中的分子仍可移动并相对紧密地排列。温度下降到冰点附近时，氢键把水分子固定到带有规则空隙的晶格中。晶格占据的空间更大，因此水结冰时体积增加，密度也低于液态水。这个现象同时解释了冰为什么通常会浮在水面，也影响了寒冷地区的岩石风化与水体生态。水的密度还会随温度改变，实际结冰过程也会受到溶质、压力和成核条件影响，因此这个规律需要在具体环境中理解。此外，水分子排列并非瞬间完成，冷却速度也会影响晶体形成方式。".into(),
+            why_it_matters: None,
+            difficulty: Difficulty::Beginner,
+            estimated_read_seconds: 50,
+        }
+    }
 
     #[test]
     fn fingerprint_ignores_spacing_and_punctuation() {
@@ -411,6 +440,42 @@ mod tests {
         .expect("generated card should validate");
         assert_eq!(cards[0].trust_status, TrustStatus::AiUnverified);
         assert!(cards[0].source_refs.is_empty());
+    }
+
+    #[test]
+    fn generated_batch_keeps_valid_cards_when_another_card_is_invalid() {
+        let invalid = GeneratedCardInput {
+            question: "太短".into(),
+            ..valid_generated_card()
+        };
+
+        let cards =
+            finalize_generated_cards(vec![valid_generated_card(), invalid], "mock", "mock-model")
+                .expect("the valid generated card should be retained");
+
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].question, valid_generated_card().question);
+    }
+
+    #[test]
+    fn generated_batch_returns_first_error_when_all_cards_are_invalid() {
+        let first_invalid = GeneratedCardInput {
+            question: "太短".into(),
+            ..valid_generated_card()
+        };
+        let second_invalid = GeneratedCardInput {
+            estimated_read_seconds: 1,
+            ..valid_generated_card()
+        };
+
+        let error =
+            finalize_generated_cards(vec![first_invalid, second_invalid], "mock", "mock-model")
+                .expect_err("an entirely invalid batch should fail");
+
+        assert!(matches!(
+            error,
+            ContentError::Validation(message) if message.contains("问题长度")
+        ));
     }
 
     #[test]

@@ -1,4 +1,6 @@
 import {
+  askFollowUp,
+  availableCardCount,
   bootstrapApp,
   clearData,
   deleteLibraryCard,
@@ -24,6 +26,12 @@ describe("browser fallback core", () => {
     expect(next.id).not.toBe(first.id);
   });
 
+  it("does not fake follow-up answers in browser preview", async () => {
+    await expect(
+      askFollowUp(fallbackCards[0]!.id, "请继续说明", []),
+    ).rejects.toThrow("请先配置模型哦~");
+  });
+
   it("keeps favorites in the non-secret in-memory preview store", async () => {
     const bootstrap = await bootstrapApp();
     const card = bootstrap.card;
@@ -31,6 +39,31 @@ describe("browser fallback core", () => {
     await recordInteraction(card.id, "favorited");
     const refreshed = await bootstrapApp();
     expect(refreshed.card?.isFavorite).toBe(true);
+  });
+
+  it("lists a hidden history card after it is favorited without restoring the feed", async () => {
+    await clearData("all");
+    const bootstrap = await bootstrapApp();
+    const card = bootstrap.card;
+    if (!card) throw new Error("expected fallback card");
+    const initialCount = await availableCardCount();
+
+    await recordInteraction(card.id, "disliked");
+    expect(await availableCardCount()).toBe(initialCount - 1);
+    expect(
+      (await listLibrary("history", null, "newest")).some(
+        (item) => item.card.id === card.id,
+      ),
+    ).toBe(true);
+
+    await recordInteraction(card.id, "favorited");
+    const favorite = (await listLibrary("favorites", null, "newest")).find(
+      (item) => item.card.id === card.id,
+    );
+
+    expect(favorite?.card.isFavorite).toBe(true);
+    expect(favorite?.card.hiddenFromFeed).toBe(true);
+    expect(await availableCardCount()).toBe(initialCount - 1);
   });
 
   it("keeps a disliked card in history until it is deleted", async () => {
