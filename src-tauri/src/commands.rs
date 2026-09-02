@@ -1,9 +1,10 @@
 use crate::content::parse_import;
 use crate::db::{DbError, ProviderProfileRecord};
 use crate::models::{
-    AppSettings, BootstrapData, DesktopCapabilities, FollowUpResponse, FollowUpRole, FollowUpTurn,
-    GenerationBatchResult, GenerationUsage, ImportResult, KnowledgeCard, LibraryItem,
-    OnboardingInput, ProviderSpec, ReminderPreset, SaveProviderInput, TopicPreference,
+    AppSettings, BootstrapData, DesktopCapabilities, FollowUpMessage, FollowUpResponse,
+    FollowUpRole, FollowUpTurn, GenerationBatchResult, GenerationUsage, ImportResult,
+    KnowledgeCard, LibraryItem, OnboardingInput, ProviderSpec, ReminderPreset, SaveProviderInput,
+    TopicPreference,
 };
 use crate::providers::{
     adapter, FollowUpRequest, GenerationRequest, ProviderContext, ProviderRegistry,
@@ -287,7 +288,15 @@ pub fn save_settings(
         .database
         .save_settings(&settings)
         .map_err(|error| error.to_string())?;
+    state
+        .auto_hide
+        .set_enabled(settings.auto_hide_on_mouse_leave);
     Ok(settings)
+}
+
+#[tauri::command]
+pub fn set_auto_hide_suspended(suspended: bool, state: State<'_, AppState>) {
+    state.auto_hide.set_suspended(suspended);
 }
 
 #[tauri::command]
@@ -610,6 +619,7 @@ pub async fn generate_random_topic(state: State<'_, AppState>) -> CommandResult<
 pub async fn ask_follow_up(
     card_id: String,
     question: String,
+    display_question: Option<String>,
     history: Vec<FollowUpTurn>,
     state: State<'_, AppState>,
 ) -> CommandResult<FollowUpResponse> {
@@ -618,7 +628,50 @@ pub async fn ask_follow_up(
         .try_operation()
         .map_err(str::to_owned)?;
     let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
-    ask_follow_up_inner(&state, &card_id, question, history).await
+    let stored_question =
+        normalize_follow_up_text(&question, "追问", MAX_FOLLOW_UP_QUESTION_CHARS)?;
+    let display_question = normalize_follow_up_text(
+        display_question.as_deref().unwrap_or(&stored_question),
+        "显示问题",
+        MAX_FOLLOW_UP_QUESTION_CHARS,
+    )?;
+    let response = ask_follow_up_inner(&state, &card_id, stored_question.clone(), history).await?;
+    state
+        .database
+        .save_follow_up_exchange(
+            card_id.trim(),
+            &display_question,
+            &stored_question,
+            &response,
+        )
+        .map_err(|error| error.to_string())?;
+    Ok(response)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub fn list_card_follow_ups(
+    card_id: String,
+    state: State<'_, AppState>,
+) -> CommandResult<Vec<FollowUpMessage>> {
+    let _operation = state
+        .persistence_gate
+        .try_operation()
+        .map_err(str::to_owned)?;
+    let card_id = card_id.trim();
+    if card_id.is_empty() || card_id.chars().count() > 128 || contains_disallowed_control(card_id) {
+        return Err("当前知识卡不存在或已删除".into());
+    }
+    state
+        .database
+        .card_by_id(card_id)
+        .map_err(|error| match error {
+            DbError::NoCards => "当前知识卡不存在或已删除".into(),
+            error => error.to_string(),
+        })?;
+    state
+        .database
+        .card_follow_ups(card_id)
+        .map_err(|error| error.to_string())
 }
 
 async fn ask_follow_up_inner(
@@ -1093,6 +1146,7 @@ pub fn clear_data(
         .clear_data(&scope)
         .map_err(|error| error.to_string())?;
     if scope == "all" {
+        state.auto_hide.set_enabled(false);
         let system_result = restore_default_system_integrations(&app);
         let credential_result = cleanup_pending_credentials(&state);
         return Ok(match (system_result, credential_result) {
@@ -1258,6 +1312,7 @@ mod tests {
             }),
             exiting: AtomicBool::new(false),
             generation_in_progress: AtomicBool::new(false),
+            auto_hide: Default::default(),
             persistence_gate: Default::default(),
         }
     }
@@ -1414,6 +1469,7 @@ mod tests {
             }),
             exiting: AtomicBool::new(false),
             generation_in_progress: AtomicBool::new(false),
+            auto_hide: Default::default(),
             persistence_gate: Default::default(),
         };
         let input = |replace_existing_key| SaveProviderInput {
@@ -1786,6 +1842,7 @@ mod tests {
             http: transport.clone(),
             exiting: AtomicBool::new(false),
             generation_in_progress: AtomicBool::new(false),
+            auto_hide: Default::default(),
             persistence_gate: Default::default(),
         };
 
@@ -1857,6 +1914,7 @@ mod tests {
             http: transport.clone(),
             exiting: AtomicBool::new(false),
             generation_in_progress: AtomicBool::new(false),
+            auto_hide: Default::default(),
             persistence_gate: Default::default(),
         };
         let history = (0..8)

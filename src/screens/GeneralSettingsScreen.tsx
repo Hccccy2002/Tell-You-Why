@@ -200,6 +200,21 @@ export function GeneralSettingsScreen({
         </label>
         <label className="switch-row">
           <span>
+            <strong>鼠标移出后自动收起</strong>
+            <small>
+              离开窗口约 0.7 秒后收至系统托盘；弹窗或拖动时不会触发。
+            </small>
+          </span>
+          <input
+            type="checkbox"
+            checked={settings.autoHideOnMouseLeave}
+            onChange={(event) =>
+              update("autoHideOnMouseLeave", event.target.checked)
+            }
+          />
+        </label>
+        <label className="switch-row">
+          <span>
             <strong>开机启动</strong>
             <small>只启动到托盘</small>
           </span>

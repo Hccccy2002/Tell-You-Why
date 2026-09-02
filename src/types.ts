@@ -53,6 +53,7 @@ export type ReminderPreset =
 export interface AppSettings {
   theme: ThemeMode;
   alwaysOnTop: boolean;
+  autoHideOnMouseLeave: boolean;
   autostart: boolean;
   personalizationEnabled: boolean;
   reminderPreset: ReminderPreset;
@@ -84,6 +85,11 @@ export interface FollowUpResult {
   providerId: "deepseek" | "kimi";
   model: string;
   switchedFromProviderId: "deepseek" | "kimi" | null;
+}
+
+export interface FollowUpMessage extends FollowUpTurn {
+  requestContent?: string;
+  result?: FollowUpResult;
 }
 
 export interface LibraryItem {

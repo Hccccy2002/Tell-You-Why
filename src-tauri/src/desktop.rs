@@ -1,3 +1,4 @@
+use crate::auto_hide;
 use crate::models::{AppSettings, ReminderPreset, WindowState};
 use crate::AppState;
 use chrono::{Datelike, Local, Timelike, Utc};
@@ -30,8 +31,12 @@ pub fn setup(app: &mut App) -> tauri::Result<()> {
         restore_window_state(&window);
         if let Ok(settings) = app.state::<AppState>().database.settings() {
             let _ = window.set_always_on_top(settings.always_on_top);
+            app.state::<AppState>()
+                .auto_hide
+                .set_enabled(settings.auto_hide_on_mouse_leave);
         }
     }
+    auto_hide::start_monitor(app.handle().clone());
     start_reminder_scheduler(app.handle().clone());
     Ok(())
 }
@@ -97,6 +102,7 @@ pub fn toggle_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
             let _ = save_window_state(&window);
+            window.state::<AppState>().auto_hide.window_hidden();
             let _ = window.hide();
         } else {
             show_window(app);
@@ -110,6 +116,7 @@ fn show_window(app: &AppHandle) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        window.state::<AppState>().auto_hide.window_shown();
     }
 }
 
@@ -159,7 +166,59 @@ pub fn handle_close_requested(window: &WebviewWindow, api: &tauri::CloseRequestA
             let _ = state.database.mark_close_tip_shown();
         }
     }
+    window.state::<AppState>().auto_hide.window_hidden();
     let _ = window.hide();
+}
+
+pub(crate) fn hide_window_for_auto_hide(
+    window: &WebviewWindow,
+    request: auto_hide::AutoHideRequest,
+) {
+    let state = window.state::<AppState>();
+    let Ok(_permit) = state.persistence_gate.try_operation() else {
+        state.auto_hide.protect_for_interaction();
+        return;
+    };
+    let _ = save_window_state_under_permit(window);
+    let Some(snapshot) = auto_hide::window_pointer_snapshot(window.app_handle(), window) else {
+        state.auto_hide.protect_for_interaction();
+        return;
+    };
+    if !state.auto_hide.confirm_hide(request, snapshot) {
+        return;
+    }
+    if window.hide().is_ok() {
+        if !state.database.auto_hide_tip_shown().unwrap_or(true) {
+            let shortcut = state
+                .database
+                .settings()
+                .map(|settings| settings.global_shortcut)
+                .unwrap_or_else(|_| "Alt+Shift+Y".to_string());
+            let notification_result = window
+                .app_handle()
+                .notification()
+                .builder()
+                .title("Tell You Why")
+                .body(format!(
+                    "已自动收至系统托盘，可用 {shortcut} 恢复；可在通用设置关闭此功能。"
+                ))
+                .show();
+            mark_tip_after_notification_success(notification_result, || {
+                let _ = state.database.mark_auto_hide_tip_shown();
+            });
+        }
+    } else {
+        state.auto_hide.window_shown();
+    }
+}
+
+fn mark_tip_after_notification_success<T, E>(
+    notification_result: Result<T, E>,
+    mark_tip: impl FnOnce(),
+) {
+    if notification_result.is_ok() {
+        mark_tip();
+    }
 }
 
 pub fn save_window_state(window: &WebviewWindow) -> Result<(), String> {
@@ -381,11 +440,23 @@ fn foreground_is_fullscreen() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
 
     #[test]
     fn overnight_quiet_hours_are_supported() {
         assert!(in_quiet_hours("23:00", "18:00", "09:00"));
         assert!(in_quiet_hours("08:30", "18:00", "09:00"));
         assert!(!in_quiet_hours("12:00", "18:00", "09:00"));
+    }
+
+    #[test]
+    fn auto_hide_tip_is_marked_only_after_a_successful_notification() {
+        let marks = Cell::new(0);
+
+        mark_tip_after_notification_success(Err::<(), ()>(()), || marks.set(marks.get() + 1));
+        assert_eq!(marks.get(), 0);
+
+        mark_tip_after_notification_success(Ok::<(), ()>(()), || marks.set(marks.get() + 1));
+        assert_eq!(marks.get(), 1);
     }
 }

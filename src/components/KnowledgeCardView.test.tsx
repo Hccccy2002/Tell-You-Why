@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { fallbackCards } from "../data/fallbackCards";
 import appStyles from "../styles.css?raw";
-import type { FollowUpResult } from "../types";
+import type { FollowUpMessage, FollowUpResult } from "../types";
 import { KnowledgeCardView } from "./KnowledgeCardView";
 
 function deferred<T>() {
@@ -85,6 +85,7 @@ describe("KnowledgeCardView", () => {
       model: "deepseek-v4-flash",
       switchedFromProviderId: null,
     }),
+    onLoadFollowUps: vi.fn().mockResolvedValue([]),
     onFollowUpBusyChange: vi.fn(),
     onInteraction: vi.fn().mockResolvedValue(undefined),
     onReturnHome: vi.fn(),
@@ -98,6 +99,7 @@ describe("KnowledgeCardView", () => {
 
   beforeEach(() => {
     Object.values(baseHandlers).forEach((handler) => handler.mockClear());
+    baseHandlers.onLoadFollowUps.mockReset().mockResolvedValue([]);
   });
 
   it("shows the new main actions, then replaces them with answer actions", async () => {
@@ -265,6 +267,9 @@ describe("KnowledgeCardView", () => {
         name: "将这张知识卡标记为不感兴趣？",
       }),
     ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "不感兴趣" })).toBeEnabled(),
+    );
     expect(baseHandlers.onDismiss).not.toHaveBeenCalled();
   });
 
@@ -348,6 +353,7 @@ describe("KnowledgeCardView", () => {
       1,
       "能举个例子吗？",
       [],
+      "能举个例子吗？",
     );
     expect(
       screen.getByText("DeepSeek · deepseek-v4-flash · AI 未核验"),
@@ -369,6 +375,7 @@ describe("KnowledgeCardView", () => {
             content: "这是一个便于理解的补充回答。",
           },
         ],
+        "能再解释一步吗？",
       );
     });
   });
@@ -410,6 +417,7 @@ describe("KnowledgeCardView", () => {
       expect(baseHandlers.onAskFollowUp).toHaveBeenCalledWith(
         expect.stringContaining(selectedText),
         [],
+        `解释「${selectedText}」`,
       );
     });
     expect(baseHandlers.onAskFollowUp.mock.calls[0]![0]).toContain(
@@ -461,6 +469,7 @@ describe("KnowledgeCardView", () => {
             content: "这是一个便于理解的补充回答。",
           },
         ],
+        "解释「氢键」",
       );
     });
     expect(input).toHaveValue("我还在编辑的问题");
@@ -822,8 +831,65 @@ describe("KnowledgeCardView", () => {
       expect(baseHandlers.onAskFollowUp).toHaveBeenCalledWith(
         "第一行\n第二行",
         [],
+        "第一行\n第二行",
       );
     });
+  });
+
+  it("restores saved follow-ups and reuses their request context", async () => {
+    const user = userEvent.setup();
+    const savedThread: FollowUpMessage[] = [
+      {
+        role: "user",
+        content: "解释「晶体结构」",
+        requestContent: "请解释选中的晶体结构",
+      },
+      {
+        role: "assistant",
+        content: "这是此前保存的回答。",
+        result: {
+          answer: "这是此前保存的回答。",
+          providerId: "deepseek",
+          model: "deepseek-v4-flash",
+          switchedFromProviderId: null,
+        },
+      },
+    ];
+    baseHandlers.onLoadFollowUps.mockResolvedValueOnce(savedThread);
+    render(
+      <KnowledgeCardView
+        card={fallbackCards[0]!}
+        availableCardCount={12}
+        busy={false}
+        canGoPrevious={true}
+        {...baseHandlers}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(baseHandlers.onLoadFollowUps).toHaveBeenCalledWith(
+        fallbackCards[0]!.id,
+      ),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "我想好了，揭晓答案" }),
+    );
+    expect(await screen.findByText("解释「晶体结构」")).toBeVisible();
+    expect(screen.getByText("这是此前保存的回答。")).toBeVisible();
+
+    const input = screen.getByRole("textbox", { name: "输入追问" });
+    await user.type(input, "还能举个例子吗？");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() =>
+      expect(baseHandlers.onAskFollowUp).toHaveBeenCalledWith(
+        "还能举个例子吗？",
+        [
+          { role: "user", content: "请解释选中的晶体结构" },
+          { role: "assistant", content: "这是此前保存的回答。" },
+        ],
+        "还能举个例子吗？",
+      ),
+    );
   });
 
   it("deduplicates loading submissions and keeps the draft after an error", async () => {

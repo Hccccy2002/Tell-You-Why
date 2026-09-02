@@ -22,6 +22,7 @@ describe("browser fallback core", () => {
     expect(
       bootstrap.providers.every((provider) => !provider.keyConfigured),
     ).toBe(true);
+    expect(bootstrap.settings.autoHideOnMouseLeave).toBe(false);
 
     const next = await nextCard(first.id);
     expect(next.id).not.toBe(first.id);

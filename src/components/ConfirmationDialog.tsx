@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useAutoHideGuard } from "../lib/autoHideGuard";
 
 interface Props {
   id: string;
@@ -24,6 +25,7 @@ export function ConfirmationDialog({
   onCancel,
   onConfirm,
 }: Props) {
+  useAutoHideGuard(true, "confirmation-dialog");
   const dialogRef = useRef<HTMLElement>(null);
   const focusRestoreFrameRef = useRef<number | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(

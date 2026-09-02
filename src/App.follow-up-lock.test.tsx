@@ -7,10 +7,11 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
-import type { FollowUpResult } from "./types";
+import type { FollowUpMessage, FollowUpResult } from "./types";
 
-const { askFollowUpMock } = vi.hoisted(() => ({
+const { askFollowUpMock, listCardFollowUpsMock } = vi.hoisted(() => ({
   askFollowUpMock: vi.fn(),
+  listCardFollowUpsMock: vi.fn(),
 }));
 
 vi.mock("./lib/api", async (importOriginal) => {
@@ -18,7 +19,11 @@ vi.mock("./lib/api", async (importOriginal) => {
   if (!actual || typeof actual !== "object") {
     throw new Error("Failed to load the real API module for this test");
   }
-  return { ...actual, askFollowUp: askFollowUpMock };
+  return {
+    ...actual,
+    askFollowUp: askFollowUpMock,
+    listCardFollowUps: listCardFollowUpsMock,
+  };
 });
 
 import App from "./App";
@@ -47,6 +52,7 @@ async function openFirstLocalCard() {
 describe("follow-up navigation lock", () => {
   beforeEach(async () => {
     askFollowUpMock.mockReset();
+    listCardFollowUpsMock.mockReset().mockResolvedValue([]);
     await clearData("all");
   });
 
@@ -106,9 +112,28 @@ describe("follow-up navigation lock", () => {
         screen.getByRole("button", { name: "返回知识小窗" }),
       ).toBeEnabled(),
     );
+    const savedThread: FollowUpMessage[] = [
+      { role: "user", content: "解释一下" },
+      {
+        role: "assistant",
+        content: "这是保留下来的回答。",
+        result: {
+          answer: "这是保留下来的回答。",
+          providerId: "deepseek",
+          model: "deepseek-v4-flash",
+          switchedFromProviderId: null,
+        },
+      },
+    ];
+    listCardFollowUpsMock.mockResolvedValue(savedThread);
     await user.click(screen.getByRole("button", { name: "返回知识小窗" }));
     expect(
       screen.getByRole("heading", { name: "想探索哪个领域？" }),
     ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /浏览现有知识点/ }));
+    await user.click(
+      screen.getByRole("button", { name: "我想好了，揭晓答案" }),
+    );
+    expect(await screen.findByText("这是保留下来的回答。")).toBeVisible();
   });
 });

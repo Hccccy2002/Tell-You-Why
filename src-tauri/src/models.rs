@@ -99,6 +99,8 @@ pub enum ReminderPreset {
 pub struct AppSettings {
     pub theme: ThemeMode,
     pub always_on_top: bool,
+    #[serde(default)]
+    pub auto_hide_on_mouse_leave: bool,
     pub autostart: bool,
     pub personalization_enabled: bool,
     pub reminder_preset: ReminderPreset,
@@ -116,6 +118,7 @@ impl Default for AppSettings {
         Self {
             theme: ThemeMode::System,
             always_on_top: false,
+            auto_hide_on_mouse_leave: false,
             autostart: false,
             personalization_enabled: true,
             reminder_preset: ReminderPreset::Manual,
@@ -256,6 +259,17 @@ pub struct FollowUpResponse {
     pub switched_from_provider_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FollowUpMessage {
+    pub role: FollowUpRole,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<FollowUpResponse>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowState {
@@ -268,8 +282,27 @@ pub struct WindowState {
 
 #[cfg(test)]
 mod tests {
-    use super::SaveProviderInput;
+    use super::{AppSettings, SaveProviderInput};
     use serde_json::json;
+
+    #[test]
+    fn legacy_app_settings_default_auto_hide_to_disabled() {
+        let mut legacy = serde_json::to_value(AppSettings::default()).expect("serialize defaults");
+        legacy
+            .as_object_mut()
+            .expect("settings object")
+            .remove("autoHideOnMouseLeave");
+
+        let settings: AppSettings =
+            serde_json::from_value(legacy).expect("deserialize legacy settings");
+
+        assert!(!settings.auto_hide_on_mouse_leave);
+        assert_eq!(
+            serde_json::to_value(settings).expect("serialize migrated settings")
+                ["autoHideOnMouseLeave"],
+            false
+        );
+    }
 
     #[test]
     fn provider_key_replacement_confirmation_defaults_to_false_and_uses_camel_case() {

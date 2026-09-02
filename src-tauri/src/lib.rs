@@ -1,3 +1,4 @@
+mod auto_hide;
 mod commands;
 mod content;
 mod db;
@@ -23,6 +24,7 @@ pub struct AppState {
     pub http: Arc<dyn ProviderTransport>,
     pub exiting: AtomicBool,
     pub generation_in_progress: AtomicBool,
+    pub auto_hide: auto_hide::AutoHideController,
     pub(crate) persistence_gate: PersistenceResetGate,
 }
 
@@ -59,23 +61,38 @@ pub fn run() {
                 http: Arc::new(http),
                 exiting: AtomicBool::new(false),
                 generation_in_progress: AtomicBool::new(false),
+                auto_hide: auto_hide::AutoHideController::default(),
                 persistence_gate: PersistenceResetGate::default(),
             });
             desktop::setup(app)?;
             if std::env::args_os().any(|argument| argument == "--hidden") {
                 if let Some(window) = app.get_webview_window("main") {
+                    window.state::<AppState>().auto_hide.window_hidden();
                     let _ = window.hide();
                 }
             }
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main" {
+            if window.label() != "main" {
+                return;
+            }
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
                     if let Some(webview_window) = window.app_handle().get_webview_window("main") {
                         desktop::handle_close_requested(&webview_window, api);
                     }
                 }
+                tauri::WindowEvent::Moved(_)
+                | tauri::WindowEvent::Resized(_)
+                | tauri::WindowEvent::ScaleFactorChanged { .. } => {
+                    window
+                        .app_handle()
+                        .state::<AppState>()
+                        .auto_hide
+                        .protect_for_interaction();
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -88,6 +105,7 @@ pub fn run() {
             commands::list_library,
             commands::delete_library_card,
             commands::save_settings,
+            commands::set_auto_hide_suspended,
             commands::save_generation_provider,
             commands::generation_usage,
             commands::pause_reminders,
@@ -99,6 +117,7 @@ pub fn run() {
             commands::generate_random_topic,
             commands::generate_random_topic_batch,
             commands::ask_follow_up,
+            commands::list_card_follow_ups,
             commands::import_cards_file,
             commands::clear_data,
             commands::open_source_url,

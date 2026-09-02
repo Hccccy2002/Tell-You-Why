@@ -4,8 +4,10 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { ConfirmationDialog } from "./ConfirmationDialog";
+import { useAutoHideGuard } from "../lib/autoHideGuard";
 import { friendlyError, openSourceUrl } from "../lib/api";
 import type {
+  FollowUpMessage,
   FollowUpResult,
   FollowUpTurn,
   InteractionKind,
@@ -24,11 +26,6 @@ const providerLabels = {
   deepseek: "DeepSeek",
   kimi: "Kimi",
 } satisfies Record<FollowUpResult["providerId"], string>;
-
-interface FollowUpMessage extends FollowUpTurn {
-  requestContent?: string;
-  result?: FollowUpResult;
-}
 
 interface SelectionAnchor {
   bottom: number;
@@ -251,7 +248,9 @@ interface Props {
   onAskFollowUp: (
     question: string,
     history: FollowUpTurn[],
+    displayQuestion: string,
   ) => Promise<FollowUpResult>;
+  onLoadFollowUps: (cardId: string) => Promise<FollowUpMessage[]>;
   onFollowUpBusyChange: (busy: boolean) => void;
   onInteraction: (kind: InteractionKind) => Promise<void>;
   onPrevious: () => void;
@@ -269,6 +268,7 @@ export function KnowledgeCardView({
   canGoPrevious,
   onReturnHome,
   onAskFollowUp,
+  onLoadFollowUps,
   onFollowUpBusyChange,
   onInteraction,
   onPrevious,
@@ -282,6 +282,10 @@ export function KnowledgeCardView({
   const [expanded, setExpanded] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState("");
   const [followUpThread, setFollowUpThread] = useState<FollowUpMessage[]>([]);
+  const [loadedFollowUpCardId, setLoadedFollowUpCardId] = useState<
+    string | null
+  >(null);
+  const followUpHistoryLoading = loadedFollowUpCardId !== card.id;
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
@@ -309,6 +313,29 @@ export function KnowledgeCardView({
   const selectionPopoverRef = useRef<HTMLDivElement>(null);
   const selectionQueryCancelButtonRef = useRef<HTMLButtonElement>(null);
   const selectionQueryButtonRef = useRef<HTMLButtonElement>(null);
+
+  useAutoHideGuard(selectionQuery !== null, "selection-query");
+
+  useEffect(() => {
+    let active = true;
+    void onLoadFollowUps(card.id)
+      .then((messages) => {
+        if (active) setFollowUpThread(messages);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setFollowUpError(
+            `暂时无法加载这张知识卡的追问记录：${friendlyError(error)}`,
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadedFollowUpCardId(card.id);
+      });
+    return () => {
+      active = false;
+    };
+  }, [card.id, onLoadFollowUps]);
 
   useEffect(() => {
     const input = followUpInputRef.current;
@@ -457,7 +484,13 @@ export function KnowledgeCardView({
   ) {
     const question = apiQuestion.trim();
     const visibleQuestion = displayQuestion.trim();
-    if (!question || !visibleQuestion || busy || followUpInFlightRef.current) {
+    if (
+      !question ||
+      !visibleQuestion ||
+      busy ||
+      followUpHistoryLoading ||
+      followUpInFlightRef.current
+    ) {
       return;
     }
 
@@ -477,7 +510,7 @@ export function KnowledgeCardView({
           role,
           content: requestContent ?? content,
         }));
-      const result = await onAskFollowUp(question, history);
+      const result = await onAskFollowUp(question, history, visibleQuestion);
       if (followUpRequestRef.current !== requestId) return;
       const answer = result.answer.trim();
       if (!answer) throw new Error("模型暂未返回内容，请稍后再试");
@@ -579,7 +612,7 @@ export function KnowledgeCardView({
     setRevealed(false);
   }
 
-  const cardBusy = busy || followUpLoading;
+  const cardBusy = busy || followUpLoading || followUpHistoryLoading;
 
   return (
     <main className={revealed ? "card-view revealed" : "card-view"}>
@@ -715,7 +748,8 @@ export function KnowledgeCardView({
                   </span>
                   <small>会参考当前卡片，也可以问其他知识</small>
                 </div>
-                {followUpThread.length > 0 || pendingQuestion ? (
+                {(!followUpHistoryLoading && followUpThread.length > 0) ||
+                pendingQuestion ? (
                   <div
                     ref={followUpThreadRef}
                     className="follow-up-thread"
@@ -838,7 +872,11 @@ export function KnowledgeCardView({
                       type="submit"
                       disabled={cardBusy || !followUpDraft.trim()}
                     >
-                      {followUpLoading ? "正在回答…" : "发送"}
+                      {followUpHistoryLoading
+                        ? "加载中…"
+                        : followUpLoading
+                          ? "正在回答…"
+                          : "发送"}
                     </button>
                   </form>
                   <small

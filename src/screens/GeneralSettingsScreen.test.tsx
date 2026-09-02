@@ -84,6 +84,36 @@ describe("GeneralSettingsScreen", () => {
     );
   });
 
+  it("saves mouse-leave auto-hide only after the settings form is submitted", async () => {
+    const bootstrap = await bootstrapApp();
+    const onSaved = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <GeneralSettingsScreen
+        initialSettings={{
+          ...bootstrap.settings,
+          autoHideOnMouseLeave: false,
+        }}
+        onSaved={onSaved}
+        onDataCleared={vi.fn()}
+      />,
+    );
+
+    const autoHide = screen.getByRole("checkbox", {
+      name: /鼠标移出后自动收起/,
+    });
+    expect(autoHide).not.toBeChecked();
+
+    await user.click(autoHide);
+    expect(autoHide).toBeChecked();
+    expect(onSaved).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "保存通用设置" }));
+    expect(onSaved).toHaveBeenCalledWith(
+      expect.objectContaining({ autoHideOnMouseLeave: true }),
+    );
+  });
+
   it.each(clearCases)(
     "clears $scope only after cancelling and confirming the reopened dialog",
     async ({ scope, entryName, title, confirmLabel }) => {

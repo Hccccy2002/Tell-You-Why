@@ -1,7 +1,7 @@
 use crate::content::{fingerprint, questions_are_similar, validate_card};
 use crate::models::{
-    AppSettings, Difficulty, ImportResult, KnowledgeCard, LibraryItem, OnboardingInput,
-    TopicPreference, TrustStatus, WindowState,
+    AppSettings, Difficulty, FollowUpMessage, FollowUpResponse, FollowUpRole, ImportResult,
+    KnowledgeCard, LibraryItem, OnboardingInput, TopicPreference, TrustStatus, WindowState,
 };
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 use serde::{Deserialize, Serialize};
@@ -222,6 +222,27 @@ impl Database {
                 );
                 INSERT INTO schema_migrations(version, applied_at)
                 VALUES (5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));",
+            )?;
+            transaction.commit()?;
+        }
+        if version < 6 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(
+                "CREATE TABLE follow_up_exchanges (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+                    display_question TEXT NOT NULL,
+                    request_question TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    provider_id TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    switched_from_provider_id TEXT,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX idx_follow_up_exchanges_card
+                ON follow_up_exchanges(card_id, id);
+                INSERT INTO schema_migrations(version, applied_at)
+                VALUES (6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));",
             )?;
             transaction.commit()?;
         }
@@ -751,6 +772,10 @@ impl Database {
             )
             .optional()?
             .ok_or(DbError::NoCards)?;
+        transaction.execute(
+            "DELETE FROM follow_up_exchanges WHERE card_id = ?1",
+            [card_id],
+        )?;
         if built_in == 0 {
             transaction.execute("DELETE FROM cards WHERE id = ?1", [card_id])?;
         } else {
@@ -770,6 +795,94 @@ impl Database {
         }
         transaction.commit()?;
         Ok(())
+    }
+
+    pub fn save_follow_up_exchange(
+        &self,
+        card_id: &str,
+        display_question: &str,
+        request_question: &str,
+        response: &FollowUpResponse,
+    ) -> Result<(), DbError> {
+        let connection = self.connect()?;
+        let inserted = connection.execute(
+            "INSERT INTO follow_up_exchanges(
+                card_id, display_question, request_question, answer,
+                provider_id, model, switched_from_provider_id, created_at
+             )
+             SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
+             FROM cards c
+             LEFT JOIN card_user_state s ON s.card_id = c.id
+             WHERE c.id = ?1 AND COALESCE(s.deleted, 0) = 0",
+            params![
+                card_id,
+                display_question,
+                request_question,
+                response.answer,
+                response.provider_id,
+                response.model,
+                response.switched_from_provider_id,
+                chrono::Utc::now().to_rfc3339(),
+            ],
+        )?;
+        if inserted == 0 {
+            return Err(DbError::NoCards);
+        }
+        Ok(())
+    }
+
+    pub fn card_follow_ups(&self, card_id: &str) -> Result<Vec<FollowUpMessage>, DbError> {
+        let connection = self.connect()?;
+        let mut statement = connection.prepare(
+            "SELECT display_question, request_question, answer, provider_id,
+                    model, switched_from_provider_id
+             FROM follow_up_exchanges
+             WHERE card_id = ?1
+             ORDER BY id ASC",
+        )?;
+        let rows = statement
+            .query_map([card_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut messages = Vec::with_capacity(rows.len() * 2);
+        for (
+            display_question,
+            request_question,
+            answer,
+            provider_id,
+            model,
+            switched_from_provider_id,
+        ) in rows
+        {
+            let request_content =
+                (display_question != request_question).then_some(request_question);
+            messages.push(FollowUpMessage {
+                role: FollowUpRole::User,
+                content: display_question,
+                request_content,
+                result: None,
+            });
+            messages.push(FollowUpMessage {
+                role: FollowUpRole::Assistant,
+                content: answer.clone(),
+                request_content: None,
+                result: Some(FollowUpResponse {
+                    answer,
+                    provider_id,
+                    model,
+                    switched_from_provider_id,
+                }),
+            });
+        }
+        Ok(messages)
     }
 
     pub fn resolve_generation_topic(
@@ -1167,6 +1280,7 @@ impl Database {
                 )?;
                 transaction.execute("DELETE FROM interactions", [])?;
                 transaction.execute("DELETE FROM card_user_state", [])?;
+                transaction.execute("DELETE FROM follow_up_exchanges", [])?;
                 transaction.execute("DELETE FROM generation_jobs", [])?;
                 transaction.execute("DELETE FROM provider_profiles", [])?;
                 transaction.execute("DELETE FROM cards WHERE built_in = 0", [])?;
@@ -1213,6 +1327,18 @@ impl Database {
     pub fn mark_close_tip_shown(&self) -> Result<(), DbError> {
         let connection = self.connect()?;
         set_json_with_connection(&connection, "close_tip_shown", &true)
+    }
+
+    pub fn auto_hide_tip_shown(&self) -> Result<bool, DbError> {
+        let connection = self.connect()?;
+        Ok(self
+            .get_json_with_connection(&connection, "auto_hide_tip_shown")?
+            .unwrap_or(false))
+    }
+
+    pub fn mark_auto_hide_tip_shown(&self) -> Result<(), DbError> {
+        let connection = self.connect()?;
+        set_json_with_connection(&connection, "auto_hide_tip_shown", &true)
     }
 
     pub fn start_generation_job(
@@ -1502,6 +1628,20 @@ mod tests {
     }
 
     #[test]
+    fn auto_hide_tip_is_shown_once_and_reset_with_all_local_data() {
+        let (_directory, database) = test_database();
+
+        assert!(!database.auto_hide_tip_shown().expect("initial tip state"));
+        database
+            .mark_auto_hide_tip_shown()
+            .expect("mark auto-hide tip");
+        assert!(database.auto_hide_tip_shown().expect("saved tip state"));
+
+        database.clear_data("all").expect("clear all data");
+        assert!(!database.auto_hide_tip_shown().expect("reset tip state"));
+    }
+
+    #[test]
     fn preview_card_does_not_create_reading_history() {
         let (_directory, database) = test_database();
         let preview = database.preview_card().expect("preview card");
@@ -1519,6 +1659,59 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn follow_ups_survive_history_clear_and_are_removed_with_the_card() {
+        let (_directory, database) = test_database();
+        let card = database.next_card(None).expect("shown card");
+        let response = FollowUpResponse {
+            answer: "因为这种排列会留下更多空隙。".into(),
+            provider_id: "deepseek".into(),
+            model: "deepseek-v4-flash".into(),
+            switched_from_provider_id: None,
+        };
+        let display_question = "解释「晶体结构」";
+        let request_question = "请解释选中的晶体结构";
+
+        database
+            .save_follow_up_exchange(&card.id, display_question, request_question, &response)
+            .expect("save follow-up");
+
+        let expected = vec![
+            FollowUpMessage {
+                role: FollowUpRole::User,
+                content: display_question.into(),
+                request_content: Some(request_question.into()),
+                result: None,
+            },
+            FollowUpMessage {
+                role: FollowUpRole::Assistant,
+                content: response.answer.clone(),
+                request_content: None,
+                result: Some(response),
+            },
+        ];
+        assert_eq!(
+            database.card_follow_ups(&card.id).expect("saved thread"),
+            expected
+        );
+
+        database.clear_data("history").expect("clear history");
+        assert_eq!(
+            database
+                .card_follow_ups(&card.id)
+                .expect("thread after history clear"),
+            expected
+        );
+
+        database
+            .delete_library_card(&card.id)
+            .expect("delete knowledge card");
+        assert!(database
+            .card_follow_ups(&card.id)
+            .expect("thread after card deletion")
+            .is_empty());
     }
 
     #[test]

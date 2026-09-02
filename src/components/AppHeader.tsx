@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useAutoHideGuard } from "../lib/autoHideGuard";
 
 export type AppView = "home" | "interests" | "models" | "library" | "settings";
 
@@ -25,6 +26,7 @@ export function AppHeader({
   onMenuToggle,
   onNavigate,
 }: Props) {
+  useAutoHideGuard(menuOpen, "main-menu");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

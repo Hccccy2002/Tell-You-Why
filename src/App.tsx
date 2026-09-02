@@ -14,12 +14,17 @@ import {
   generateSameTopic,
   generateTopicBatch,
   isDesktop,
+  listCardFollowUps,
   nextCard,
   recordCardShown,
   recordInteraction,
   saveGenerationProvider,
   saveOnboarding,
 } from "./lib/api";
+import {
+  installAutoHideInteractionGuards,
+  resetAutoHideGuards,
+} from "./lib/autoHideGuard";
 import { GeneralSettingsScreen } from "./screens/GeneralSettingsScreen";
 import { InterestSettingsScreen } from "./screens/InterestSettingsScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
@@ -93,6 +98,15 @@ export default function App() {
   const updateCardFollowUpBusy = useCallback((value: boolean) => {
     cardFollowUpBusyRef.current = value;
     setCardFollowUpBusy(value);
+  }, []);
+
+  useEffect(() => {
+    void resetAutoHideGuards();
+    const cleanupInteractionGuards = installAutoHideInteractionGuards();
+    return () => {
+      cleanupInteractionGuards();
+      void resetAutoHideGuards();
+    };
   }, []);
 
   useEffect(() => {
@@ -323,9 +337,10 @@ export default function App() {
   async function askCurrentCardFollowUp(
     question: string,
     history: FollowUpTurn[],
+    displayQuestion: string,
   ): Promise<FollowUpResult> {
     if (!data?.card) throw new Error("当前知识卡不可用，请切换后再试");
-    return askFollowUp(data.card.id, question, history);
+    return askFollowUp(data.card.id, question, history, displayQuestion);
   }
 
   async function advance() {
@@ -850,6 +865,7 @@ export default function App() {
             (card) => !dismissedCardIds.has(card.id),
           )}
           onAskFollowUp={askCurrentCardFollowUp}
+          onLoadFollowUps={listCardFollowUps}
           onFollowUpBusyChange={updateCardFollowUpBusy}
           onInteraction={interaction}
           onReturnHome={() => {

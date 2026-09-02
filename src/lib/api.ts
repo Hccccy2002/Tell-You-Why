@@ -1,10 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { fallbackCards, presetTopics } from "../data/fallbackCards";
+import { withAutoHideGuard } from "./autoHideGuard";
 import type {
   AppSettings,
   BootstrapData,
   DataClearScope,
+  FollowUpMessage,
   FollowUpResult,
   FollowUpTurn,
   GenerationBatchResult,
@@ -21,6 +23,7 @@ import type {
 const defaultSettings: AppSettings = {
   theme: "system",
   alwaysOnTop: false,
+  autoHideOnMouseLeave: false,
   autostart: false,
   personalizationEnabled: true,
   reminderPreset: "manual",
@@ -89,6 +92,7 @@ const memory = {
   favorites: new Set<string>(),
   hidden: new Set<string>(),
   deleted: new Set<string>(),
+  followUps: new Map<string, FollowUpMessage[]>(),
 };
 
 export const isDesktop = () =>
@@ -286,6 +290,7 @@ export async function deleteLibraryCard(cardId: string): Promise<void> {
     memory.hidden.add(cardId);
     memory.favorites.delete(cardId);
     memory.history = memory.history.filter((item) => item.card.id !== cardId);
+    memory.followUps.delete(cardId);
   });
 }
 
@@ -373,10 +378,23 @@ export async function askFollowUp(
   cardId: string,
   question: string,
   history: FollowUpTurn[],
+  displayQuestion = question,
 ): Promise<FollowUpResult> {
-  return desktopOr("ask_follow_up", { cardId, question, history }, () => {
-    throw new Error("请先配置模型哦~");
-  });
+  return desktopOr(
+    "ask_follow_up",
+    { cardId, question, displayQuestion, history },
+    () => {
+      throw new Error("请先配置模型哦~");
+    },
+  );
+}
+
+export async function listCardFollowUps(
+  cardId: string,
+): Promise<FollowUpMessage[]> {
+  return desktopOr("list_card_follow_ups", { cardId }, () =>
+    structuredClone(memory.followUps.get(cardId) ?? []),
+  );
 }
 
 export async function generateTopicBatch(
@@ -409,11 +427,13 @@ export async function generateRandomTopicBatch(
 
 export async function chooseAndImportCards(): Promise<ImportResult | null> {
   if (!isDesktop()) throw new Error("知识卡导入只在桌面应用中可用。");
-  const path = await open({
-    multiple: false,
-    directory: false,
-    filters: [{ name: "知识卡文件", extensions: ["json", "csv"] }],
-  });
+  const path = await withAutoHideGuard("file-picker", () =>
+    open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "知识卡文件", extensions: ["json", "csv"] }],
+    }),
+  );
   if (!path) return null;
   return invoke<ImportResult>("import_cards_file", { path });
 }
@@ -438,6 +458,7 @@ export async function clearData(scope: DataClearScope): Promise<string | null> {
       memory.favorites.clear();
       memory.hidden.clear();
       memory.deleted.clear();
+      memory.followUps.clear();
       memory.onboardingComplete = false;
       memory.settings = { ...defaultSettings };
       memory.generationProviderId = "deepseek";
