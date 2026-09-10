@@ -1,0 +1,227 @@
+{
+  "id": "hw-035",
+  "applies_to": "corpus.jsonl text field, excluding document header",
+  "line_numbering": "one-based",
+  "lines": [
+    {
+      "line": 1,
+      "source_line_start": 194,
+      "source_line_end": 194
+    },
+    {
+      "line": 2,
+      "source_line_start": 195,
+      "source_line_end": 195
+    },
+    {
+      "line": 3,
+      "source_line_start": 196,
+      "source_line_end": 196
+    },
+    {
+      "line": 4,
+      "source_line_start": 197,
+      "source_line_end": 197
+    },
+    {
+      "line": 5,
+      "source_line_start": 198,
+      "source_line_end": 198
+    },
+    {
+      "line": 6,
+      "source_line_start": 199,
+      "source_line_end": 199
+    },
+    {
+      "line": 7,
+      "source_line_start": 200,
+      "source_line_end": 202
+    },
+    {
+      "line": 8,
+      "source_line_start": 203,
+      "source_line_end": 203
+    },
+    {
+      "line": 9,
+      "source_line_start": 204,
+      "source_line_end": 204
+    },
+    {
+      "line": 10,
+      "source_line_start": 205,
+      "source_line_end": 205
+    },
+    {
+      "line": 11,
+      "source_line_start": 206,
+      "source_line_end": 208
+    },
+    {
+      "line": 12,
+      "source_line_start": 209,
+      "source_line_end": 209
+    },
+    {
+      "line": 13,
+      "source_line_start": 210,
+      "source_line_end": 210
+    },
+    {
+      "line": 14,
+      "source_line_start": 211,
+      "source_line_end": 211
+    },
+    {
+      "line": 15,
+      "source_line_start": 212,
+      "source_line_end": 212
+    },
+    {
+      "line": 16,
+      "source_line_start": 213,
+      "source_line_end": 213
+    },
+    {
+      "line": 17,
+      "source_line_start": 214,
+      "source_line_end": 214
+    },
+    {
+      "line": 18,
+      "source_line_start": 215,
+      "source_line_end": 215
+    },
+    {
+      "line": 19,
+      "source_line_start": 216,
+      "source_line_end": 216
+    },
+    {
+      "line": 20,
+      "source_line_start": 217,
+      "source_line_end": 217
+    },
+    {
+      "line": 21,
+      "source_line_start": 218,
+      "source_line_end": 218
+    },
+    {
+      "line": 22,
+      "source_line_start": 219,
+      "source_line_end": 219
+    },
+    {
+      "line": 23,
+      "source_line_start": 220,
+      "source_line_end": 220
+    },
+    {
+      "line": 24,
+      "source_line_start": 221,
+      "source_line_end": 221
+    },
+    {
+      "line": 25,
+      "source_line_start": 222,
+      "source_line_end": 222
+    },
+    {
+      "line": 26,
+      "source_line_start": 223,
+      "source_line_end": 223
+    },
+    {
+      "line": 27,
+      "source_line_start": 224,
+      "source_line_end": 224
+    },
+    {
+      "line": 28,
+      "source_line_start": 225,
+      "source_line_end": 225
+    },
+    {
+      "line": 29,
+      "source_line_start": 226,
+      "source_line_end": 226
+    },
+    {
+      "line": 30,
+      "source_line_start": 227,
+      "source_line_end": 227
+    },
+    {
+      "line": 31,
+      "source_line_start": 228,
+      "source_line_end": 228
+    },
+    {
+      "line": 32,
+      "source_line_start": 229,
+      "source_line_end": 229
+    },
+    {
+      "line": 33,
+      "source_line_start": 230,
+      "source_line_end": 230
+    },
+    {
+      "line": 34,
+      "source_line_start": 231,
+      "source_line_end": 231
+    },
+    {
+      "line": 35,
+      "source_line_start": 232,
+      "source_line_end": 232
+    },
+    {
+      "line": 36,
+      "source_line_start": 233,
+      "source_line_end": 233
+    },
+    {
+      "line": 37,
+      "source_line_start": 234,
+      "source_line_end": 234
+    },
+    {
+      "line": 38,
+      "source_line_start": 235,
+      "source_line_end": 235
+    },
+    {
+      "line": 39,
+      "source_line_start": 236,
+      "source_line_end": 236
+    },
+    {
+      "line": 40,
+      "source_line_start": 237,
+      "source_line_end": 237
+    },
+    {
+      "line": 41,
+      "source_line_start": 238,
+      "source_line_end": 238
+    },
+    {
+      "line": 42,
+      "source_line_start": 239,
+      "source_line_end": 239
+    },
+    {
+      "line": 43,
+      "source_line_start": 240,
+      "source_line_end": 240
+    },
+    {
+      "line": 44,
+      "source_line_start": 241,
+      "source_line_end": 241
+    }
+  ]
+}

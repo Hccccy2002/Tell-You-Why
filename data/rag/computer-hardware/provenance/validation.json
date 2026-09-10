@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "checked_at": "2026-09-09T02:02:43.983621+00:00",
+  "documents_checked": 35,
+  "downloaded_source_files_checked": 21,
+  "source_works": 2,
+  "exact_duplicate_documents": 0,
+  "overlapping_selected_source_ranges": 0,
+  "checks": [
+    "raw SHA-256 and Git blob SHA-1 match saved source tree",
+    "UTF-8 / manifest and corpus consistency",
+    "original excerpt bytes and normalized-text hashes",
+    "pinned source URLs and valid line ranges",
+    "line mappings cover every normalized text line",
+    "license snapshots and attribution present",
+    "no unresolved R execution blocks or image embeds",
+    "selected ranges are disjoint; no exact text duplicates",
+    "known overbroad memory-sharing paragraph excluded"
+  ],
+  "not_checked": [
+    "full factual correctness or independent expert review",
+    "semantic duplicate detection",
+    "image, diagram or OCR interpretation",
+    "downstream retrieval or generation quality"
+  ]
+}

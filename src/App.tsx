@@ -28,6 +28,7 @@ import {
 import { GeneralSettingsScreen } from "./screens/GeneralSettingsScreen";
 import { InterestSettingsScreen } from "./screens/InterestSettingsScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
+import { KnowledgeBaseScreen } from "./screens/KnowledgeBaseScreen";
 import { ModelSettingsScreen } from "./screens/ModelSettingsScreen";
 import type {
   AppSettings,
@@ -913,6 +914,7 @@ export default function App() {
           onHistoryCleared={() => void dataCleared("history")}
         />
       ) : null}
+      {view === "knowledge-base" ? <KnowledgeBaseScreen /> : null}
       {view === "interests" ? (
         <InterestSettingsScreen
           initialTopics={data.topics}

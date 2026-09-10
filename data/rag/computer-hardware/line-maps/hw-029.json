@@ -1,0 +1,62 @@
+{
+  "id": "hw-029",
+  "applies_to": "corpus.jsonl text field, excluding document header",
+  "line_numbering": "one-based",
+  "lines": [
+    {
+      "line": 1,
+      "source_line_start": 329,
+      "source_line_end": 329
+    },
+    {
+      "line": 2,
+      "source_line_start": 330,
+      "source_line_end": 330
+    },
+    {
+      "line": 3,
+      "source_line_start": 331,
+      "source_line_end": 331
+    },
+    {
+      "line": 4,
+      "source_line_start": 332,
+      "source_line_end": 332
+    },
+    {
+      "line": 5,
+      "source_line_start": 333,
+      "source_line_end": 333
+    },
+    {
+      "line": 6,
+      "source_line_start": 334,
+      "source_line_end": 334
+    },
+    {
+      "line": 7,
+      "source_line_start": 335,
+      "source_line_end": 335
+    },
+    {
+      "line": 8,
+      "source_line_start": 336,
+      "source_line_end": 336
+    },
+    {
+      "line": 9,
+      "source_line_start": 337,
+      "source_line_end": 337
+    },
+    {
+      "line": 10,
+      "source_line_start": 338,
+      "source_line_end": 338
+    },
+    {
+      "line": 11,
+      "source_line_start": 339,
+      "source_line_end": 339
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# This case has an unreliable pre-existing OCR layer; re-read scanned pages.
+dpi: 220
+ocr_mode: always
+min_confidence: 0.85
+cpu_threads: 4
+chunk_tokens: 320
+overlap_tokens: 40
+embedding_batch_size: 16
+# Case-specific, explicitly recorded; pages 1-8 are retained as non-body pages.
+exclude_before_page: 9
+native_text_trusted: false

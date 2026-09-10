@@ -3,9 +3,21 @@ mod commands;
 mod content;
 mod db;
 mod desktop;
+mod knowledge_base;
+mod learning;
+mod learning_commands;
+mod learning_generation;
+#[cfg(test)]
+mod learning_live_tests;
+mod learning_store;
 mod models;
 mod persistence_gate;
 mod providers;
+mod rag;
+mod rag_commands;
+#[cfg(test)]
+mod rag_live_tests;
+mod rag_store;
 mod secret_store;
 
 use db::Database;
@@ -53,6 +65,9 @@ pub fn run() {
             database
                 .initialize()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            database
+                .rag_recover_interrupted()
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
             let http = RestrictedHttpClient::new()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             app.manage(AppState {
@@ -65,6 +80,7 @@ pub fn run() {
                 persistence_gate: PersistenceResetGate::default(),
             });
             desktop::setup(app)?;
+            app.manage(knowledge_base::KnowledgeBaseState::default());
             if std::env::args_os().any(|argument| argument == "--hidden") {
                 if let Some(window) = app.get_webview_window("main") {
                     window.state::<AppState>().auto_hide.window_hidden();
@@ -96,6 +112,21 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            knowledge_base::kb_read,
+            knowledge_base::kb_import,
+            knowledge_base::kb_resume,
+            knowledge_base::kb_pause,
+            rag_commands::rag_providers,
+            rag_commands::rag_prepare,
+            learning_generation::rag_prepare_random,
+            rag_commands::rag_generate,
+            rag_commands::rag_list,
+            learning_commands::learning_start,
+            learning_commands::learning_resume,
+            learning_commands::learning_next,
+            learning_commands::learning_previous,
+            learning_commands::learning_record_event,
+            learning_commands::learning_reset,
             commands::bootstrap_app,
             commands::next_card,
             commands::available_card_count,
