@@ -1,0 +1,25 @@
+### PCIE总线
+
+与HT类似，PCIE总线也是串行总线。PCIE与设备进行连接的时候同样采用点对点的方式，一组PCIE接口只能连接一个设备。为了连接多个设备，就需要实现多个接口，如图\@ref(fig:pcie-interconnect)所示。
+
+与HT又有所不同，两者在信号定义和接收发送方法上有很大差别。上一节介绍过，HT总线主要包括三种信号，分别为CLK、CTL、CAD，其中CLK作为随路时钟使用，用于传递总线的频率信息并用作数据恢复。
+
+```{r pcie-interconnect, echo=FALSE, fig.align='center', fig.cap="PCIE接口连接示意图", out.width='100%'}
+knitr::include_graphics("images/chapter6/pcie_interconnect.png")
+```
+
+PCIE的总线信号如表\@ref(tab:pcie-signals)所示。
+
+```{r pcie-signals, echo = FALSE, message=FALSE, tab.cap='PCIE总线主要信号定义'}
+autonum <- run_autonum(seq_id = "tab", bkm = "pcie-signals", bkm_all = TRUE)
+readr::read_csv('./materials/chapter6/pcie_signals.csv') %>%
+flextable() %>%
+set_caption(caption="PCIE总线主要信号定义", autonum = autonum) %>%
+theme_box() %>%
+autofit()
+```
+
+可以看到，PCIE接口上只有用于数据传输的信号。HT接口上，CAD[n:0]通常是以8位为单位，共用一组时钟信号，总线宽度可以为8位、16位或32位。而PCIE接口上的各个TX信号之间相互独立，最小单位为1位，称之为通道（Lane）。常见的总线宽度有1位、4位、8位及16位。如千兆网卡、SATA扩展卡、USB扩展卡等总线宽度大多为1位，而显卡、RAID卡等总线宽度通常为16位。
+
+PCIE在进行传输时，仅仅发送数据信号，而没有发送时钟信号。在接收端通过总线初始化时约定好的数据序列恢复出与发送端同步的时钟，并使用该时钟对接收到的数据信号进行采样，得到原始数据。
+

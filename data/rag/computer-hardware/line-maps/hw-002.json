@@ -1,0 +1,77 @@
+{
+  "id": "hw-002",
+  "applies_to": "corpus.jsonl text field, excluding document header",
+  "line_numbering": "one-based",
+  "lines": [
+    {
+      "line": 1,
+      "source_line_start": 9,
+      "source_line_end": 9
+    },
+    {
+      "line": 2,
+      "source_line_start": 10,
+      "source_line_end": 10
+    },
+    {
+      "line": 3,
+      "source_line_start": 11,
+      "source_line_end": 11
+    },
+    {
+      "line": 4,
+      "source_line_start": 12,
+      "source_line_end": 12
+    },
+    {
+      "line": 5,
+      "source_line_start": 13,
+      "source_line_end": 13
+    },
+    {
+      "line": 6,
+      "source_line_start": 14,
+      "source_line_end": 14
+    },
+    {
+      "line": 7,
+      "source_line_start": 15,
+      "source_line_end": 17
+    },
+    {
+      "line": 8,
+      "source_line_start": 18,
+      "source_line_end": 18
+    },
+    {
+      "line": 9,
+      "source_line_start": 19,
+      "source_line_end": 19
+    },
+    {
+      "line": 10,
+      "source_line_start": 20,
+      "source_line_end": 20
+    },
+    {
+      "line": 11,
+      "source_line_start": 21,
+      "source_line_end": 21
+    },
+    {
+      "line": 12,
+      "source_line_start": 22,
+      "source_line_end": 22
+    },
+    {
+      "line": 13,
+      "source_line_start": 23,
+      "source_line_end": 23
+    },
+    {
+      "line": 14,
+      "source_line_start": 24,
+      "source_line_end": 24
+    }
+  ]
+}

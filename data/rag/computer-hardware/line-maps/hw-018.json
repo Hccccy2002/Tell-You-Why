@@ -1,0 +1,112 @@
+{
+  "id": "hw-018",
+  "applies_to": "corpus.jsonl text field, excluding document header",
+  "line_numbering": "one-based",
+  "lines": [
+    {
+      "line": 1,
+      "source_line_start": 192,
+      "source_line_end": 192
+    },
+    {
+      "line": 2,
+      "source_line_start": 193,
+      "source_line_end": 193
+    },
+    {
+      "line": 3,
+      "source_line_start": 194,
+      "source_line_end": 194
+    },
+    {
+      "line": 4,
+      "source_line_start": 195,
+      "source_line_end": 195
+    },
+    {
+      "line": 5,
+      "source_line_start": 196,
+      "source_line_end": 196
+    },
+    {
+      "line": 6,
+      "source_line_start": 197,
+      "source_line_end": 197
+    },
+    {
+      "line": 7,
+      "source_line_start": 198,
+      "source_line_end": 198
+    },
+    {
+      "line": 8,
+      "source_line_start": 199,
+      "source_line_end": 199
+    },
+    {
+      "line": 9,
+      "source_line_start": 200,
+      "source_line_end": 200
+    },
+    {
+      "line": 10,
+      "source_line_start": 201,
+      "source_line_end": 201
+    },
+    {
+      "line": 11,
+      "source_line_start": 202,
+      "source_line_end": 202
+    },
+    {
+      "line": 12,
+      "source_line_start": 203,
+      "source_line_end": 203
+    },
+    {
+      "line": 13,
+      "source_line_start": 204,
+      "source_line_end": 204
+    },
+    {
+      "line": 14,
+      "source_line_start": 205,
+      "source_line_end": 205
+    },
+    {
+      "line": 15,
+      "source_line_start": 206,
+      "source_line_end": 206
+    },
+    {
+      "line": 16,
+      "source_line_start": 207,
+      "source_line_end": 207
+    },
+    {
+      "line": 17,
+      "source_line_start": 208,
+      "source_line_end": 210
+    },
+    {
+      "line": 18,
+      "source_line_start": 211,
+      "source_line_end": 211
+    },
+    {
+      "line": 19,
+      "source_line_start": 212,
+      "source_line_end": 212
+    },
+    {
+      "line": 20,
+      "source_line_start": 213,
+      "source_line_end": 213
+    },
+    {
+      "line": 21,
+      "source_line_start": 214,
+      "source_line_end": 214
+    }
+  ]
+}

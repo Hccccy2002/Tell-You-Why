@@ -9,7 +9,12 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     watch: {
-      ignored: ["**/src-tauri/**"],
+      ignored: [
+        "**/src-tauri/**",
+        "**/rag-service/**",
+        "**/data/**",
+        "**/tmp/**",
+      ],
     },
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],
@@ -19,6 +24,7 @@ export default defineConfig({
     sourcemap: false,
   },
   test: {
+    include: ["src/**/*.test.{ts,tsx}"],
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: true,

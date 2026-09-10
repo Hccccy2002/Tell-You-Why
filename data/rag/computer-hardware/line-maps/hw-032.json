@@ -1,0 +1,162 @@
+{
+  "id": "hw-032",
+  "applies_to": "corpus.jsonl text field, excluding document header",
+  "line_numbering": "one-based",
+  "lines": [
+    {
+      "line": 1,
+      "source_line_start": 352,
+      "source_line_end": 352
+    },
+    {
+      "line": 2,
+      "source_line_start": 353,
+      "source_line_end": 353
+    },
+    {
+      "line": 3,
+      "source_line_start": 354,
+      "source_line_end": 354
+    },
+    {
+      "line": 4,
+      "source_line_start": 355,
+      "source_line_end": 355
+    },
+    {
+      "line": 5,
+      "source_line_start": 356,
+      "source_line_end": 356
+    },
+    {
+      "line": 6,
+      "source_line_start": 357,
+      "source_line_end": 357
+    },
+    {
+      "line": 7,
+      "source_line_start": 358,
+      "source_line_end": 360
+    },
+    {
+      "line": 8,
+      "source_line_start": 361,
+      "source_line_end": 361
+    },
+    {
+      "line": 9,
+      "source_line_start": 362,
+      "source_line_end": 364
+    },
+    {
+      "line": 10,
+      "source_line_start": 365,
+      "source_line_end": 365
+    },
+    {
+      "line": 11,
+      "source_line_start": 366,
+      "source_line_end": 368
+    },
+    {
+      "line": 12,
+      "source_line_start": 369,
+      "source_line_end": 369
+    },
+    {
+      "line": 13,
+      "source_line_start": 370,
+      "source_line_end": 370
+    },
+    {
+      "line": 14,
+      "source_line_start": 371,
+      "source_line_end": 371
+    },
+    {
+      "line": 15,
+      "source_line_start": 372,
+      "source_line_end": 372
+    },
+    {
+      "line": 16,
+      "source_line_start": 373,
+      "source_line_end": 373
+    },
+    {
+      "line": 17,
+      "source_line_start": 374,
+      "source_line_end": 374
+    },
+    {
+      "line": 18,
+      "source_line_start": 375,
+      "source_line_end": 375
+    },
+    {
+      "line": 19,
+      "source_line_start": 376,
+      "source_line_end": 376
+    },
+    {
+      "line": 20,
+      "source_line_start": 377,
+      "source_line_end": 377
+    },
+    {
+      "line": 21,
+      "source_line_start": 378,
+      "source_line_end": 378
+    },
+    {
+      "line": 22,
+      "source_line_start": 379,
+      "source_line_end": 379
+    },
+    {
+      "line": 23,
+      "source_line_start": 380,
+      "source_line_end": 380
+    },
+    {
+      "line": 24,
+      "source_line_start": 381,
+      "source_line_end": 381
+    },
+    {
+      "line": 25,
+      "source_line_start": 382,
+      "source_line_end": 382
+    },
+    {
+      "line": 26,
+      "source_line_start": 383,
+      "source_line_end": 383
+    },
+    {
+      "line": 27,
+      "source_line_start": 384,
+      "source_line_end": 384
+    },
+    {
+      "line": 28,
+      "source_line_start": 385,
+      "source_line_end": 385
+    },
+    {
+      "line": 29,
+      "source_line_start": 386,
+      "source_line_end": 386
+    },
+    {
+      "line": 30,
+      "source_line_start": 387,
+      "source_line_end": 387
+    },
+    {
+      "line": 31,
+      "source_line_start": 388,
+      "source_line_end": 390
+    }
+  ]
+}

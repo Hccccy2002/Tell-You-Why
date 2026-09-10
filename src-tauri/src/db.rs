@@ -71,7 +71,7 @@ impl Database {
         Ok(())
     }
 
-    fn connect(&self) -> Result<Connection, DbError> {
+    pub(crate) fn connect(&self) -> Result<Connection, DbError> {
         let connection = Connection::open(&self.path)?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
         connection.pragma_update(None, "journal_mode", "WAL")?;
@@ -244,6 +244,28 @@ impl Database {
                 INSERT INTO schema_migrations(version, applied_at)
                 VALUES (6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));",
             )?;
+            transaction.commit()?;
+        }
+        if version < 7 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(
+                "CREATE TABLE rag_tasks (
+                    id TEXT PRIMARY KEY, kb TEXT NOT NULL, kind TEXT NOT NULL,
+                    state TEXT NOT NULL, created_at TEXT NOT NULL, started_at TEXT,
+                    record TEXT NOT NULL
+                );
+                CREATE INDEX rag_tasks_kb ON rag_tasks(kb, created_at);
+                CREATE TABLE rag_cards (
+                    id TEXT PRIMARY KEY, kb TEXT NOT NULL, fingerprint TEXT NOT NULL,
+                    created_at TEXT NOT NULL, record TEXT NOT NULL, UNIQUE(kb,fingerprint)
+                );
+                INSERT INTO schema_migrations VALUES (7, strftime('%Y-%m-%dT%H:%M:%fZ','now'));",
+            )?;
+            transaction.commit()?;
+        }
+        if version < 8 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(include_str!("learning_schema.sql"))?;
             transaction.commit()?;
         }
         connection.execute(
@@ -1282,6 +1304,10 @@ impl Database {
                 transaction.execute("DELETE FROM card_user_state", [])?;
                 transaction.execute("DELETE FROM follow_up_exchanges", [])?;
                 transaction.execute("DELETE FROM generation_jobs", [])?;
+                transaction.execute("DELETE FROM rag_tasks", [])?;
+                transaction.execute("DELETE FROM rag_learning_sessions", [])?;
+                transaction.execute("DELETE FROM rag_learning_units", [])?;
+                transaction.execute("DELETE FROM rag_cards", [])?;
                 transaction.execute("DELETE FROM provider_profiles", [])?;
                 transaction.execute("DELETE FROM cards WHERE built_in = 0", [])?;
                 transaction.execute("DELETE FROM topic_preferences", [])?;

@@ -16,3 +16,13 @@ Thumbs.db
 .idea/
 .vscode/
 test-results/
+
+# Local Python knowledge-base runtime and generated document data
+rag-service/.venv/
+rag-service/.pytest_cache/
+rag-service/.ruff_cache/
+rag-service/**/*.egg-info/
+**/__pycache__/
+data/models/
+data/knowledge-bases/
+tmp/

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useAutoHideGuard } from "../lib/autoHideGuard";
 
-export type AppView = "home" | "interests" | "models" | "library" | "settings";
+export type AppView =
+  "home" | "interests" | "models" | "library" | "settings" | "knowledge-base";
 
 interface Props {
   view: AppView;
@@ -16,6 +17,7 @@ const menuItems: Array<[AppView, string, string]> = [
   ["interests", "兴趣设置", "◇"],
   ["models", "模型设置", "◎"],
   ["library", "收藏与历史", "☆"],
+  ["knowledge-base", "PDF 知识库", "▤"],
   ["settings", "通用设置", "⚙"],
 ];
 
@@ -49,6 +51,15 @@ export function AppHeader({
         <span>Tell You Why</span>
       </button>
       <div className="header-actions">
+        <button
+          className="kb-header-button"
+          onClick={() => onNavigate("knowledge-base")}
+          disabled={navigationLocked}
+          aria-label="PDF 知识库"
+          aria-current={view === "knowledge-base" ? "page" : undefined}
+        >
+          PDF
+        </button>
         <button
           className="icon-button"
           type="button"

@@ -1,0 +1,106 @@
+﻿{
+    "sha":  "dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c",
+    "node_id":  "C_kwDOGSP4SNoAKGRmYzFlYTNmZmMyMmI1ZjA5YzUxY2MzYWY4MGIyNWMzY2U2Y2NkNmM",
+    "commit":  {
+                   "author":  {
+                                  "name":  "foxsen",
+                                  "email":  "fxzhang@ict.ac.cn",
+                                  "date":  "2025-11-20T01:47:45Z"
+                              },
+                   "committer":  {
+                                     "name":  "GitHub",
+                                     "email":  "noreply@github.com",
+                                     "date":  "2025-11-20T01:47:45Z"
+                                 },
+                   "message":  "Merge pull request #49 from Traveler0014/patch-1\n\nFix some typos in contents",
+                   "tree":  {
+                                "sha":  "73a0ace1791c94a7481ec9c0e2a176288c6dadd5",
+                                "url":  "https://api.github.com/repos/foxsen/archbase/git/trees/73a0ace1791c94a7481ec9c0e2a176288c6dadd5"
+                            },
+                   "url":  "https://api.github.com/repos/foxsen/archbase/git/commits/dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c",
+                   "comment_count":  0,
+                   "verification":  {
+                                        "verified":  true,
+                                        "reason":  "valid",
+                                        "signature":  "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJpHnNBCRC1aQ7uu5UhlAAA1HEQAANy6zLEIQ/r/PSu9jQD6fJx\n2aDh7F1ttsc0QGRoC/GMlMjJwkeAdhD5nRaAhNmrY12gfPslhEiGilwtdRV2w+Ay\n+gRfb5w3SYzrZLVWOdu3CTSDflqwJ2Iq2bNcEEMxJrU6HYfnJAcH5f+U10zR7JCp\nqA+ufLrugNkX1FVp1EIXWzysFteSN//Ki9lujXxDb26wPvO6VtsTeyMzVcKjE5Q4\ntnpnWj6r3yT/yIo84SPJEwiCqdcIMa7s4twSEh2paU7h74olJENBRgVsuTtgBrzj\nksOd9WIou0u6dw/DbEpBlrBgQQKpSMQ/s9dmJjF5RANRRZG+B3kqyQ35pkP7ELD4\ncm6Ih1jbTxz0eQzhzr4na4Ke1P2vySXNTvPUjxzyzURAwG+ijGE5DOJJCxLi3JF/\nYgjbq6UqPx31GhpL2pNg31d9xUdnt6/lllybHS0LDuRc53ofDhqmmBzKd7QUqOtR\ngaNbiaesEYcy8n2kSQOROEZF4S140IpuDoGQgxmbvoSUaNiasFJYWmazjMzpw8Wi\nlKqhGU7tdboU7WrfAg+z8mTzu+5kup7qoDRsH+4fUXEIKwiKAjJaHC+j1gCR9xsg\n3xtmtKEKtB7xPbdOVHAaSBGoQ6VH3aV3D8RMyiS8vK3aO+UQlqqxBRIBjEWVDb1T\n1pyjFIUjZbuV9NqgRkUw\n=DQMO\n-----END PGP SIGNATURE-----\n",
+                                        "payload":  "tree 73a0ace1791c94a7481ec9c0e2a176288c6dadd5\nparent 73a2e735ac95e761e4bbea57d9bc43cac834a8b3\nparent a437077805fbab9ceeebab30032f2580f4a7c164\nauthor foxsen \u003cfxzhang@ict.ac.cn\u003e 1763603265 +0800\ncommitter GitHub \u003cnoreply@github.com\u003e 1763603265 +0800\n\nMerge pull request #49 from Traveler0014/patch-1\n\nFix some typos in contents",
+                                        "verified_at":  "2025-11-20T01:47:46Z"
+                                    }
+               },
+    "url":  "https://api.github.com/repos/foxsen/archbase/commits/dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c",
+    "html_url":  "https://github.com/foxsen/archbase/commit/dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c",
+    "comments_url":  "https://api.github.com/repos/foxsen/archbase/commits/dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c/comments",
+    "author":  {
+                   "login":  "foxsen",
+                   "id":  875144,
+                   "node_id":  "MDQ6VXNlcjg3NTE0NA==",
+                   "avatar_url":  "https://avatars.githubusercontent.com/u/875144?v=4",
+                   "gravatar_id":  "",
+                   "url":  "https://api.github.com/users/foxsen",
+                   "html_url":  "https://github.com/foxsen",
+                   "followers_url":  "https://api.github.com/users/foxsen/followers",
+                   "following_url":  "https://api.github.com/users/foxsen/following{/other_user}",
+                   "gists_url":  "https://api.github.com/users/foxsen/gists{/gist_id}",
+                   "starred_url":  "https://api.github.com/users/foxsen/starred{/owner}{/repo}",
+                   "subscriptions_url":  "https://api.github.com/users/foxsen/subscriptions",
+                   "organizations_url":  "https://api.github.com/users/foxsen/orgs",
+                   "repos_url":  "https://api.github.com/users/foxsen/repos",
+                   "events_url":  "https://api.github.com/users/foxsen/events{/privacy}",
+                   "received_events_url":  "https://api.github.com/users/foxsen/received_events",
+                   "type":  "User",
+                   "user_view_type":  "public",
+                   "site_admin":  false
+               },
+    "committer":  {
+                      "login":  "web-flow",
+                      "id":  19864447,
+                      "node_id":  "MDQ6VXNlcjE5ODY0NDQ3",
+                      "avatar_url":  "https://avatars.githubusercontent.com/u/19864447?v=4",
+                      "gravatar_id":  "",
+                      "url":  "https://api.github.com/users/web-flow",
+                      "html_url":  "https://github.com/web-flow",
+                      "followers_url":  "https://api.github.com/users/web-flow/followers",
+                      "following_url":  "https://api.github.com/users/web-flow/following{/other_user}",
+                      "gists_url":  "https://api.github.com/users/web-flow/gists{/gist_id}",
+                      "starred_url":  "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+                      "subscriptions_url":  "https://api.github.com/users/web-flow/subscriptions",
+                      "organizations_url":  "https://api.github.com/users/web-flow/orgs",
+                      "repos_url":  "https://api.github.com/users/web-flow/repos",
+                      "events_url":  "https://api.github.com/users/web-flow/events{/privacy}",
+                      "received_events_url":  "https://api.github.com/users/web-flow/received_events",
+                      "type":  "User",
+                      "user_view_type":  "public",
+                      "site_admin":  false
+                  },
+    "parents":  [
+                    {
+                        "sha":  "73a2e735ac95e761e4bbea57d9bc43cac834a8b3",
+                        "url":  "https://api.github.com/repos/foxsen/archbase/commits/73a2e735ac95e761e4bbea57d9bc43cac834a8b3",
+                        "html_url":  "https://github.com/foxsen/archbase/commit/73a2e735ac95e761e4bbea57d9bc43cac834a8b3"
+                    },
+                    {
+                        "sha":  "a437077805fbab9ceeebab30032f2580f4a7c164",
+                        "url":  "https://api.github.com/repos/foxsen/archbase/commits/a437077805fbab9ceeebab30032f2580f4a7c164",
+                        "html_url":  "https://github.com/foxsen/archbase/commit/a437077805fbab9ceeebab30032f2580f4a7c164"
+                    }
+                ],
+    "stats":  {
+                  "total":  2,
+                  "additions":  1,
+                  "deletions":  1
+              },
+    "files":  [
+                  {
+                      "sha":  "472a442b77562f377f33a1eba301eaef1f9b8b79",
+                      "filename":  "materials/chapter3/csr.csv",
+                      "status":  "modified",
+                      "additions":  1,
+                      "deletions":  1,
+                      "changes":  2,
+                      "blob_url":  "https://github.com/foxsen/archbase/blob/dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c/materials%2Fchapter3%2Fcsr.csv",
+                      "raw_url":  "https://github.com/foxsen/archbase/raw/dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c/materials%2Fchapter3%2Fcsr.csv",
+                      "contents_url":  "https://api.github.com/repos/foxsen/archbase/contents/materials%2Fchapter3%2Fcsr.csv?ref=dfc1ea3ffc22b5f09c51cc3af80b25c3ce6ccd6c",
+                      "patch":  "@@ -1,5 +1,5 @@\n 助记符,编号,说明\r\n-CRMD,Ox0,处理器当前运行模式及地址翻译模式、全局中断使能等配置信息。\r\n+CRMD,0x0,处理器当前运行模式及地址翻译模式、全局中断使能等配置信息\r\n PRMD,0x1,触发当前普通异常的现场的运行模式及全局中断使能等配置信息\r\n EUEN,0x2,扩展部件的使能控制\r\n MISC,0x3,各权限等级下是否运行使用部分特权指令等杂项配置\r"
+                  }
+              ]
+}

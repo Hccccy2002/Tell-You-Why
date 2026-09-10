@@ -1,0 +1,33 @@
+### 通用多核处理器的片上Cache结构
+
+片上Cache结构是通用多核处理器设计的重要内容。片上Cache的种类主要有：私有Cache、片上共享Cache、片间共享Cache。图\@ref(fig:cache-structure)a是私有Cache结构示意图，图\@ref(fig:cache-structure)b是片上共享Cache结构示意图（由于一级Cache的访问速度对性能影响大，通用多核处理器的一级Cache几乎都是私有的）。私有Cache结构具有较快的访问速度，但是具有较高的失效率。共享Cache结构的访问速度稍慢，但具有失效率低的优点。多处理器芯片间共享Cache结构的访问速度慢，且失效率高，因此并不常用。
+
+
+```{r cache-structure, fig.cap='Cache结构示意图', fig.align='center', echo = FALSE, out.width='50%'}
+knitr::include_graphics('./images/chapter11/cache_structure.png')
+```
+
+<!-- 图11.1 Cache结构图 -->
+
+
+目前，主流多核处理器的典型Cache 结构是：片内共享最后一级Cache（Last Level Cache，简称LLC），片间共享内存。表\@ref(tab:cache-parameter)列出了典型商用多核处理器的Cache结构参数。处理器核的一级Cache和二级Cache私有，三级Cache（LLC）共享。有些处理器甚至有片外的四级Cache，例如Intel i7处理器。
+
+```{r cache-parameter, echo = FALSE, message=FALSE, tab.cap='商用多核处理器主要参数示例'}
+autonum <- run_autonum(seq_id = "tab", bkm = "cache-parameter", bkm_all = TRUE)
+readr::read_csv('./materials/chapter11/cache_parameter.csv') %>%
+flextable() %>%
+set_caption(caption="商用多核处理器主要参数示例", autonum = autonum) %>%
+theme_box() %>%
+autofit()
+```
+
+在共享LLC结构中，主要有UCA（Uniform Cache Access）和NUCA（Non-Uniform Cache Access）两种。图\@ref(fig:shared-llc)为共享LLC结构示意图（假设二级Cache为LLC）。
+
+```{r shared-llc, fig.cap='共享LLC结构示意图', fig.align='center', echo = FALSE, out.width='100%'}
+knitr::include_graphics('./images/chapter11/shared_llc.png')
+```
+
+UCA是一种集中式共享结构，多个处理器核通过总线或者交叉开关连接LLC，所有处理器核对LLC的访问延迟相同。这种集中式的共享LLC，很容易随着处理器核数目的增加成为瓶颈。另外，UCA结构由于使用总线或者交叉开关互连，可扩展性受限。因此，通常在处理器核数较少的多核处理器中采用UCA结构，例如四核龙芯3号处理器。
+
+NUCA是一种分布式共享结构，每个处理器核拥有本地的LLC，并通过片上互连访问其他处理器核的LLC。在NUCA结构中，处理器核可以访问所有的LLC，但是不同位置的LLC具有不同的访问延迟。当工作集较小时，处理器核的本地Cache足够容纳工作集，处理器核只使用本地Cache；当工作集较大时，本地Cache中放不下的数据可以放到远地Cache中。NUCA结构需要高效Cache查找和替换算法，使得在使用远地Cache时不影响性能。NUCA结构中通常采用可扩展的片上互连（如Mesh片上网络等），采用基于目录的Cache一致性协议，具有良好的可扩展性，可以有效支持较多数目的处理器核。因此，在具有较多核数的多核/众核处理器中通常采用NUCA结构，如SPARC M7和龙芯3C5000等。
+

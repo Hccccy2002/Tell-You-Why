@@ -31,10 +31,10 @@ const MODEL_OPERATION_IN_PROGRESS_ERROR: &str = "已有模型请求或敏感设�
 const PROVIDER_KEY_REPLACEMENT_CONFIRMATION_REQUIRED: &str =
     "目标服务通道已有 API Key，请确认覆盖后重试";
 
-struct GenerationLock<'a>(&'a AtomicBool);
+pub(crate) struct GenerationLock<'a>(&'a AtomicBool);
 
 impl<'a> GenerationLock<'a> {
-    fn acquire(flag: &'a AtomicBool) -> CommandResult<Self> {
+    pub(crate) fn acquire(flag: &'a AtomicBool) -> CommandResult<Self> {
         flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .map(|_| Self(flag))
             .map_err(|_| MODEL_OPERATION_IN_PROGRESS_ERROR.into())

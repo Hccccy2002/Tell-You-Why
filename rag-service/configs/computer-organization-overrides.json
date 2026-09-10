@@ -1,0 +1,7 @@
+{
+  "source_sha256": "d58d01be37b9df5a5706b10f4eef298539ec1d1a55f24f58f9e5654de67d3d60",
+  "bookmarks": [
+    {"title": "5.5 程序中断方式", "page": 198, "reason": "Verified against the rendered PDF: heading 5.5 occurs near the bottom of physical page 198, printed page 192."},
+    {"title": "6.2 数的定点表示和浮点表示234", "page": 234, "new_title": "6.2 数的定点表示和浮点表示", "reason": "Verified against the rendered PDF: heading 6.2 occurs mid-page on physical page 234, printed page 228; bookmark has no destination."}
+  ]
+}

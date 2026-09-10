@@ -758,7 +758,7 @@ struct ChatMessage {
     content: Option<String>,
 }
 
-fn extract_content(body: &str) -> Result<String, ProviderError> {
+pub(crate) fn extract_content(body: &str) -> Result<String, ProviderError> {
     let response: ChatResponse =
         serde_json::from_str(body).map_err(|_| ProviderError::MalformedResponse)?;
     let choice = response
@@ -816,7 +816,7 @@ fn strip_json_fence(content: &str) -> &str {
         .unwrap_or(without_open)
 }
 
-fn ensure_success(status: u16, body: &str) -> Result<(), ProviderError> {
+pub(crate) fn ensure_success(status: u16, body: &str) -> Result<(), ProviderError> {
     if (200..300).contains(&status) {
         return Ok(());
     }

@@ -1,0 +1,27 @@
+{
+  "documents": 35,
+  "source_works": 2,
+  "by_source": {
+    "计算机体系结构基础（第三版）": 30,
+    "Hello 算法": 5
+  },
+  "by_topic": {
+    "系统组成": 2,
+    "数据表示": 3,
+    "芯片与逻辑": 1,
+    "CPU与指令": 6,
+    "内存与缓存": 6,
+    "总线与外设": 7,
+    "启动与中断": 2,
+    "多核与SoC": 5,
+    "性能与功耗": 3
+  },
+  "by_difficulty": {
+    "入门": 21,
+    "进阶": 14
+  },
+  "text_characters": 78700,
+  "min_document_characters": 326,
+  "max_document_characters": 6472,
+  "documents_with_omitted_nontext": 25
+}
