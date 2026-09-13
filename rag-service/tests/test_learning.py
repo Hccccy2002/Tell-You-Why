@@ -37,6 +37,18 @@ def test_learning_rejects_wrong_scope_version_and_unknown_unit(desktop):
         library.learning_evidence("test", "version1", "invented", "c1")
 
 
+def test_empty_learning_catalog_keeps_book_and_chapter_for_model_fallback(desktop, monkeypatch):
+    library, _, _ = desktop
+    original = library.learning_units("test", "version1", "c1")
+    monkeypatch.setattr("tellwhy_kb.learning.units", lambda *args: [])
+    empty = library.learning_units("test", "version1", "c1")
+    assert empty["items"] == []
+    assert empty["chapter_path"] == original["items"][0]["chapter_path"]
+    assert empty["filename"] == original["filename"]
+    assert empty["source_sha256"] == original["source_sha256"]
+    assert empty["version"] == "version1"
+
+
 def test_learning_primary_survives_empty_retrieval_and_budget_is_not_truncated(desktop):
     library, root, _ = desktop
     unit = library.learning_units("test", "version1")["items"][0]

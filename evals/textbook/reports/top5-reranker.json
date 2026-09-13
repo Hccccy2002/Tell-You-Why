@@ -1,0 +1,1302 @@
+{
+  "schema_version": 1,
+  "dataset_version": "textbook-eval-v1",
+  "source_sha256": "d58d01be37b9df5a5706b10f4eef298539ec1d1a55f24f58f9e5654de67d3d60",
+  "knowledge_version": "b92d18a9c5ccddd6e3fdbc59",
+  "dataset_sha256": "df6b58cb68af4a40e4658346105bdc134de207a77681fb673072c6c72f27b2eb",
+  "raw_report_sha256": "b94a9e31eb1765f8e2a5292c8836e73787678d7c9d8f3dad8394444c955b6c16",
+  "embedding_index_sha256": "f58cec19effeea8b0a56ca322d0484f8267db11250e5ea44f1afdb717d6ad99e",
+  "reranker_manifest": {
+    "repository": "BAAI/bge-reranker-base",
+    "revision": "2cfc18c9415c912f9d8155881c133215df768a70",
+    "files": {
+      "config.json": "289adf7ada1eb6b4afa7589a48a032d45a076cf2e46dcdb3b4cabc33be14f708",
+      "model.safetensors": "ced967c45fd1902eb92716c9ceeca7c95a936770ea9db611f5a841b926e33fbd",
+      "tokenizer.json": "9eb652ac4e40cc093272bbbe0f55d521cf67570060227109b5cdc20945a4489e",
+      "tokenizer_config.json": "a1d6bc8734a6f635dc158508bef000f8e2e5a759c7d92f984b2c86e5ff53425b",
+      "special_tokens_map.json": "d5469a60db23249c7f8945013d78df30b44b6bf686c6bb4740f4223f77b1b535",
+      "sentencepiece.bpe.model": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865"
+    }
+  },
+  "budget": "five distinct complete source blocks, at most 10000 characters",
+  "llm_api_requests": 0,
+  "metrics": {
+    "baseline_top5": {
+      "cases": 40,
+      "labeled_cases": 34,
+      "first_hit_count": 18,
+      "top5_hit_count": 27,
+      "complete_evidence_count": 25,
+      "mean_reciprocal_rank": 0.6397058823529411,
+      "mean_reference_recall": 0.7598039215686274,
+      "median_ms": 432.4643999989348,
+      "max_display_count": 5,
+      "five_sources_cases": 40
+    },
+    "reranked_top5": {
+      "cases": 40,
+      "labeled_cases": 34,
+      "first_hit_count": 26,
+      "top5_hit_count": 30,
+      "complete_evidence_count": 27,
+      "mean_reciprocal_rank": 0.8137254901960784,
+      "mean_reference_recall": 0.8431372549019608,
+      "median_ms": 6560.446499999671,
+      "max_display_count": 5,
+      "five_sources_cases": 40
+    }
+  },
+  "split_metrics": {
+    "baseline_top5/development": {
+      "hit_at_5": 1,
+      "all_at_5": 0.8,
+      "recall_at_5": 0.8666666666666667,
+      "mrr_at_5": 0.9,
+      "evidence_recall": 0.8666666666666667,
+      "all_evidence": 0.8,
+      "cases": 8,
+      "supported_cases": 5,
+      "search_median_ms": 454.9227500010602,
+      "search_p95_ms": 484.44219999873894
+    },
+    "baseline_top5/regression": {
+      "hit_at_5": 0.75,
+      "all_at_5": 0.75,
+      "recall_at_5": 0.75,
+      "mrr_at_5": 0.6041666666666666,
+      "evidence_recall": 0.75,
+      "all_evidence": 0.75,
+      "cases": 24,
+      "supported_cases": 24,
+      "search_median_ms": 439.37129999903846,
+      "search_p95_ms": 493.1159000007028
+    },
+    "baseline_top5/validation": {
+      "hit_at_5": 0.8,
+      "all_at_5": 0.6,
+      "recall_at_5": 0.7,
+      "mrr_at_5": 0.55,
+      "evidence_recall": 0.7,
+      "all_evidence": 0.6,
+      "cases": 8,
+      "supported_cases": 5,
+      "search_median_ms": 269.3120500007353,
+      "search_p95_ms": 511.7255999975896
+    },
+    "reranked_top5/development": {
+      "hit_at_5": 1,
+      "all_at_5": 0.6,
+      "recall_at_5": 0.8333333333333334,
+      "mrr_at_5": 0.7666666666666666,
+      "evidence_recall": 0.8333333333333334,
+      "all_evidence": 0.6,
+      "cases": 8,
+      "supported_cases": 5,
+      "search_median_ms": 6979.44705000009,
+      "search_p95_ms": 11784.123800000089
+    },
+    "reranked_top5/regression": {
+      "hit_at_5": 0.8333333333333334,
+      "all_at_5": 0.8333333333333334,
+      "recall_at_5": 0.8333333333333334,
+      "mrr_at_5": 0.8125,
+      "evidence_recall": 0.8333333333333334,
+      "all_evidence": 0.8333333333333334,
+      "cases": 24,
+      "supported_cases": 24,
+      "search_median_ms": 6436.959700000443,
+      "search_p95_ms": 8524.261000002298
+    },
+    "reranked_top5/validation": {
+      "hit_at_5": 1,
+      "all_at_5": 0.8,
+      "recall_at_5": 0.9,
+      "mrr_at_5": 0.8666666666666667,
+      "evidence_recall": 0.9,
+      "all_evidence": 0.8,
+      "cases": 8,
+      "supported_cases": 5,
+      "search_median_ms": 7051.334899999347,
+      "search_p95_ms": 9817.040399997495
+    }
+  },
+  "desktop_smoke": {
+    "passed": true,
+    "cold_process_seconds": 17.95,
+    "display_count": 5,
+    "page_rendered": 9
+  },
+  "query_clause_trial": {
+    "adopted": false,
+    "cases": 10,
+    "additional_recall_declines": ["x01", "x07"]
+  },
+  "notes": [
+    "Equal five-block display budget. Non-exhaustive source labels measure coverage/rank, not precision or factuality. Previously used splits are regression cohorts, not a new blind holdout.",
+    "AI source annotations; zero human reviews. Six cases without source labels are excluded from retrieval hit metrics.",
+    "Two composite questions have worse first-label rank; x05 loses one labeled block. This is not a guarantee that each selected passage is the best possible or that every question is fully covered.",
+    "UI display retrieval changed; original generation packets and Agent citations remain intact."
+  ],
+  "changes": [
+    {
+      "id": "d01",
+      "question": "计算机硬件是什么？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.25,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0009-006-47847b38",
+        "p0171-006-d1563aba",
+        "p0171-014-b2c3be52",
+        "p0187-006-6eecedb0",
+        "p0009-005-5452fe4d"
+      ]
+    },
+    {
+      "id": "d02",
+      "question": "总线的作用是什么？",
+      "before": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0047-006-ee23b76c"]
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0052-004-f96ff149",
+        "p0047-006-ee23b76c",
+        "p0047-007-183df796",
+        "p0071-012-a15d1e8c",
+        "p0065-016-df2dc7c8"
+      ]
+    },
+    {
+      "id": "d03",
+      "question": "存储器用来存放什么？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.25,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0074-004-fbef9f39",
+        "p0075-013-e5831caf",
+        "p0153-010-15ccb5d7",
+        "p0076-005-33f382d7",
+        "p0076-006-8e35c047"
+      ]
+    },
+    {
+      "id": "d04",
+      "question": "为什么数据线需要扩位？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0100-004-41935cae",
+        "p0097-014-35974ee0",
+        "p0049-012-048c7dc9",
+        "p0055-002-aedc85b5",
+        "p0246-020-b148b55c"
+      ]
+    },
+    {
+      "id": "d05",
+      "question": "Cache和主存内容为什么必须一致？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0120-002-219842e6",
+        "p0120-003-7221bd84",
+        "p0120-004-5ea90a97",
+        "p0120-007-fa1ed28d",
+        "p0077-002-7cf2ee92"
+      ]
+    },
+    {
+      "id": "t01",
+      "question": "软件与能看见摸着的硬件有什么区别？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0009-007-cd961c26",
+        "p0009-006-47847b38",
+        "p0009-005-5452fe4d",
+        "p0175-003-16a6daf2",
+        "p0033-012-10655bff"
+      ]
+    },
+    {
+      "id": "t02",
+      "question": "冯诺依曼计算机中指令和数据采用哪种进制表示？",
+      "before": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0014-010-dcf54ad4"]
+      },
+      "after": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0014-010-dcf54ad4"]
+      },
+      "top5_block_ids": [
+        "p0014-007-da5cbf18",
+        "p0414-014-d056b093",
+        "p0219-009-71160a11",
+        "p0299-010-06e810c1",
+        "p0337-009-201f00d5"
+      ]
+    },
+    {
+      "id": "t03",
+      "question": "除了改进微处理器，还有哪种并行性可以提高计算机性能？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0030-009-6a2e32d8",
+        "p0031-010-5050dd41",
+        "p0031-009-16724f89",
+        "p0031-003-1eef3e50",
+        "p0351-012-c4d79253"
+      ]
+    },
+    {
+      "id": "t04",
+      "question": "多个部件同时在一条总线上发送信息会怎样？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0047-006-ee23b76c",
+        "p0063-005-20e098b2",
+        "p0063-007-3f79fe6d",
+        "p0067-006-852957ca",
+        "p0065-007-68327d92"
+      ]
+    },
+    {
+      "id": "t05",
+      "question": "串行通信传送一个字节要怎样逐位发送？",
+      "before": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0050-019-06a85e49"]
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0050-019-06a85e49",
+        "p0194-014-8b483e33",
+        "p0069-010-7e40b5ba",
+        "p0290-014-b5451644",
+        "p0069-014-a28d03cd"
+      ]
+    },
+    {
+      "id": "t06",
+      "question": "并行传送一个字节需要几条传输线？",
+      "before": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0050-021-dbec4d39"]
+      },
+      "after": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0050-021-dbec4d39"]
+      },
+      "top5_block_ids": [
+        "p0050-019-06a85e49",
+        "p0166-004-155176e5",
+        "p0049-005-a2fcad76",
+        "p0194-014-8b483e33",
+        "p0166-006-cea61a7f"
+      ]
+    },
+    {
+      "id": "t07",
+      "question": "存储器访问时间从什么时候算到什么时候？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0080-010-ac76f27a",
+        "p0142-006-9e75ab76",
+        "p0127-013-fa99c181",
+        "p0117-007-926d4a60",
+        "p0080-011-51a587b3"
+      ]
+    },
+    {
+      "id": "t08",
+      "question": "连接存储芯片时，ROM一般保存哪些内容？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0100-011-198d6921",
+        "p0094-004-2ea10cb4",
+        "p0115-004-b41e2ca4",
+        "p0100-006-75a76049",
+        "p0080-024-f3f5c07c"
+      ]
+    },
+    {
+      "id": "t09",
+      "question": "程序写入Cache某个单元时会遇到什么一致性问题？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0120-002-219842e6",
+        "p0120-007-fa1ed28d",
+        "p0129-002-a553c718",
+        "p0120-004-5ea90a97",
+        "p0120-006-00652d5a"
+      ]
+    },
+    {
+      "id": "t10",
+      "question": "CPU包括哪两大部分？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0343-005-1f96fb58",
+        "p0223-001-38d075e6",
+        "p0024-007-cfda65a9",
+        "p0430-010-180ecb46",
+        "p0432-010-2be86a1b"
+      ]
+    },
+    {
+      "id": "t11",
+      "question": "机器语言由什么构成，每条语句表达什么？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0306-003-c7133c49",
+        "p0011-002-c91cccbf",
+        "p0032-007-855e70d3",
+        "p0332-004-0c0585e6",
+        "p0032-008-cc9b5e98"
+      ]
+    },
+    {
+      "id": "t12",
+      "question": "除CPU和存储器以外，计算机硬件的第三个关键部分是什么？",
+      "before": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0161-001-458e693d"]
+      },
+      "after": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0161-001-458e693d"]
+      },
+      "top5_block_ids": [
+        "p0101-013-22e3e186",
+        "p0077-006-78d05cbc",
+        "p0076-005-33f382d7",
+        "p0100-008-8174521d",
+        "p0074-004-fbef9f39"
+      ]
+    },
+    {
+      "id": "t13",
+      "question": "参与计算机运算的数可以分为哪两大类？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0225-003-f9721a8d",
+        "p0249-015-1bbbaaf7",
+        "p0249-016-68f66ae0",
+        "p0235-009-a98eda24",
+        "p0284-008-93a647fc"
+      ]
+    },
+    {
+      "id": "t14",
+      "question": "控制单元设计这一章用多少条机器指令举例？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0401-001-f443d3b7",
+        "p0420-011-e13066da",
+        "p0381-001-8e85657d",
+        "p0423-003-905e1e59",
+        "p0420-019-fdb34137"
+      ]
+    },
+    {
+      "id": "t15",
+      "question": "控制单元发出的命令序列叫什么？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0381-003-530bfad2",
+        "p0393-014-f3a44c2c",
+        "p0381-001-8e85657d",
+        "p0384-015-546697e0",
+        "p0399-004-8cf8f512"
+      ]
+    },
+    {
+      "id": "t16",
+      "question": "十进制整数转换成二进制时如何取余数？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0300-013-1abb42f0",
+        "p0300-014-edcefe61",
+        "p0152-011-6e56287b",
+        "p0243-013-4f9b2887",
+        "p0264-021-780aba2e"
+      ]
+    },
+    {
+      "id": "t17",
+      "question": "十进制小数转二进制的重复乘法怎么做？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0300-013-1abb42f0",
+        "p0300-009-c2ebc539",
+        "p0300-007-c4a0584b",
+        "p0300-006-2a82b5db",
+        "p0301-005-2c5567c6"
+      ]
+    },
+    {
+      "id": "t18",
+      "question": "IBM System/370系列说明计算机结构和组成有什么关系？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0014-003-a0cb09b8",
+        "p0013-007-3362ca27",
+        "p0327-008-5dbfda5d",
+        "p0028-005-6664442d",
+        "p0014-002-d0dc63d4"
+      ]
+    },
+    {
+      "id": "t19",
+      "question": "计算机软件通常分为哪两大类？",
+      "before": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0009-008-c85713c3"]
+      },
+      "after": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0009-008-c85713c3"]
+      },
+      "top5_block_ids": [
+        "p0191-008-78e6b78a",
+        "p0009-005-5452fe4d",
+        "p0009-009-2f70454b",
+        "p0033-004-c7cce01a",
+        "p0191-010-aa07f784"
+      ]
+    },
+    {
+      "id": "n01",
+      "question": "2026年最新酷睿处理器的官方售价是多少？",
+      "before": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0030-003-415e22de",
+        "p0030-002-7ba54daf",
+        "p0432-016-f8b43364",
+        "p0030-006-9ad2dd98",
+        "p0030-007-0117035f"
+      ]
+    },
+    {
+      "id": "n02",
+      "question": "这本教材作者明年的私人旅行计划是什么？",
+      "before": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0401-001-f443d3b7",
+        "p0038-005-4939e1b2",
+        "p0405-032-33bd5723",
+        "p0113-010-db7716ee",
+        "p0383-016-d32dbb10"
+      ]
+    },
+    {
+      "id": "n03",
+      "question": "Redis Cluster的16384个哈希槽如何迁移？",
+      "before": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0331-003-fe46863c",
+        "p0323-006-e02c9fcd",
+        "p0351-002-4d756a4b",
+        "p0129-002-a553c718",
+        "p0126-016-ed75510e"
+      ]
+    },
+    {
+      "id": "n04",
+      "question": "完整还原PDF第300页转换算式的上下标和连接箭头。",
+      "before": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0324-002-6a1a0b86",
+        "p0232-027-da3eea9f",
+        "p0267-006-f388dcaf",
+        "p0151-021-f7cab8cb",
+        "p0267-002-8022313d"
+      ]
+    },
+    {
+      "id": "n05",
+      "question": "画出PDF第100页74138译码器的连接线并标出引脚有效电平。",
+      "before": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0087-009-048a2dcb",
+        "p0087-007-09283837",
+        "p0088-004-b416d636",
+        "p0080-022-5354b0ee",
+        "p0087-005-bec77235"
+      ]
+    },
+    {
+      "id": "n06",
+      "question": "逐步列出PDF第260页补码乘法竖式的每一个中间值。",
+      "before": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": null,
+        "all_at_5": null,
+        "recall_at_5": null,
+        "mrr_at_5": null,
+        "evidence_recall": null,
+        "all_evidence": null,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0276-025-829731bf",
+        "p0232-028-f136fcbc",
+        "p0262-012-60eddcd0",
+        "p0232-027-da3eea9f",
+        "p0262-010-da603255"
+      ]
+    },
+    {
+      "id": "x01",
+      "question": "CPU和存储器各负责什么？请结合CPU结构与存储器章节解释。",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.3333333333333333,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0076-005-33f382d7",
+        "p0112-019-775e1397",
+        "p0074-004-fbef9f39",
+        "p0343-005-1f96fb58",
+        "p0074-001-690df45b"
+      ]
+    },
+    {
+      "id": "x02",
+      "question": "一条总线可以同时由多个部件发送吗？多个部件同时接收又是否允许？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0047-006-ee23b76c",
+        "p0063-005-20e098b2",
+        "p0066-002-4627e7bd",
+        "p0065-007-68327d92",
+        "p0067-005-a3ecac22"
+      ]
+    },
+    {
+      "id": "x03",
+      "question": "比较串行、并行传送一个字节时的线路数量与适用距离。",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": false,
+        "recall_at_5": 0.3333333333333333,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 0.3333333333333333,
+        "all_evidence": false,
+        "missing_blocks": ["p0050-019-06a85e49", "p0050-021-dbec4d39"]
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": false,
+        "recall_at_5": 0.6666666666666666,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 0.6666666666666666,
+        "all_evidence": false,
+        "missing_blocks": ["p0050-021-dbec4d39"]
+      },
+      "top5_block_ids": [
+        "p0050-019-06a85e49",
+        "p0050-022-4541f5a4",
+        "p0070-005-678e58fb",
+        "p0194-014-8b483e33",
+        "p0166-004-155176e5"
+      ]
+    },
+    {
+      "id": "x04",
+      "question": "Cache写直达法与写回法分别何时更新主存？为什么写回法需要修改标志？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0120-005-852292a6",
+        "p0120-004-5ea90a97",
+        "p0120-006-00652d5a",
+        "p0120-003-7221bd84",
+        "p0120-007-fa1ed28d"
+      ]
+    },
+    {
+      "id": "x05",
+      "question": "存取时间和存取周期是同一个指标吗？分别描述什么，通常谁更长？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": false,
+        "recall_at_5": 0.5,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 0.5,
+        "all_evidence": false,
+        "missing_blocks": ["p0080-010-ac76f27a"]
+      },
+      "top5_block_ids": [
+        "p0080-011-51a587b3",
+        "p0080-013-f0e9161a",
+        "p0394-002-d842cc10",
+        "p0080-009-89ad4ac0",
+        "p0128-013-161c0b5d"
+      ]
+    },
+    {
+      "id": "x06",
+      "question": "结合存储器的总体用途与芯片选型，为什么程序既可能出现在ROM描述中，也可能出现在RAM描述中？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": false,
+        "recall_at_5": 0.5,
+        "mrr_at_5": 0.25,
+        "evidence_recall": 0.5,
+        "all_evidence": false,
+        "missing_blocks": ["p0074-004-fbef9f39"]
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": false,
+        "recall_at_5": 0.5,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 0.5,
+        "all_evidence": false,
+        "missing_blocks": ["p0074-004-fbef9f39"]
+      },
+      "top5_block_ids": [
+        "p0100-011-198d6921",
+        "p0104-011-3442815e",
+        "p0101-012-cdfa58a0",
+        "p0101-005-5e26618a",
+        "p0113-010-db7716ee"
+      ]
+    },
+    {
+      "id": "x07",
+      "question": "软件能发挥功能是否意味着不需要硬件？请结合两者定义说明。",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.5,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0009-007-cd961c26",
+        "p0033-012-10655bff",
+        "p0033-008-cb1d25df",
+        "p0009-006-47847b38",
+        "p0033-013-056b992a"
+      ]
+    },
+    {
+      "id": "x08",
+      "question": "机器语言的一条语句与机器的指令系统有什么区别？",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0306-003-c7133c49",
+        "p0332-004-0c0585e6",
+        "p0325-017-53b20968",
+        "p0011-002-c91cccbf",
+        "p0310-007-23edfe68"
+      ]
+    },
+    {
+      "id": "x09",
+      "question": "体系结构相同的计算机，组成和价格性能也必然相同吗？请用IBM System/370说明。",
+      "before": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0014-003-a0cb09b8",
+        "p0327-008-5dbfda5d",
+        "p0013-007-3362ca27",
+        "p0013-006-cb5184c4",
+        "p0014-002-d0dc63d4"
+      ]
+    },
+    {
+      "id": "x10",
+      "question": "控制器取指令时会访问存储器，分析指令时又要确定哪些信息？",
+      "before": {
+        "hit_at_5": false,
+        "all_at_5": false,
+        "recall_at_5": 0.0,
+        "mrr_at_5": 0,
+        "evidence_recall": 0.0,
+        "all_evidence": false,
+        "missing_blocks": ["p0343-008-f36a3885", "p0343-011-d92a9af8"]
+      },
+      "after": {
+        "hit_at_5": true,
+        "all_at_5": true,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 0.3333333333333333,
+        "evidence_recall": 1.0,
+        "all_evidence": true,
+        "missing_blocks": []
+      },
+      "top5_block_ids": [
+        "p0382-024-7936e823",
+        "p0317-005-35a1dc2d",
+        "p0343-011-d92a9af8",
+        "p0343-008-f36a3885",
+        "p0343-006-a0084b0d"
+      ]
+    }
+  ]
+}

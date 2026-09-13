@@ -1,0 +1,926 @@
+{
+  "schema_version": 1,
+  "dataset_version": "textbook-eval-v1",
+  "kb": "computer-organization",
+  "source_sha256": "d58d01be37b9df5a5706b10f4eef298539ec1d1a55f24f58f9e5654de67d3d60",
+  "knowledge_version": "b92d18a9c5ccddd6e3fdbc59",
+  "source_filename": "计算机组成原理.pdf",
+  "source_pages": 436,
+  "annotation_policy": "AI对照原PDF页面与已发布原文块核验；尚无人类复核。证据为非穷尽标注，保留未入索引的证据缺口。旧题归为regression，不称为独立测试集；新增validation在优化时不用于调参。",
+  "cases": [
+    {
+      "id": "d01",
+      "split": "regression",
+      "kind": "single",
+      "question": "计算机硬件是什么？",
+      "reference_answer": "硬件是计算机的实体部分，由各种电子元器件以及光、电、机设备实物组成。",
+      "evidence": [
+        {
+          "block_id": "p0009-006-47847b38",
+          "page": 9,
+          "quote": "计算机的实体部分",
+          "text_sha256": "9876a26fa9ef3e8ac34d4564afa4783e48795ab97780e227ab85858d7ee2856c",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "d02",
+      "split": "regression",
+      "kind": "single",
+      "question": "总线的作用是什么？",
+      "reference_answer": "总线连接多个部件，是这些部件共享的信息传输介质。",
+      "evidence": [
+        {
+          "block_id": "p0047-006-ee23b76c",
+          "page": 47,
+          "quote": "各部件共享的传输介质",
+          "text_sha256": "5df2229898947bdb47c4baa2a0459b44794958af94c887da1ba70cd03ef2e8c0",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "d03",
+      "split": "regression",
+      "kind": "single",
+      "question": "存储器用来存放什么？",
+      "reference_answer": "存储器是计算机的记忆设备，用来存放程序和数据。",
+      "evidence": [
+        {
+          "block_id": "p0074-004-fbef9f39",
+          "page": 74,
+          "quote": "用来存放程序和数据",
+          "text_sha256": "9e13485935cc734f28b3972d3825c8226c892ff7fc63eabf1009c80bfa345642",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "d04",
+      "split": "regression",
+      "kind": "single",
+      "question": "为什么数据线需要扩位？",
+      "reference_answer": "CPU与存储芯片的数据线数可能不同，因此需要对存储芯片扩位，使数据位数与CPU的数据线数相等。",
+      "evidence": [
+        {
+          "block_id": "p0100-004-41935cae",
+          "page": 100,
+          "quote": "使其数据位数与CPU的数据线数相等",
+          "text_sha256": "7670ed41312ca663cdb63aa7c4a525b4b27ace7536e2ad9e8a19f4454e10cd5a",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "d05",
+      "split": "regression",
+      "kind": "multi",
+      "question": "Cache和主存内容为什么必须一致？",
+      "reference_answer": "写入Cache会改变数据，需要用一致性策略管理与主存的对应关系。写直达法同时更新二者；写回法允许暂时不同，用标志位区分修改过的块，在替换时将修改过的块写回。",
+      "evidence": [
+        {
+          "block_id": "p0120-002-219842e6",
+          "page": 120,
+          "quote": "被映射的主存块内的信息完全一致",
+          "text_sha256": "073cbacd0046a01a962aff58aa91ebdbe2599d499a1b5a21ad101e89be398ab1",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0120-003-7221bd84",
+          "page": 120,
+          "quote": "即写操作时数据既写人Cache又写入主存",
+          "text_sha256": "104936d1779b08925bc68a204010e91889f1a00d5870a5a7c79bd9a370986b80",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0120-004-5ea90a97",
+          "page": 120,
+          "quote": "写操作时只把数据写入Cache而不写入主存",
+          "text_sha256": "45ea97eef8244aa3fb4c0f26e843c43e2fea630d100c396f69444bb9e7c01092",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe",
+      "rubric": "必须区分逻辑一致性和写回策略允许的暂时差异，不可宣称写回法每次写都立即更新主存。"
+    },
+    {
+      "id": "t01",
+      "split": "regression",
+      "kind": "multi",
+      "question": "软件与能看见摸着的硬件有什么区别？",
+      "reference_answer": "硬件是实体设备；软件由人们预先编制、具有特定功能的程序组成，通常存放在主存或辅存中。",
+      "evidence": [
+        {
+          "block_id": "p0009-007-cd961c26",
+          "page": 9,
+          "quote": "人们事先编制",
+          "text_sha256": "d204803cd6137811dc6bcd9b07cab3feffca9f9d0455c199f35312d5bc4680a3",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0009-006-47847b38",
+          "page": 9,
+          "quote": "计算机的实体部分",
+          "text_sha256": "9876a26fa9ef3e8ac34d4564afa4783e48795ab97780e227ab85858d7ee2856c",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t02",
+      "split": "regression",
+      "kind": "single",
+      "question": "冯诺依曼计算机中指令和数据采用哪种进制表示？",
+      "reference_answer": "指令和数据均使用二进制数表示。",
+      "evidence": [
+        {
+          "block_id": "p0014-010-dcf54ad4",
+          "page": 14,
+          "quote": "指令和数据均用二进制数表示",
+          "text_sha256": "46230f49e88cfe09cd8068713f20997c20458f468c552d571e73e52b9dc0c258",
+          "eligible_at_annotation": false
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t03",
+      "split": "regression",
+      "kind": "single",
+      "question": "除了改进微处理器，还有哪种并行性可以提高计算机性能？",
+      "reference_answer": "还可以开发指令级并行性，但受数据预测精度、指令窗口大小及顺序程序特性等因素限制。",
+      "evidence": [
+        {
+          "block_id": "p0030-009-6a2e32d8",
+          "page": 30,
+          "quote": "开发指令级并行性",
+          "text_sha256": "a18f9b8cea7e7b41aec8933f9cf2a899bfea6bb8554e8d7bc1a6d1e96b1df3c2",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t04",
+      "split": "regression",
+      "kind": "single",
+      "question": "多个部件同时在一条总线上发送信息会怎样？",
+      "reference_answer": "两个或更多部件同时发送会导致信号冲突，使传输无效；某一时刻只允许一个部件发送。",
+      "evidence": [
+        {
+          "block_id": "p0047-006-ee23b76c",
+          "page": 47,
+          "quote": "信号冲突",
+          "text_sha256": "5df2229898947bdb47c4baa2a0459b44794958af94c887da1ba70cd03ef2e8c0",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t05",
+      "split": "regression",
+      "kind": "single",
+      "question": "串行通信传送一个字节要怎样逐位发送？",
+      "reference_answer": "根据本教材的示例，一个字节通过一条传输线，分八次由低位到高位逐位传送。",
+      "evidence": [
+        {
+          "block_id": "p0050-019-06a85e49",
+          "page": 50,
+          "quote": "分8次由低位到高位",
+          "text_sha256": "0db30b847674a5646cf648db0a308aaca846c1d3a33f6f56735d7e8da0780fb5",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t06",
+      "split": "regression",
+      "kind": "single",
+      "question": "并行传送一个字节需要几条传输线？",
+      "reference_answer": "一个字节由八条并行传输线同时从源传送到目的地。",
+      "evidence": [
+        {
+          "block_id": "p0050-021-dbec4d39",
+          "page": 50,
+          "quote": "通过8条并行传输线同时",
+          "text_sha256": "9f87ad25ab283d5388b8d08ec160d18c40d0fd0dc1b3ff2969dde3cb47312186",
+          "eligible_at_annotation": false
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t07",
+      "split": "regression",
+      "kind": "single",
+      "question": "存储器访问时间从什么时候算到什么时候？",
+      "reference_answer": "访问时间是从启动一次存储器读或写操作，到完成该操作所需的全部时间。",
+      "evidence": [
+        {
+          "block_id": "p0080-010-ac76f27a",
+          "page": 80,
+          "quote": "到完成该操作所需的全部时间",
+          "text_sha256": "5c6d190a60a2a8fb747304f83575aa2d60bb0ffb645550d519b173333ce1dd99",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t08",
+      "split": "regression",
+      "kind": "single",
+      "question": "连接存储芯片时，ROM一般保存哪些内容？",
+      "reference_answer": "ROM通常用来存放系统程序、标准子程序及各类常数。",
+      "evidence": [
+        {
+          "block_id": "p0100-011-198d6921",
+          "page": 100,
+          "quote": "存放系统程序、标准子程序",
+          "text_sha256": "48185d8a1d276089352823caad8f37cc02f30fbaa0eb1427660c03d530e843f0",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t09",
+      "split": "regression",
+      "kind": "single",
+      "question": "程序写入Cache某个单元时会遇到什么一致性问题？",
+      "reference_answer": "写操作可能造成Cache与主存对应内容不同步，需要通过写直达、写回等策略管理一致性。",
+      "evidence": [
+        {
+          "block_id": "p0120-002-219842e6",
+          "page": 120,
+          "quote": "Cache与主存内容保持一致",
+          "text_sha256": "073cbacd0046a01a962aff58aa91ebdbe2599d499a1b5a21ad101e89be398ab1",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t10",
+      "split": "regression",
+      "kind": "single",
+      "question": "CPU包括哪两大部分？",
+      "reference_answer": "CPU包括运算器和控制器两大部分。",
+      "evidence": [
+        {
+          "block_id": "p0343-005-1f96fb58",
+          "page": 343,
+          "quote": "运算器和控制器两大部分",
+          "text_sha256": "ea7b2481c4f9b5cf28523eccaecd16d0e1d76718ef9e8043f8fe593b4e9380f8",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t11",
+      "split": "regression",
+      "kind": "single",
+      "question": "机器语言由什么构成，每条语句表达什么？",
+      "reference_answer": "机器语言由一条条语句构成，每条语句表达某种语义，例如执行什么操作及操作信息的位置。",
+      "evidence": [
+        {
+          "block_id": "p0306-003-c7133c49",
+          "page": 306,
+          "quote": "机器语言是由一条条语句构成",
+          "text_sha256": "d9f618597187425284da5449b420d3c674e6933f53a5f87aa0e8a5a91a4dba6f",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t12",
+      "split": "regression",
+      "kind": "single",
+      "question": "除CPU和存储器以外，计算机硬件的第三个关键部分是什么？",
+      "reference_answer": "第三个关键部分是输入输出模块，也称输入输出系统。",
+      "evidence": [
+        {
+          "block_id": "p0161-001-458e693d",
+          "page": 161,
+          "quote": "第三个关键部分是输入输出模块",
+          "text_sha256": "845de5cea07ddef148ac9ab314035fd97d5eb6216180e26825ecad5241cd2030",
+          "eligible_at_annotation": false
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t13",
+      "split": "regression",
+      "kind": "single",
+      "question": "参与计算机运算的数可以分为哪两大类？",
+      "reference_answer": "参与运算的数分为无符号数和有符号数。",
+      "evidence": [
+        {
+          "block_id": "p0225-003-f9721a8d",
+          "page": 225,
+          "quote": "在计算机中参与运算的数有两大类：无符号数和有符号数。",
+          "text_sha256": "ad03912e61670229787b35d2c934fb7d9a12ede5b8ac65174c345de80ac3420e",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t14",
+      "split": "regression",
+      "kind": "single",
+      "question": "控制单元设计这一章用多少条机器指令举例？",
+      "reference_answer": "本章以十条机器指令为例。",
+      "evidence": [
+        {
+          "block_id": "p0401-001-f443d3b7",
+          "page": 401,
+          "quote": "本章以10条机器指令为例",
+          "text_sha256": "77a20cb1da2080d239383d3d23b088b4daa8c4e2add4e1858c7984d58a9f1d29",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t15",
+      "split": "regression",
+      "kind": "single",
+      "question": "控制单元发出的命令序列叫什么？",
+      "reference_answer": "控制单元发出的是各种微操作命令，又称控制信号的序列。",
+      "evidence": [
+        {
+          "block_id": "p0381-003-530bfad2",
+          "page": 381,
+          "quote": "控制单元具有发出各种微操作命令",
+          "text_sha256": "60e9f335e605b3e09986d5643ee177e17d3d99e5cb0b27f02222b93f2ec5d8af",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t16",
+      "split": "regression",
+      "kind": "single",
+      "question": "十进制整数转换成二进制时如何取余数？",
+      "reference_answer": "整数部分反复除以二取余数，直到商为零，按取余的逆序组成结果。",
+      "evidence": [
+        {
+          "block_id": "p0300-013-1abb42f0",
+          "page": 300,
+          "quote": "整数部分除以2取余数",
+          "text_sha256": "e9a21763cce9ee81fa4399d96b2fd3df1f0fd10f6701cb2342a86f93894f7ad1",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe",
+      "rubric": "逆序取余还应对照第300页转换图的最低位/最高位标记，文字证据未包含全部视觉信息。"
+    },
+    {
+      "id": "t17",
+      "split": "regression",
+      "kind": "single",
+      "question": "十进制小数转二进制的重复乘法怎么做？",
+      "reference_answer": "小数部分反复乘以二取整数，直到小数部分为零，或达到所要求的精度。",
+      "evidence": [
+        {
+          "block_id": "p0300-013-1abb42f0",
+          "page": 300,
+          "quote": "小数部分乘以2取整数",
+          "text_sha256": "e9a21763cce9ee81fa4399d96b2fd3df1f0fd10f6701cb2342a86f93894f7ad1",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t18",
+      "split": "regression",
+      "kind": "single",
+      "question": "IBM System/370系列说明计算机结构和组成有什么关系？",
+      "reference_answer": "同一体系结构可以有不同组成、价格和性能。IBM System/370的新型号保留原体系结构，从而使用户原有软件投资得到保护。",
+      "evidence": [
+        {
+          "block_id": "p0014-003-a0cb09b8",
+          "page": 14,
+          "quote": "IBMSystem/370",
+          "text_sha256": "107cb285f14d28500991cc5bf38092f2b05efe1f6f83e60d27503ff977cb516f",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "t19",
+      "split": "regression",
+      "kind": "single",
+      "question": "计算机软件通常分为哪两大类？",
+      "reference_answer": "计算机软件通常分为系统软件和应用软件。",
+      "evidence": [
+        {
+          "block_id": "p0009-008-c85713c3",
+          "page": 9,
+          "quote": "系统软件和应用软件",
+          "text_sha256": "de64b06ae93ad23b6b76cc30d1f2e07d248e7b98435613c01e262a92326496fc",
+          "eligible_at_annotation": false
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "n01",
+      "split": "development",
+      "kind": "absent",
+      "question": "2026年最新酷睿处理器的官方售价是多少？",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "evidence": [],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "n02",
+      "split": "development",
+      "kind": "absent",
+      "question": "这本教材作者明年的私人旅行计划是什么？",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "evidence": [],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "n03",
+      "split": "development",
+      "kind": "absent",
+      "question": "Redis Cluster的16384个哈希槽如何迁移？",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "evidence": [],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe"
+    },
+    {
+      "id": "n04",
+      "split": "validation",
+      "kind": "unsupported_visual",
+      "question": "完整还原PDF第300页转换算式的上下标和连接箭头。",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "evidence": [],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe",
+      "unavailable_visual_pages": [300]
+    },
+    {
+      "id": "n05",
+      "split": "validation",
+      "kind": "unsupported_visual",
+      "question": "画出PDF第100页74138译码器的连接线并标出引脚有效电平。",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "evidence": [],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe",
+      "unavailable_visual_pages": [100]
+    },
+    {
+      "id": "n06",
+      "split": "validation",
+      "kind": "unsupported_visual",
+      "question": "逐步列出PDF第260页补码乘法竖式的每一个中间值。",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "evidence": [],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "legacy_retrieval_probe",
+      "unavailable_visual_pages": [260]
+    },
+    {
+      "id": "x01",
+      "split": "development",
+      "kind": "multi",
+      "question": "CPU和存储器各负责什么？请结合CPU结构与存储器章节解释。",
+      "reference_answer": "CPU包括运算器和控制器，完成运算与控制；存储器用于保存程序和数据。",
+      "evidence": [
+        {
+          "block_id": "p0343-005-1f96fb58",
+          "page": 343,
+          "quote": "CPU实质包括运算器和控制器两大部分",
+          "text_sha256": "ea7b2481c4f9b5cf28523eccaecd16d0e1d76718ef9e8043f8fe593b4e9380f8",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0074-004-fbef9f39",
+          "page": 74,
+          "quote": "用来存放程序和数据",
+          "text_sha256": "9e13485935cc734f28b3972d3825c8226c892ff7fc63eabf1009c80bfa345642",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x02",
+      "split": "development",
+      "kind": "contrast",
+      "question": "一条总线可以同时由多个部件发送吗？多个部件同时接收又是否允许？",
+      "reference_answer": "某一时刻只允许一个部件发送，否则信号冲突；多个部件可以同时接收相同的信息。",
+      "evidence": [
+        {
+          "block_id": "p0047-006-ee23b76c",
+          "page": 47,
+          "quote": "只允许有一个部件向总线发送信息，而多个部件可以同时从总线上接收相同的信息",
+          "text_sha256": "5df2229898947bdb47c4baa2a0459b44794958af94c887da1ba70cd03ef2e8c0",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x03",
+      "split": "development",
+      "kind": "multi",
+      "question": "比较串行、并行传送一个字节时的线路数量与适用距离。",
+      "reference_answer": "串行使用一条线逐位传送，适合较远距离；并行用八条线同时传一个字节，适合近距离，教材通常取小于30米。",
+      "evidence": [
+        {
+          "block_id": "p0050-019-06a85e49",
+          "page": 50,
+          "quote": "1字节的数据要通过一条传输线分8次",
+          "text_sha256": "0db30b847674a5646cf648db0a308aaca846c1d3a33f6f56735d7e8da0780fb5",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0050-021-dbec4d39",
+          "page": 50,
+          "quote": "通过8条并行传输线同时",
+          "text_sha256": "9f87ad25ab283d5388b8d08ec160d18c40d0fd0dc1b3ff2969dde3cb47312186",
+          "eligible_at_annotation": false
+        },
+        {
+          "block_id": "p0050-022-4541f5a4",
+          "page": 50,
+          "quote": "并行通信适宜于近距离的数据传输",
+          "text_sha256": "8b82f975ffc9600fd1762b8f1365298950078a7dee3daec2e2165a347529c405",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x04",
+      "split": "development",
+      "kind": "multi",
+      "question": "Cache写直达法与写回法分别何时更新主存？为什么写回法需要修改标志？",
+      "reference_answer": "写直达同时写Cache和主存；写回先只写Cache，修改过的块替换时才写回主存。清/浊标志区分未修改和已修改的块，未修改块不必写回。",
+      "evidence": [
+        {
+          "block_id": "p0120-003-7221bd84",
+          "page": 120,
+          "quote": "即写操作时数据既写人Cache又写入主存",
+          "text_sha256": "104936d1779b08925bc68a204010e91889f1a00d5870a5a7c79bd9a370986b80",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0120-004-5ea90a97",
+          "page": 120,
+          "quote": "写操作时只把数据写入Cache而不写入主存",
+          "text_sha256": "45ea97eef8244aa3fb4c0f26e843c43e2fea630d100c396f69444bb9e7c01092",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x05",
+      "split": "development",
+      "kind": "multi",
+      "question": "存取时间和存取周期是同一个指标吗？分别描述什么，通常谁更长？",
+      "reference_answer": "存取时间是完成一次读写操作的时间；存取周期是连续两次独立操作所需的最小间隔，通常大于存取时间。",
+      "evidence": [
+        {
+          "block_id": "p0080-010-ac76f27a",
+          "page": 80,
+          "quote": "到完成该操作所需的全部时间",
+          "text_sha256": "5c6d190a60a2a8fb747304f83575aa2d60bb0ffb645550d519b173333ce1dd99",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0080-011-51a587b3",
+          "page": 80,
+          "quote": "连续两次独立的存储器操作",
+          "text_sha256": "a400e92356fe438527c24e82e8679f954b8fbc3aedf3759885d0c5a435146813",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x06",
+      "split": "validation",
+      "kind": "multi",
+      "question": "结合存储器的总体用途与芯片选型，为什么程序既可能出现在ROM描述中，也可能出现在RAM描述中？",
+      "reference_answer": "存储器总体保存程序和数据；教材选型建议ROM保存系统程序、标准子程序和常数，RAM为用户编程设置，两者面向不同用途。",
+      "evidence": [
+        {
+          "block_id": "p0074-004-fbef9f39",
+          "page": 74,
+          "quote": "用来存放程序和数据",
+          "text_sha256": "9e13485935cc734f28b3972d3825c8226c892ff7fc63eabf1009c80bfa345642",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0100-011-198d6921",
+          "page": 100,
+          "quote": "RAM则是为用户编程而设置的",
+          "text_sha256": "48185d8a1d276089352823caad8f37cc02f30fbaa0eb1427660c03d530e843f0",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x07",
+      "split": "validation",
+      "kind": "multi",
+      "question": "软件能发挥功能是否意味着不需要硬件？请结合两者定义说明。",
+      "reference_answer": "硬件是实体设备，软件由程序组成；软件性能的发挥依托硬件支撑，计算机性能取决于二者功能的总和。",
+      "evidence": [
+        {
+          "block_id": "p0009-006-47847b38",
+          "page": 9,
+          "quote": "计算机的实体部分",
+          "text_sha256": "9876a26fa9ef3e8ac34d4564afa4783e48795ab97780e227ab85858d7ee2856c",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0009-007-cd961c26",
+          "page": 9,
+          "quote": "“软件”性能的发挥也必须依托“硬件”的支撑",
+          "text_sha256": "d204803cd6137811dc6bcd9b07cab3feffca9f9d0455c199f35312d5bc4680a3",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x08",
+      "split": "validation",
+      "kind": "contrast",
+      "question": "机器语言的一条语句与机器的指令系统有什么区别？",
+      "reference_answer": "一条机器语言语句称为机器指令；全部机器指令的集合称为机器的指令系统。",
+      "evidence": [
+        {
+          "block_id": "p0306-003-c7133c49",
+          "page": 306,
+          "quote": "将全部机器指令的集合称为机器的指令系统",
+          "text_sha256": "d9f618597187425284da5449b420d3c674e6933f53a5f87aa0e8a5a91a4dba6f",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x09",
+      "split": "validation",
+      "kind": "contrast",
+      "question": "体系结构相同的计算机，组成和价格性能也必然相同吗？请用IBM System/370说明。",
+      "reference_answer": "不必然相同。同系列可以采用不同组成，价格性能有差异；System/370升级机型保留原体系结构，使用户可以继续使用已有软件。",
+      "evidence": [
+        {
+          "block_id": "p0014-003-a0cb09b8",
+          "page": 14,
+          "quote": "IBMSystem/370",
+          "text_sha256": "107cb285f14d28500991cc5bf38092f2b05efe1f6f83e60d27503ff977cb516f",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    },
+    {
+      "id": "x10",
+      "split": "validation",
+      "kind": "multi",
+      "question": "控制器取指令时会访问存储器，分析指令时又要确定哪些信息？",
+      "reference_answer": "取指令时形成指令地址并发出取指命令，从对应存储单元取出指令；分析时确定要完成的操作及操作数的有效地址。",
+      "evidence": [
+        {
+          "block_id": "p0343-008-f36a3885",
+          "page": 343,
+          "quote": "将对应此地址的指令取到控制器中",
+          "text_sha256": "89f63a1dc3f2366ba16d6b1b7e93b3103e6bfb6a9db32b35ea87c293e32f3a7f",
+          "eligible_at_annotation": true
+        },
+        {
+          "block_id": "p0343-011-d92a9af8",
+          "page": 343,
+          "quote": "操作数的有效地址",
+          "text_sha256": "ae58ed6765d8c51b59fd66b20e70a7c1be14d06b65296bea7b3455351b9b9ce8",
+          "eligible_at_annotation": true
+        }
+      ],
+      "review": {
+        "method": "ai_source_review",
+        "human_reviewer": null,
+        "date": "2026-09-12"
+      },
+      "origin": "new_source_review"
+    }
+  ]
+}

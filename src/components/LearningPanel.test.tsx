@@ -1,8 +1,10 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { LearningPanel } from "./LearningPanel";
 import * as api from "../lib/learning";
+import * as rag from "../lib/rag";
+import type { RagTask } from "../lib/rag";
 import type { LearningView } from "../lib/learning";
 import type { PdfKnowledgeBase } from "../lib/knowledgeBase";
 vi.mock("../lib/learning", async (load) => ({
@@ -13,6 +15,12 @@ vi.mock("../lib/learning", async (load) => ({
   learningPrevious: vi.fn(),
   learningRecord: vi.fn(),
   learningReset: vi.fn(),
+}));
+vi.mock("../lib/rag", () => ({
+  ragProviders: vi.fn(),
+  ragPrepareRandom: vi.fn(),
+  ragGenerate: vi.fn(),
+  ragRelatedSources: vi.fn(),
 }));
 const book: PdfKnowledgeBase = {
   id: "book",
@@ -233,6 +241,153 @@ it("restores revealed progress without new shown events", async () => {
   await screen.findByText("保存程序和数据。");
   expect(api.learningRecord).not.toHaveBeenCalled();
 });
+it("shows LLM content with optional original text and working page navigation", async () => {
+  const p = props();
+  current.card!.result!.generation_mode = "llm";
+  vi.mocked(rag.ragRelatedSources).mockResolvedValue(current.card!.packet);
+  current.card!.result!.answer[0]!.citations = [];
+  current.card!.result!.explanation[0]!.citations = [];
+  current.session!.history[0]!.confirmed = true;
+  current.session!.history[0]!.revealed = true;
+  vi.mocked(api.learningResume).mockResolvedValue(current);
+  render(<LearningPanel {...p} />);
+  await screen.findByText("保存程序和数据。");
+  expect(screen.getByText("AI 生成 · 原文供对照参考")).toBeInTheDocument();
+  expect(
+    screen.queryByText("存储器存放程序和数据。它由多个存储单元组成。"),
+  ).not.toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "相关原文" }));
+  expect(
+    screen.getByText("存储器存放程序和数据。它由多个存储单元组成。"),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "查看第 3 页原文 ↗" }));
+  expect(p.onPage).toHaveBeenCalledWith(3, "v1");
+  await user.click(screen.getByRole("button", { name: "AI 解释" }));
+  expect(
+    screen.getByText("可以把存储器理解为存放指令和数据的书架。"),
+  ).toBeInTheDocument();
+});
+it("restores a prose fallback without requiring original text or an explanation field", async () => {
+  current.card!.result!.generation_mode = "llm";
+  current.card!.result!.answer = [
+    { text: "这是 LLM 的完整讲解。", citations: [] },
+  ];
+  current.card!.result!.explanation = [];
+  current.card!.packet.evidence = [];
+  vi.mocked(rag.ragRelatedSources).mockResolvedValue(current.card!.packet);
+  current.card!.packet.chapter_path = ["存储器"];
+  current.session!.history[0]!.confirmed = true;
+  current.session!.history[0]!.revealed = true;
+  vi.mocked(api.learningResume).mockResolvedValue(current);
+  render(<LearningPanel {...props()} />);
+  await screen.findByText("这是 LLM 的完整讲解。");
+  expect(screen.getByText("存储器")).toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "相关原文" }));
+  expect(
+    await screen.findByText("暂未找到可用的相关原文。"),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /查看第/ }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "AI 解释" }));
+  expect(
+    within(screen.getByRole("region", { name: "AI 解释" })).getByText(
+      "这是 LLM 的完整讲解。",
+    ),
+  ).toBeInTheDocument();
+});
+it("shows the requested notice when next runs out of cards and keeps the current card", async () => {
+  render(<LearningPanel {...props()} />);
+  const user = await begin();
+  await user.click(screen.getByRole("button", { name: "揭晓答案" }));
+  vi.mocked(api.learningNext).mockResolvedValue({
+    ...current,
+    reason: "当前筛选下没有可抽取卡片",
+  });
+  await user.click(screen.getByRole("button", { name: "下一张 →" }));
+  const dialog = await screen.findByRole("dialog", { name: "学习提示" });
+  expect(dialog).toHaveTextContent("暂时没有新的知识卡了哦~请新增一张~");
+  expect(screen.getByText("存储器有什么作用？")).toBeInTheDocument();
+  expect(rag.ragGenerate).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole("button", { name: "知道了" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "生成新卡" })).toBeEnabled();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "下一张 →" })).toHaveFocus(),
+  );
+  await user.click(screen.getByRole("button", { name: "下一张 →" }));
+  expect(
+    await screen.findByRole("dialog", { name: "学习提示" }),
+  ).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+it("shows the notice for an empty next response but not for a failed request", async () => {
+  render(<LearningPanel {...props()} />);
+  const user = await begin();
+  await user.click(screen.getByRole("button", { name: "揭晓答案" }));
+  vi.mocked(api.learningNext).mockRejectedValueOnce(new Error("读取失败"));
+  await user.click(screen.getByRole("button", { name: "下一张 →" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("读取失败");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  vi.mocked(api.learningNext).mockResolvedValue({ ...current, card: null });
+  await user.click(screen.getByRole("button", { name: "下一张 →" }));
+  expect(
+    await screen.findByRole("dialog", { name: "学习提示" }),
+  ).toHaveTextContent("暂时没有新的知识卡了哦~请新增一张~");
+});
+it("places direct generation between previous and next and locks navigation until it finishes", async () => {
+  current.session!.history[0]!.confirmed = true;
+  current.session!.history[0]!.revealed = true;
+  current.session!.history.push({ ...current.session!.history[0]!, id: "p2" });
+  current.session!.cursor = 1;
+  vi.mocked(api.learningResume).mockResolvedValue(current);
+  vi.mocked(rag.ragProviders).mockResolvedValue([
+    { id: "deepseek", region: "default", model: "m1" },
+  ]);
+  vi.mocked(rag.ragPrepareRandom).mockResolvedValue({
+    ...current.card!,
+    state: "prepared",
+    result: null,
+  });
+  let complete!: (task: RagTask) => void;
+  vi.mocked(rag.ragGenerate).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  render(<LearningPanel {...props()} />);
+  await screen.findByText("保存程序和数据。");
+  expect(
+    within(screen.getByLabelText("学习卡片操作"))
+      .getAllByRole("button")
+      .map((button) => button.textContent),
+  ).toEqual(["← 上一张", "生成新卡", "下一张 →"]);
+  expect(screen.getByRole("button", { name: "← 上一张" })).toBeEnabled();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "生成新卡" }));
+  expect(screen.getByRole("button", { name: "生成中…" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "← 上一张" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "下一张 →" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "学习设置" }));
+  expect(screen.getByLabelText("章节范围")).toBeDisabled();
+  expect(screen.getByRole("button", { name: "重置学习记录" })).toBeDisabled();
+  await act(async () => {
+    complete(current.card!);
+    await Promise.resolve();
+  });
+  await screen.findByText(/新卡已保存为未学习/);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "下一张 →" })).toBeEnabled(),
+  );
+  expect(screen.getByRole("button", { name: "← 上一张" })).toBeEnabled();
+  expect(api.learningResume).toHaveBeenCalledTimes(2);
+  expect(rag.ragGenerate).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText("本次教材摘录")).not.toBeInTheDocument();
+});
 it("keeps the open evidence when returning from the PDF, and collapses details for the next card", async () => {
   const p = props();
   const mounted = render(<LearningPanel {...p} />);
@@ -258,6 +413,7 @@ it("keeps the open evidence when returning from the PDF, and collapses details f
   vi.mocked(api.learningNext).mockResolvedValue(next);
   await user.click(screen.getByRole("button", { name: "下一张 →" }));
   expect(await screen.findByText("总线有什么作用？")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("region", { name: "原文依据" }),
   ).not.toBeInTheDocument();

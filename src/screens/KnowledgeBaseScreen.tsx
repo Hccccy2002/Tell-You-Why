@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { LearningPanel } from "../components/LearningPanel";
+import { ReviewAgentPanel } from "../components/ReviewAgentPanel";
 import "../knowledge-base.css";
 import { friendlyError } from "../lib/api";
 import { useAutoHideGuard } from "../lib/autoHideGuard";
@@ -386,8 +387,11 @@ export function KnowledgeBaseScreen() {
 }
 
 function BookContent({ book }: { book: PdfKnowledgeBase }) {
-  const [tab, setTab] = useState<"search" | "page" | "learning">("search");
+  const [tab, setTab] = useState<"search" | "page" | "learning" | "review">(
+    "search",
+  );
   const [learningOpened, setLearningOpened] = useState(false);
+  const [reviewOpened, setReviewOpened] = useState(false);
   const [pageVersion, setPageVersion] = useState<string | undefined>();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [chapter, setChapter] = useState("");
@@ -495,6 +499,7 @@ function BookContent({ book }: { book: PdfKnowledgeBase }) {
           [
             ["search", "检索"],
             ["learning", "随机学习"],
+            ["review", "复习 Agent"],
             ["page", "原文"],
           ] as const
         ).map(([value, label]) => (
@@ -505,6 +510,7 @@ function BookContent({ book }: { book: PdfKnowledgeBase }) {
             onClick={() => {
               setTab(value);
               if (value === "learning") setLearningOpened(true);
+              if (value === "review") setReviewOpened(true);
               setError(null);
             }}
           >
@@ -626,6 +632,16 @@ function BookContent({ book }: { book: PdfKnowledgeBase }) {
           />
         </div>
       ) : null}
+      {reviewOpened && (
+        <div hidden={tab !== "review"}>
+          <ReviewAgentPanel
+            book={book}
+            chapters={chapters}
+            active={tab === "review"}
+            onPage={goPage}
+          />
+        </div>
+      )}
       {tab === "page" ? (
         <>
           <form

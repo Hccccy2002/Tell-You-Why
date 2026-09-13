@@ -2,7 +2,13 @@ import { useEffect, useRef } from "react";
 import { useAutoHideGuard } from "../lib/autoHideGuard";
 
 export type AppView =
-  "home" | "interests" | "models" | "library" | "settings" | "knowledge-base";
+  | "home"
+  | "interests"
+  | "models"
+  | "library"
+  | "settings"
+  | "knowledge-base"
+  | "evaluation";
 
 interface Props {
   view: AppView;
@@ -18,6 +24,7 @@ const menuItems: Array<[AppView, string, string]> = [
   ["models", "模型设置", "◎"],
   ["library", "收藏与历史", "☆"],
   ["knowledge-base", "PDF 知识库", "▤"],
+  ["evaluation", "质量评测", "▥"],
   ["settings", "通用设置", "⚙"],
 ];
 

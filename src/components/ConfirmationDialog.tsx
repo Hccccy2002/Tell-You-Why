@@ -5,6 +5,7 @@ import { useAutoHideGuard } from "../lib/autoHideGuard";
 interface Props {
   id: string;
   eyebrow?: string;
+  variant?: "confirmation" | "notice";
   title: string;
   children: ReactNode;
   confirmLabel: string;
@@ -17,6 +18,7 @@ interface Props {
 export function ConfirmationDialog({
   id,
   eyebrow = "操作确认",
+  variant = "confirmation",
   title,
   children,
   confirmLabel,
@@ -119,18 +121,29 @@ export function ConfirmationDialog({
         <div id={`${id}-description`} className="confirmation-description">
           {children}
         </div>
-        <div className="confirmation-actions">
+        <div
+          className={
+            variant === "notice"
+              ? "confirmation-actions confirmation-actions-single"
+              : "confirmation-actions"
+          }
+        >
+          {variant === "confirmation" && (
+            <button
+              className="confirmation-cancel"
+              disabled={busy}
+              autoFocus
+              onClick={onCancel}
+            >
+              取消
+            </button>
+          )}
           <button
-            className="confirmation-cancel"
+            className={
+              variant === "notice" ? "primary-button" : "confirmation-danger"
+            }
             disabled={busy}
-            autoFocus
-            onClick={onCancel}
-          >
-            取消
-          </button>
-          <button
-            className="confirmation-danger"
-            disabled={busy}
+            autoFocus={variant === "notice"}
             onClick={onConfirm}
           >
             {busy ? busyLabel : confirmLabel}

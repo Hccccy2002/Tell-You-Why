@@ -268,6 +268,17 @@ impl Database {
             transaction.execute_batch(include_str!("learning_schema.sql"))?;
             transaction.commit()?;
         }
+        if version < 9 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(include_str!("review_schema.sql"))?;
+            transaction.commit()?;
+        }
+        if version < 10 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(include_str!("review_memory_schema.sql"))?;
+            crate::review_memory::backfill(&transaction)?;
+            transaction.commit()?;
+        }
         connection.execute(
             "UPDATE card_user_state
              SET hidden = 1
@@ -1305,6 +1316,9 @@ impl Database {
                 transaction.execute("DELETE FROM follow_up_exchanges", [])?;
                 transaction.execute("DELETE FROM generation_jobs", [])?;
                 transaction.execute("DELETE FROM rag_tasks", [])?;
+                transaction.execute("DELETE FROM review_memory_events", [])?;
+                transaction.execute("DELETE FROM review_memory", [])?;
+                transaction.execute("DELETE FROM review_runs", [])?;
                 transaction.execute("DELETE FROM rag_learning_sessions", [])?;
                 transaction.execute("DELETE FROM rag_learning_units", [])?;
                 transaction.execute("DELETE FROM rag_cards", [])?;

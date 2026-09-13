@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { RandomLearningCard } from "./RandomLearningCard";
@@ -71,20 +71,12 @@ beforeEach(() => {
     },
   });
 });
-async function preview() {
-  const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "生成新卡" }));
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "预览原文" })).toBeEnabled(),
-  );
-  await user.click(screen.getByRole("button", { name: "预览原文" }));
-  await screen.findByText("主素材正文");
-  return user;
-}
-it("previews selected scope before any cloud call and refreshes learning only on success", async () => {
+it("generates and saves with one click using the selected chapter without opening a preview", async () => {
   const saved = vi.fn();
   render(<RandomLearningCard book={book} chapter="c1" onSaved={saved} />);
-  const user = await preview();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "生成新卡" }));
+  await screen.findByText(/新卡已保存为未学习/);
   expect(api.ragPrepareRandom).toHaveBeenCalledWith({
     kb: "b",
     version: "v1",
@@ -92,34 +84,143 @@ it("previews selected scope before any cloud call and refreshes learning only on
     provider: "deepseek",
     region: "default",
   });
-  expect(api.ragGenerate).not.toHaveBeenCalled();
-  await user.click(screen.getByRole("button", { name: "发送摘录并生成新卡" }));
-  await screen.findByText(/新卡已保存为未学习/);
+  expect(api.ragGenerate).toHaveBeenCalledExactlyOnceWith(task.id);
+  expect(screen.queryByText("主素材正文")).not.toBeInTheDocument();
+  expect(screen.queryByText("本次教材摘录")).not.toBeInTheDocument();
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   expect(saved).toHaveBeenCalledTimes(1);
   expect(api.ragGenerate).toHaveBeenCalledTimes(1);
 });
-it("reports insufficient evidence without retry or changing learning state", async () => {
+it("saves the LLM fallback without opening source content", async () => {
   vi.mocked(api.ragGenerate).mockResolvedValue({
     ...task,
     state: "completed",
     result: {
-      status: "insufficient",
+      status: "answered",
       question: "问题",
-      answer: [],
+      answer: [{ text: "模型提供的通俗讲解", citations: [] }],
       explanation: [],
-      reason: "条件不完整",
+      reason: "",
+      generation_mode: "llm",
     },
   });
   const saved = vi.fn();
   render(<RandomLearningCard book={book} chapter="" onSaved={saved} />);
-  const user = await preview();
-  await user.click(screen.getByRole("button", { name: "发送摘录并生成新卡" }));
-  await screen.findByText("依据不足：条件不完整");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "生成新卡" }));
+  await screen.findByText(/新卡已保存为未学习/);
+  expect(saved).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText("主素材正文")).not.toBeInTheDocument();
+  expect(api.ragGenerate).toHaveBeenCalledTimes(1);
+});
+it("does not load providers or call the model before the user clicks generate", () => {
+  render(<RandomLearningCard book={book} chapter="" onSaved={vi.fn()} />);
+  expect(api.ragProviders).not.toHaveBeenCalled();
+  expect(api.ragGenerate).not.toHaveBeenCalled();
+});
+
+it("keeps one generation in flight and releases the busy state after failure", async () => {
+  let fail!: (error: Error) => void;
+  vi.mocked(api.ragGenerate).mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        fail = reject;
+      }),
+  );
+  const saved = vi.fn();
+  const busy = vi.fn();
+  render(
+    <RandomLearningCard
+      book={book}
+      chapter="c1"
+      onSaved={saved}
+      onBusyChange={busy}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.dblClick(screen.getByRole("button", { name: "生成新卡" }));
+  expect(screen.getByRole("button", { name: "生成中…" })).toBeDisabled();
+  expect(api.ragGenerate).toHaveBeenCalledTimes(1);
+  expect(busy).toHaveBeenLastCalledWith(true);
+  await act(async () => {
+    fail(new Error("模型请求失败"));
+    await Promise.resolve();
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent("模型请求失败");
+  expect(saved).not.toHaveBeenCalled();
+  expect(busy).toHaveBeenLastCalledWith(false);
+  expect(screen.getByRole("button", { name: "生成新卡" })).toBeEnabled();
+  await user.click(screen.getByRole("button", { name: "生成新卡" }));
+  await screen.findByText(/新卡已保存为未学习/);
+  expect(saved).toHaveBeenCalledTimes(1);
+  expect(api.ragGenerate).toHaveBeenCalledTimes(2);
+});
+
+it("reports missing models without preparing evidence or starting generation", async () => {
+  vi.mocked(api.ragProviders).mockResolvedValue([]);
+  render(<RandomLearningCard book={book} chapter="" onSaved={vi.fn()} />);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "生成新卡" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "请先在模型设置中配置并测试模型通道",
+  );
+  expect(api.ragPrepareRandom).not.toHaveBeenCalled();
+  expect(api.ragGenerate).not.toHaveBeenCalled();
+});
+
+it("still generates a card when no usable evidence was selected", async () => {
+  vi.mocked(api.ragPrepareRandom).mockResolvedValue({
+    ...task,
+    packet: { ...task.packet, evidence: [] },
+  });
+  const saved = vi.fn();
+  render(<RandomLearningCard book={book} chapter="c1" onSaved={saved} />);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "生成新卡" }));
+  await screen.findByText(/新卡已保存为未学习/);
+  expect(api.ragGenerate).toHaveBeenCalledExactlyOnceWith(task.id);
+  expect(saved).toHaveBeenCalledTimes(1);
+});
+
+it("reports an unavailable model without pretending a card was saved", async () => {
+  vi.mocked(api.ragGenerate).mockResolvedValue({
+    ...task,
+    state: "failed",
+    error: "模型服务暂时不可用",
+  });
+  const saved = vi.fn();
+  render(<RandomLearningCard book={book} chapter="" onSaved={saved} />);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "生成新卡" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "模型服务暂时不可用",
+  );
   expect(saved).not.toHaveBeenCalled();
   expect(api.ragGenerate).toHaveBeenCalledTimes(1);
 });
-it("does not require providers until the generation controls are opened", () => {
-  render(<RandomLearningCard book={book} chapter="" onSaved={vi.fn()} />);
-  expect(api.ragProviders).not.toHaveBeenCalled();
+
+it("does not start a model call if the panel was unmounted during preparation", async () => {
+  let complete!: (task: RagTask) => void;
+  vi.mocked(api.ragPrepareRandom).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const mounted = render(
+    <RandomLearningCard book={book} chapter="" onSaved={vi.fn()} />,
+  );
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "生成新卡" }));
+  await waitFor(() => expect(api.ragPrepareRandom).toHaveBeenCalledTimes(1));
+  mounted.unmount();
+  await act(async () => {
+    complete(task);
+    await Promise.resolve();
+  });
   expect(api.ragGenerate).not.toHaveBeenCalled();
 });

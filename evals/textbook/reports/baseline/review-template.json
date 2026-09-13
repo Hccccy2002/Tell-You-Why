@@ -1,0 +1,93 @@
+{
+  "dataset_sha256": "df6b58cb68af4a40e4658346105bdc134de207a77681fb673072c6c72f27b2eb",
+  "rows": [
+    {
+      "id": "d01",
+      "result_sha256": "83dad23698dbf403655d2e1dad9ddabcdfd866464d1ea57c8cc21c42a1241296",
+      "question": "计算机硬件是什么？",
+      "reference_answer": "硬件是计算机的实体部分，由各种电子元器件以及光、电、机设备实物组成。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    },
+    {
+      "id": "d05",
+      "result_sha256": "eddbc01d8e3adfea058fbe86924c615567c5d35cda544264a3a18884164b1e17",
+      "question": "Cache和主存内容为什么必须一致？",
+      "reference_answer": "写入Cache会改变数据，需要用一致性策略管理与主存的对应关系。写直达法同时更新二者；写回法允许暂时不同，用标志位区分修改过的块，在替换时将修改过的块写回。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    },
+    {
+      "id": "t10",
+      "result_sha256": "72d50d48353cd1bdc631cbb663eade0d6277101a9e7ddacd2afcf76793e84399",
+      "question": "CPU包括哪两大部分？",
+      "reference_answer": "CPU包括运算器和控制器两大部分。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    },
+    {
+      "id": "t13",
+      "result_sha256": "f8db604fe6d665ae56833c70419dc39fb6dab5ebe9efed82afda6b0323be1728",
+      "question": "参与计算机运算的数可以分为哪两大类？",
+      "reference_answer": "参与运算的数分为无符号数和有符号数。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    },
+    {
+      "id": "x01",
+      "result_sha256": "80a3df1e48f236001c9f48cb48e17acd45845136296eda28c293731f78855914",
+      "question": "CPU和存储器各负责什么？请结合CPU结构与存储器章节解释。",
+      "reference_answer": "CPU包括运算器和控制器，完成运算与控制；存储器用于保存程序和数据。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    },
+    {
+      "id": "x04",
+      "result_sha256": "ecf6d71582ffe00b9f51323cd87f3ad1a151b762e70055bf611099083dcbaa29",
+      "question": "Cache写直达法与写回法分别何时更新主存？为什么写回法需要修改标志？",
+      "reference_answer": "写直达同时写Cache和主存；写回先只写Cache，修改过的块替换时才写回主存。清/浊标志区分未修改和已修改的块，未修改块不必写回。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    },
+    {
+      "id": "n01",
+      "result_sha256": "7d42ccaeac3e8ddaed0c81bc8502336aa5513b3ad6e9cb65ee10c8a85df6a205",
+      "question": "2026年最新酷睿处理器的官方售价是多少？",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    },
+    {
+      "id": "n03",
+      "result_sha256": "61e89705cdabed4756d0793ecf0cccb2de9c34fed84d69a3e63fff4be7fd3378",
+      "question": "Redis Cluster的16384个哈希槽如何迁移？",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "method": null,
+      "reviewer": null,
+      "correct": null,
+      "grounded": null,
+      "notes": ""
+    }
+  ]
+}

@@ -29,6 +29,7 @@ import { GeneralSettingsScreen } from "./screens/GeneralSettingsScreen";
 import { InterestSettingsScreen } from "./screens/InterestSettingsScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { KnowledgeBaseScreen } from "./screens/KnowledgeBaseScreen";
+import { EvaluationScreen } from "./screens/EvaluationScreen";
 import { ModelSettingsScreen } from "./screens/ModelSettingsScreen";
 import type {
   AppSettings,
@@ -915,6 +916,7 @@ export default function App() {
         />
       ) : null}
       {view === "knowledge-base" ? <KnowledgeBaseScreen /> : null}
+      {view === "evaluation" ? <EvaluationScreen /> : null}
       {view === "interests" ? (
         <InterestSettingsScreen
           initialTopics={data.topics}

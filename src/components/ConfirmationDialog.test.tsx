@@ -29,6 +29,35 @@ function DialogHarness() {
 }
 
 describe("ConfirmationDialog", () => {
+  it("shows a notice with one focused acknowledgement button", async () => {
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmationDialog
+        id="notice"
+        variant="notice"
+        eyebrow="随机学习"
+        title="学习提示"
+        confirmLabel="知道了"
+        busyLabel="知道了"
+        busy={false}
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      >
+        <p>暂时没有新的知识卡了哦~请新增一张~</p>
+      </ConfirmationDialog>,
+    );
+    const user = userEvent.setup();
+    const acknowledge = screen.getByRole("button", { name: "知道了" });
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(acknowledge).toHaveFocus();
+    await user.tab();
+    expect(acknowledge).toHaveFocus();
+    await user.click(acknowledge);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await user.keyboard("{Escape}");
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
   it("traps focus, closes on Escape, and restores the trigger focus", async () => {
     const user = userEvent.setup();
     const appRoot = document.createElement("div");

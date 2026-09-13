@@ -74,7 +74,9 @@ Tell You Why 是一款运行在 Windows 10/11 上的轻量知识小窗，适合�
 
 ## 技术栈
 
-PDF 资料准备的 Python 模块位于 `rag-service/`，已接入桌面 APP。点击右上角 **PDF** 或菜单中的 **PDF 知识库**，即可导入、暂停续跑、浏览章节、检索和查看原文。已有的《计算机组成原理》会自动显示。“问答与学习”提供基于教材的 RAG 问答、单张学习卡、摘录预览及引用保存，详见 [教材问答与学习卡](docs/rag-minimal-loop-guide.md)。“随机学习”支持已有卡离线抽样、近期避重、掌握/需复习记录和教材随机选材生成，详见 [随机学习使用说明](docs/random-learning-guide.md)。批量生成及自动间隔复习留待后续阶段。PDF 环境说明见 [知识库界面](docs/pdf-desktop-guide.md)，命令行见 [Python 模块说明](rag-service/README.md)。
+PDF 随机学习与复习 Agent 的“相关原文”按当前题目检索并重排，只展示最多 5 条。使用本地 BGE Reranker，无额外 LLM API 调用。模型准备命令见 [Python 模块说明](rag-service/README.md#安装与模型准备)，方法和实测结果见 [Top 5 原文检索](docs/related-sources-top5.md)。
+
+PDF 资料准备的 Python 模块位于 `rag-service/`，已接入桌面 APP。点击右上角 **PDF** 或菜单中的 **PDF 知识库**，即可导入、暂停续跑、检索和查看原文。已有的《计算机组成原理》会自动显示。“随机学习”提供简洁知识卡、直接生成新卡、原文对照和模型解释。“复习 Agent”根据学习记录调用工具检索教材、讲解、出题并记录用户实际答题结果，支持失败恢复与执行追踪导出。使用方式见 [复习 Agent](docs/review-agent-guide.md)，质量评测见 [评测说明](evals/review-agent/README.md)，分阶段测试结果见 [开发记录](docs/review-agent-development.md)。自动间隔复习留待后续阶段。PDF 环境说明见 [知识库界面](docs/pdf-desktop-guide.md)，命令行见 [Python 模块说明](rag-service/README.md)。
 
 | 层级       | 实现                                         |
 | ---------- | -------------------------------------------- |
@@ -239,11 +241,11 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 最近一次验证结果：
 
-- 前端测试 72 项通过（13 个测试文件）。
-- Rust 常规测试 72 项通过。
-- 1 项 Windows Credential Manager 实机测试默认忽略，需要人工显式执行。
-- Prettier、ESLint、TypeScript、Vite 生产构建和严格 Clippy 通过。
-- DeepSeek、Kimi 适配器以及跨供应商故障切换均使用本地 Mock Transport 测试，不读取真实 Key、不访问真实供应商、不产生费用。
+- 前端测试 116 项通过（18 个测试文件）。
+- Rust 常规测试 126 项通过；Python RAG 69 项及两套评测脚本 23 项通过。
+- 6 项实机/真实模型/显式评测入口默认忽略；复习 Agent 受控评测 10 个场景通过，真实教材与到期复习评测也已执行。
+- ESLint、TypeScript、Vite 生产构建和严格 Clippy 通过；修改文件的 Prettier 检查通过，全库仍有 48 个未改动文件的既有格式问题。
+- 适配器和故障切换的常规测试使用 Mock Transport；本次另经授权调用 DeepSeek 官方 API，真实数据及结论见下方评测文档。
 
 ## 构建 Windows 程序
 
@@ -290,6 +292,8 @@ examples/                    JSON/CSV 内容导入模板
 - [MVP 实施计划与 P0 追踪](docs/implementation-plan.md)
 - [技术决策记录](docs/decisions.md)
 - [内容导入与审核流程](docs/content-import.md)
+- [复习 Agent 使用与持久化](docs/review-agent-guide.md)
+- [真实教材评测与持续复习验收](docs/textbook-agent-roadmap.md)
 - [安全复核](docs/security-review.md)
 - [Windows 人工测试清单](docs/manual-test-checklist.md)
 
