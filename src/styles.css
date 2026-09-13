@@ -1890,6 +1890,10 @@ select {
   margin-top: 15px;
 }
 
+.confirmation-actions-single {
+  grid-template-columns: 1fr;
+}
+
 .confirmation-actions button {
   min-height: 44px;
   border-radius: 9px;

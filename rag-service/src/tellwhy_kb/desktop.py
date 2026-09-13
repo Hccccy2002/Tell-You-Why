@@ -325,6 +325,32 @@ class DesktopLibrary:
             raise ValueError("资料版本已更新，请重新预览")
         return {"version": version}
 
+    def related_sources(self, kb: str, version: str, query: str, chapter: str | None = None):
+        """Top 5 for the finished question; never replace its original citation snapshot."""
+        if not isinstance(query, str) or not query.strip() or len(query) > 1000:
+            raise ValueError("请输入 1–1000 字的问题")
+        directory = inside(self.kb_root(kb), "versions/" + safe_name(version))
+        manifest = read_json(directory / "manifest.json")
+        if manifest["version"] != version:
+            raise ValueError("原文版本不一致")
+        for relative in ("knowledge.sqlite", "embeddings.npy"):
+            if file_hash(directory / relative) != manifest["files"][relative]:
+                raise ValueError("知识库索引校验失败，请重新导入")
+        source = inside(self.kb_root(kb), manifest["source"]["path"])
+        if file_hash(source) != manifest["source"]["sha256"]:
+            raise ValueError("原始 PDF 校验失败")
+        for relative, checksum in manifest["models"]["embedding"]["files"].items():
+            if file_hash(inside(self.models / "embedding", relative)) != checksum:
+                raise ValueError("检索模型校验失败")
+        from .evidence import assemble
+        from .indexing.embedding import Encoder
+        from .indexing.reranker import Reranker
+        from .search import SearchIndex
+
+        reranker = Reranker(self.models)
+        with SearchIndex(directory, Encoder(self.models)) as index:
+            return assemble(index, manifest, kb, query.strip(), chapter, reranker=reranker)
+
     def learning_units(self, kb: str, version: str, chapter: str | None = None):
         from .learning import units
 
@@ -332,7 +358,21 @@ class DesktopLibrary:
         if manifest["version"] != version:
             raise ValueError("资料版本已更新，请刷新后重新选择")
         with readonly(directory / "knowledge.sqlite") as db:
-            return {"kb": kb, "version": version, "items": units(db, manifest, kb, chapter)}
+            items = units(db, manifest, kb, chapter)
+            chapters = {r[0]: json.loads(r[1]) for r in db.execute("SELECT id,data FROM chapters")}
+            path, current, seen = [], chapter, set()
+            while current in chapters and current not in seen:
+                seen.add(current)
+                path.insert(0, chapters[current]["title"])
+                current = chapters[current].get("parent_id")
+            return {
+                "kb": kb,
+                "version": version,
+                "filename": manifest["source"].get("filename", kb + ".pdf"),
+                "source_sha256": manifest["source"]["sha256"],
+                "chapter_path": path,
+                "items": items,
+            }
 
     def learning_evidence(self, kb: str, version: str, unit_id: str, chapter: str | None = None):
         from .evidence import assemble
@@ -391,6 +431,7 @@ class DesktopLibrary:
             "search": self.search,
             "page": self.page,
             "evidence": self.evidence,
+            "related_sources": self.related_sources,
             "learning_units": self.learning_units,
             "learning_version": self.learning_version,
             "learning_evidence": self.learning_evidence,

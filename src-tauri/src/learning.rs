@@ -69,6 +69,18 @@ fn paths(card: &Value) -> Vec<Vec<String>> {
             .map(str::to_owned)
             .collect()];
     }
+    if card["packet"]["evidence"]
+        .as_array()
+        .is_some_and(Vec::is_empty)
+    {
+        if let Some(path) = card["packet"]["chapter_path"].as_array() {
+            return vec![path
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()];
+        }
+    }
     card["packet"]["evidence"]
         .as_array()
         .into_iter()
@@ -249,7 +261,8 @@ impl Database {
             })
             .filter(|(card, _)| {
                 !excluded.contains(card["id"].as_str().unwrap_or(""))
-                    && source_keys(card).is_disjoint(&excluded_sources)
+                    && (card["result"]["generation_mode"] == "llm"
+                        || source_keys(card).is_disjoint(&excluded_sources))
             })
             .collect();
         if session.filter == "default" && candidates.iter().any(|(_, s)| s == "new") {
@@ -506,6 +519,35 @@ mod tests {
         let selected = db.learning_next(&all.id, 0, now, 1).unwrap();
         assert_eq!(selected.session.history[0].card_id, "card-002");
         assert_eq!(db.learning_summary("other", now).unwrap()["today"], 0);
+    }
+    #[test]
+    fn learning_next_can_draw_new_llm_cards_from_a_previously_seen_source() {
+        let (_dir, db, now) = crate::learning_store::tests::setup();
+        db.connect()
+            .unwrap()
+            .execute("DELETE FROM rag_cards", [])
+            .unwrap();
+        populate(&db, now, 1);
+        let session = draw(&db, &start(&db, now, false), now, 1);
+        let mut generated = db.learning_card("card-000").unwrap();
+        generated["id"] = json!("new-model-card");
+        generated["result"] =
+            json!({"status":"answered", "generation_mode":"llm", "question":"另一个角度"});
+        db.connect()
+            .unwrap()
+            .execute(
+                "INSERT INTO rag_cards VALUES ('new-model-card','book','new-question',?,?)",
+                params![now.to_rfc3339(), generated.to_string()],
+            )
+            .unwrap();
+        let session = draw(&db, &session, now, 2);
+        assert_eq!(session.history.last().unwrap().card_id, "new-model-card");
+        assert_eq!(
+            db.learning_next(&session.id, session.revision, now, 3)
+                .unwrap()
+                .eligible,
+            0
+        );
     }
     #[test]
     fn learning_reservation_reuse_expiry_and_stale_next_do_not_skip_cards() {

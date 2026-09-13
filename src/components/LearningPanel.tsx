@@ -42,9 +42,12 @@ export function LearningPanel({
 }) {
   const [view, setView] = useState<LearningView | null>(null);
   const [filter, setFilter] = useState("default");
-  const [busy, setBusy] = useState(false);
+  const [saving, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const busy = saving || generating;
   const [error, setError] = useState<string | null>(null);
   const [reset, setReset] = useState(false);
+  const [noMoreCards, setNoMoreCards] = useState(false);
   const [undo, setUndo] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const running = useRef(false);
@@ -121,6 +124,7 @@ export function LearningPanel({
       presentation.confirmed ||
       !session ||
       running.current ||
+      generating ||
       confirmAttempt.current === presentation.id
     )
       return;
@@ -153,6 +157,18 @@ export function LearningPanel({
     const request = event("status", status);
     const result = await run(() => learningRecord(request), false);
     if (result && live.current) setUndo(request.id);
+  }
+  async function next() {
+    const result = await run(async () => {
+      if (!view || !presentation) throw new Error("请先开始学习");
+      let current = view;
+      if (!presentation.revealed)
+        current = await learningRecord(event("skipped"));
+      return learningNext(current.session!);
+    });
+    if (result && live.current && (result.reason || !result.card?.result)) {
+      setNoMoreCards(true);
+    }
   }
   function resume() {
     void run(async () => {
@@ -246,7 +262,7 @@ export function LearningPanel({
           </button>
         </div>
       )}
-      {busy && (
+      {saving && (
         <p className="learning-status" role="status">
           正在保存或加载…
         </p>
@@ -301,6 +317,7 @@ export function LearningPanel({
           <header className="learning-card-meta">
             <span>
               {view.card.packet.evidence[0]?.chapter_path.join(" / ") ||
+                view.card.packet.chapter_path?.join(" / ") ||
                 "整本教材"}
             </span>
             <span className="learning-card-state">
@@ -337,7 +354,11 @@ export function LearningPanel({
                 card={view.card}
                 onPage={onPage}
               />
-              <p className="learning-trust">AI 生成 · 请结合原文核对</p>
+              <p className="learning-trust">
+                {view.card.result.generation_mode === "llm"
+                  ? "AI 生成 · 原文供对照参考"
+                  : "AI 生成 · 请结合原文核对"}
+              </p>
               <div className="learning-feedback">
                 <button
                   className="text-button"
@@ -379,43 +400,48 @@ export function LearningPanel({
               </div>
             </div>
           )}
-          <footer className="learning-navigation">
-            <button
-              className="text-button"
-              disabled={busy || !session || !session.cursor}
-              onClick={() => void run(() => learningPrevious(session!))}
-            >
-              ← 上一张
-            </button>
-            <button
-              className={
-                presentation.revealed ? "primary-button" : "text-button"
-              }
-              disabled={
-                busy || !presentation.confirmed || !matches || !!view.reason
-              }
-              onClick={() =>
-                void run(async () => {
-                  let current = view;
-                  if (!presentation.revealed)
-                    current = await learningRecord(event("skipped"));
-                  return learningNext(current.session!);
-                })
-              }
-            >
-              {presentation.revealed ? "下一张 →" : "跳过 →"}
-            </button>
-          </footer>
         </article>
       )}
-      <RandomLearningCard
-        key={`${book.id}:${book.version}:${chapter}`}
-        book={book}
-        chapter={chapter}
-        onSaved={() => {
-          void run(() => learningResume(book.id));
-        }}
-      />
+      <footer className="learning-navigation" aria-label="学习卡片操作">
+        <button
+          className="text-button"
+          disabled={busy || !session || !session.cursor}
+          onClick={() => void run(() => learningPrevious(session!))}
+        >
+          ← 上一张
+        </button>
+        <RandomLearningCard
+          book={book}
+          chapter={chapter}
+          disabled={busy}
+          onBusyChange={setGenerating}
+          onSaved={async () => {
+            await run(() => learningResume(book.id));
+          }}
+        />
+        <button
+          className={presentation?.revealed ? "primary-button" : "text-button"}
+          disabled={busy || !presentation?.confirmed || !matches}
+          onClick={() => void next()}
+        >
+          {!presentation || presentation.revealed ? "下一张 →" : "跳过 →"}
+        </button>
+      </footer>
+      {noMoreCards && active && (
+        <ConfirmationDialog
+          id="learning-no-more-cards"
+          variant="notice"
+          eyebrow="随机学习"
+          title="学习提示"
+          confirmLabel="知道了"
+          busyLabel="知道了"
+          busy={false}
+          onCancel={() => setNoMoreCards(false)}
+          onConfirm={() => setNoMoreCards(false)}
+        >
+          <p>暂时没有新的知识卡了哦~请新增一张~</p>
+        </ConfirmationDialog>
+      )}
       {reset && (
         <ConfirmationDialog
           id="learning-reset"

@@ -1,0 +1,96 @@
+{
+  "dataset_sha256": "df6b58cb68af4a40e4658346105bdc134de207a77681fb673072c6c72f27b2eb",
+  "retrieval": {
+    "hybrid/development": {
+      "hit_at_5": 1,
+      "all_at_5": 0.8,
+      "recall_at_5": 0.8666666666666667,
+      "mrr_at_5": 1.0,
+      "evidence_recall": 0.9333333333333333,
+      "all_evidence": 0.8,
+      "cases": 8,
+      "supported_cases": 5,
+      "search_median_ms": 19.42254999994475,
+      "search_p95_ms": 21.517099998163758
+    },
+    "hybrid/regression": {
+      "hit_at_5": 0.7916666666666666,
+      "all_at_5": 0.7916666666666666,
+      "recall_at_5": 0.7916666666666666,
+      "mrr_at_5": 0.6840277777777778,
+      "evidence_recall": 0.8333333333333334,
+      "all_evidence": 0.8333333333333334,
+      "cases": 24,
+      "supported_cases": 24,
+      "search_median_ms": 19.497700001011253,
+      "search_p95_ms": 25.182800000038696
+    }
+  },
+  "source_gaps": [
+    {
+      "case_id": "t02",
+      "block_id": "p0014-010-dcf54ad4",
+      "page": 14
+    },
+    {
+      "case_id": "t06",
+      "block_id": "p0050-021-dbec4d39",
+      "page": 50
+    },
+    {
+      "case_id": "t12",
+      "block_id": "p0161-001-458e693d",
+      "page": 161
+    },
+    {
+      "case_id": "t19",
+      "block_id": "p0009-008-c85713c3",
+      "page": 9
+    },
+    {
+      "case_id": "x03",
+      "block_id": "p0050-021-dbec4d39",
+      "page": 50
+    }
+  ],
+  "generation": {
+    "planned": 9,
+    "recorded": 9,
+    "completed": 9,
+    "answered": 6,
+    "insufficient": 3,
+    "failed": 0,
+    "pending_or_interrupted": 0,
+    "citation_substring_validity": 1,
+    "duration_median_ms": 6890,
+    "requests": 15,
+    "requests_with_token_usage": 15,
+    "reported_total_tokens": 47258
+  },
+  "agent": null,
+  "quality_reviews": {
+    "human": null,
+    "ai": {
+      "reviewed": 9,
+      "planned": 9,
+      "correct": 0.7777777777777778,
+      "grounded": 1
+    }
+  },
+  "experiment": {
+    "source_sha256": "d58d01be37b9df5a5706b10f4eef298539ec1d1a55f24f58f9e5654de67d3d60",
+    "knowledge_version": "b92d18a9c5ccddd6e3fdbc59",
+    "embedding_index_sha256": "f58cec19effeea8b0a56ca322d0484f8267db11250e5ea44f1afdb717d6ad99e",
+    "embedding_model_manifest_sha256": "6f00dc0dbd74893ad21f3597e1bea5d456b7f9dee13d853ec872d303a14585f1",
+    "generation_binding": {
+      "agent_prompt_version": "review-agent-v1",
+      "dataset_sha256": "df6b58cb68af4a40e4658346105bdc134de207a77681fb673072c6c72f27b2eb",
+      "ids": ["d01", "d05", "t10", "t13", "x01", "x04", "n01", "n03", "t05"],
+      "input_sha256": "a264516420142c2e7e8f28a4824c0f727b840f3dd570ae3fd8c4552b3d6c4f28",
+      "model": "deepseek-v4-flash",
+      "provider": "deepseek",
+      "rag_prompt_version": "textbook-rag-v10",
+      "region": "default"
+    }
+  }
+}

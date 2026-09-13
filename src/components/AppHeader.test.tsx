@@ -28,10 +28,11 @@ describe("AppHeader", () => {
       "模型设置",
       "收藏与历史",
       "通用设置",
+      "质量评测",
     ].map((name) =>
       screen.getByRole("button", { name: new RegExp(`^${name}$`) }),
     );
-    expect(navigationButtons).toHaveLength(5);
+    expect(navigationButtons).toHaveLength(6);
     for (const button of navigationButtons) {
       expect(button).toBeDisabled();
     }
@@ -52,5 +53,7 @@ describe("AppHeader", () => {
     );
     await user.click(screen.getByRole("button", { name: "模型设置" }));
     expect(onNavigate).toHaveBeenCalledWith("models");
+    await user.click(screen.getByRole("button", { name: "质量评测" }));
+    expect(onNavigate).toHaveBeenCalledWith("evaluation");
   });
 });

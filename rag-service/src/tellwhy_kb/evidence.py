@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import unicodedata
 
 from .processing.chunking import validate_locations
 
 
-def assemble(index, manifest, kb, query, chapter, mode="hybrid", max_chars=10000, primary_unit=None):
+def assemble(index, manifest, kb, query, chapter, mode="hybrid", max_chars=10000, primary_unit=None,
+             reranker=None):
     if not 100 <= max_chars <= 10000:
         raise ValueError("Invalid evidence budget")
-    ranked = index.search(query, top_k=8, mode=mode, chapter=chapter)
+    if reranker is not None and primary_unit is not None:
+        raise ValueError("主素材证据不能由展示重排替换")
+    ranked = index.search(query, top_k=24 if reranker is not None else 8, mode=mode, chapter=chapter)
     rows = index.db.execute("SELECT data FROM blocks ORDER BY page,rowid").fetchall()
     blocks = [json.loads(r[0]) for r in rows]
     by_id = {b["id"]: b for b in blocks}
@@ -39,18 +44,57 @@ def assemble(index, manifest, kb, query, chapter, mode="hybrid", max_chars=10000
             paths[bid] = result["chapter_path"]
             chunks.setdefault(bid, []).append(result["chunk_id"])
 
-    # Seed blocks first. Only adjacent blocks in the same section can supplement them.
+    # Seed blocks first. Look past at most three unusable blocks (e.g. a diagram),
+    # but stop at a page/section boundary or the nearest usable prose block.
     candidates = list(seeds)
     for bid in seeds:
         seed = by_id[bid]
-        for p in (positions[bid] - 1, positions[bid] + 1):
-            if 0 <= p < len(blocks):
+        for direction in (-1, 1):
+            for distance in range(1, 5):
+                p = positions[bid] + direction * distance
+                if not 0 <= p < len(blocks):
+                    break
                 neighbor = blocks[p]
-                if seed.get("section_id") and neighbor.get("section_id") == seed["section_id"]:
-                    nid = neighbor["id"]
-                    if nid not in candidates:
-                        candidates.append(nid)
-                        paths[nid] = paths[bid]
+                if not seed.get("section_id") or neighbor.get("section_id") != seed["section_id"]:
+                    break
+                if distance > 1 and neighbor["page"] != seed["page"]:
+                    break
+                if (
+                    not neighbor.get("eligible")
+                    or neighbor.get("kind") in {"paragraph_title", "doc_title"}
+                    or not neighbor["text"].strip()
+                ):
+                    continue
+                nid = neighbor["id"]
+                if nid not in candidates:
+                    candidates.append(nid)
+                    paths[nid] = paths[bid]
+                break
+
+    ranking = None
+    relevance = {}
+    if reranker is not None:
+        # Rank actual source blocks, including usable context, before imposing the display budget.
+        # Chunk overlap and repeated text must not occupy multiple Top 5 positions.
+        unique, seen_text = [], set()
+        for bid in candidates:
+            block = by_id[bid]
+            normalized = "".join(unicodedata.normalize("NFKC", block["text"]).split())
+            if (not block.get("eligible") or block.get("kind") in {"paragraph_title", "doc_title"}
+                    or not normalized or normalized in seen_text):
+                continue
+            unique.append(bid)
+            seen_text.add(normalized)
+        scores = reranker.score(query, [by_id[bid]["text"] for bid in unique]) if unique else []
+        if len(scores) != len(unique) or any(not math.isfinite(s) for s in scores):
+            raise ValueError("原文重排结果无效")
+        relevance = dict(zip(unique, scores, strict=True))
+        candidates = sorted(unique, key=lambda bid: -relevance[bid])
+        ranking = {
+            "method": "retrieve_rerank", "retrieval": mode,
+            "model": reranker.manifest["repository"], "revision": reranker.manifest["revision"],
+            "candidate_chunks": len(ranked["results"]), "candidate_blocks": len(unique), "top_k": 5,
+        }
 
     evidence, used, omitted = [], 0, 0
     for bid in candidates:
@@ -62,7 +106,7 @@ def assemble(index, manifest, kb, query, chapter, mode="hybrid", max_chars=10000
             or not text.strip()
         ):
             continue
-        if len(evidence) >= 12 or used + len(text) > max_chars:
+        if len(evidence) >= (5 if reranker is not None else 12) or used + len(text) > max_chars:
             omitted += 1
             continue
         # Keep whole source blocks: no model-input truncation can remove a condition.
@@ -82,6 +126,8 @@ def assemble(index, manifest, kb, query, chapter, mode="hybrid", max_chars=10000
                 "role": "primary" if bid in primary_ids else "retrieved" if bid in seeds else "neighbor",
             }
         )
+        if reranker is not None:
+            evidence[-1]["relevance_score"] = relevance[bid]
         used += len(text)
     packet = {
         "schema_version": 1,
@@ -99,6 +145,8 @@ def assemble(index, manifest, kb, query, chapter, mode="hybrid", max_chars=10000
         "text_chars": used,
         "omitted_for_budget": omitted,
     }
+    if ranking is not None:
+        packet["ranking"] = ranking
     if primary_unit:
         if not set(primary_ids).issubset({e["block_id"] for e in evidence}):
             raise ValueError("主素材未完整进入证据包")

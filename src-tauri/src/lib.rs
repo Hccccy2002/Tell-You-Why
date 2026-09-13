@@ -3,6 +3,10 @@ mod commands;
 mod content;
 mod db;
 mod desktop;
+mod evaluation;
+mod evaluation_fixture;
+mod evaluation_live;
+mod evaluation_review;
 mod knowledge_base;
 mod learning;
 mod learning_commands;
@@ -18,7 +22,19 @@ mod rag_commands;
 #[cfg(test)]
 mod rag_live_tests;
 mod rag_store;
+mod review_agent;
+mod review_commands;
+mod review_eval;
+mod review_memory;
+#[cfg(test)]
+mod review_memory_tests;
+mod review_store;
+#[cfg(test)]
+mod review_tests;
+mod review_trace;
 mod secret_store;
+#[cfg(test)]
+mod textbook_eval;
 
 use db::Database;
 use persistence_gate::PersistenceResetGate;
@@ -68,6 +84,9 @@ pub fn run() {
             database
                 .rag_recover_interrupted()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            database
+                .review_recover()
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
             let http = RestrictedHttpClient::new()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             app.manage(AppState {
@@ -81,6 +100,9 @@ pub fn run() {
             });
             desktop::setup(app)?;
             app.manage(knowledge_base::KnowledgeBaseState::default());
+            app.manage(evaluation::EvaluationState(
+                evaluation::EvaluationManager::open(data_dir.join("evaluations")).map(Arc::new),
+            ));
             if std::env::args_os().any(|argument| argument == "--hidden") {
                 if let Some(window) = app.get_webview_window("main") {
                     window.state::<AppState>().auto_hide.window_hidden();
@@ -112,6 +134,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            evaluation::evaluation_list,
+            evaluation::evaluation_start,
+            evaluation::evaluation_read,
+            evaluation::evaluation_cancel,
+            evaluation::evaluation_export,
+            evaluation::evaluation_save_review,
             knowledge_base::kb_read,
             knowledge_base::kb_import,
             knowledge_base::kb_resume,
@@ -120,7 +148,18 @@ pub fn run() {
             rag_commands::rag_prepare,
             learning_generation::rag_prepare_random,
             rag_commands::rag_generate,
+            rag_commands::rag_related_sources,
             rag_commands::rag_list,
+            review_commands::review_start,
+            review_commands::review_continue,
+            review_commands::review_latest,
+            review_commands::review_read,
+            review_commands::review_answer,
+            review_commands::review_cancel,
+            review_commands::review_trace,
+            review_commands::review_history,
+            review_commands::review_memory,
+            review_commands::review_export,
             learning_commands::learning_start,
             learning_commands::learning_resume,
             learning_commands::learning_next,

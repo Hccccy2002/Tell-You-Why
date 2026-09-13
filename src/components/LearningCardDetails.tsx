@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import type { RagTask } from "../lib/rag";
+import { RelatedSources } from "./RelatedSources";
 
 export function LearningCardDetails({
   card,
@@ -18,7 +19,11 @@ export function LearningCardDetails({
       claim.citations.map((citation) => citation.evidence_id),
     ),
   );
-  const evidence = card.packet.evidence.filter((item) => citedIds.has(item.id));
+  const modelGenerated = card.result.generation_mode === "llm";
+  const evidenceLabel = modelGenerated ? "相关原文" : "原文依据";
+  const evidence = card.packet.evidence
+    .filter((item) => citedIds.has(item.id))
+    .slice(0, 5);
 
   return (
     <div className="learning-details">
@@ -31,7 +36,7 @@ export function LearningCardDetails({
             setExpanded(expanded === "evidence" ? null : "evidence")
           }
         >
-          原文依据{" "}
+          {evidenceLabel}{" "}
           <span aria-hidden="true">{expanded === "evidence" ? "−" : "+"}</span>
         </button>
         <button
@@ -48,11 +53,30 @@ export function LearningCardDetails({
           </span>
         </button>
       </div>
-      {expanded === "evidence" && (
+      {modelGenerated && (
         <section
           id={`${panelId}-evidence`}
           className="learning-detail-panel"
-          aria-label="原文依据"
+          aria-label={evidenceLabel}
+          hidden={expanded !== "evidence"}
+        >
+          <RelatedSources
+            request={{
+              kb: card.kb,
+              version: card.packet.version,
+              chapter: card.packet.chapter,
+              query: [...card.result.question].slice(0, 1000).join(""),
+            }}
+            active={expanded === "evidence"}
+            onPage={onPage}
+          />
+        </section>
+      )}
+      {!modelGenerated && expanded === "evidence" && (
+        <section
+          id={`${panelId}-evidence`}
+          className="learning-detail-panel"
+          aria-label={evidenceLabel}
         >
           <p className="learning-detail-caption">
             来自《{card.packet.filename}》的原文摘录
@@ -83,8 +107,11 @@ export function LearningCardDetails({
           className="learning-detail-panel"
           aria-label="AI 解释"
         >
-          {card.result.explanation.length ? (
-            card.result.explanation.map((claim, index) => (
+          {card.result.explanation.length || modelGenerated ? (
+            (card.result.explanation.length
+              ? card.result.explanation
+              : card.result.answer
+            ).map((claim, index) => (
               <p className="learning-explanation" key={index}>
                 {claim.text}
               </p>

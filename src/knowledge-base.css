@@ -323,15 +323,6 @@
     margin: 0;
   }
 }
-.rag-result {
-  border: 1px solid var(--border-color, #ddd);
-  padding: 14px;
-  border-radius: 12px;
-  overflow-wrap: anywhere;
-}
-.rag-result h3 {
-  margin-top: 6px;
-}
 .learning-panel {
   display: grid;
   gap: 14px;
@@ -340,7 +331,6 @@
 }
 .learning-toolbar,
 .learning-card-meta,
-.learning-navigation,
 .learning-settings-actions {
   display: flex;
   align-items: center;
@@ -491,11 +481,25 @@
   color: var(--accent);
 }
 .learning-navigation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 .learning-navigation button {
   font-size: 13px;
+}
+.learning-navigation > button:first-child {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+}
+.learning-navigation > button:last-child {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
 }
 .learning-settings {
   padding: 14px;
@@ -547,39 +551,17 @@
   line-height: 1.8;
   margin: 0 0 24px;
 }
-.learning-generator-toggle {
-  font-size: 12px;
+.learning-generator {
+  display: contents;
 }
-.learning-generator-form {
-  margin-top: 12px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
+.learning-generator-button {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
 }
-.learning-generator .rag-result {
-  padding: 16px 0 0;
-  border: 0;
-}
-.learning-generator summary {
-  cursor: pointer;
-  font-size: 12px;
-}
-.learning-generator blockquote {
-  margin: 12px 0;
-  padding-left: 12px;
-  border-left: 2px solid var(--border);
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-.learning-generator blockquote strong {
-  color: var(--text-soft);
-  font-size: 11px;
-  font-weight: 500;
-}
-.learning-generation-info {
-  margin-top: 14px;
-  color: var(--text-soft);
+.learning-generation-message {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
 }
 .kb-content > .segmented-control {
   flex-wrap: wrap;

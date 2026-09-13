@@ -42,6 +42,41 @@ pub fn rag_providers(state: State<'_, AppState>) -> Result<Value, String> {
         .collect::<Vec<_>>()))
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RelatedSourcesRequest {
+    kb: String,
+    version: String,
+    chapter: Option<String>,
+    query: String,
+}
+
+#[tauri::command]
+pub async fn rag_related_sources(
+    request: RelatedSourcesRequest,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let _permit = state.persistence_gate.try_operation()?;
+    identifier(&request.kb)?;
+    identifier(&request.version)?;
+    if let Some(chapter) = &request.chapter {
+        identifier(chapter)?;
+    }
+    if request.query.trim().is_empty() || request.query.chars().count() > 1000 {
+        return Err("请输入 1–1000 字的问题".into());
+    }
+    // Only one CPU reranker runs at a time, including requests from multiple windows.
+    let wire = json!({"op":"related_sources","kb":request.kb,"version":request.version,
+        "chapter":request.chapter,"query":request.query.trim()});
+    tauri::async_runtime::spawn_blocking(move || {
+        static RERANKER: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _slot = RERANKER.lock().map_err(|e| e.to_string())?;
+        Runtime::discover()?.call(wire)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn rag_prepare(
     request: PrepareRequest,
@@ -106,7 +141,7 @@ pub(crate) async fn generate_inner(task_id: String, state: &AppState) -> Result<
     if task["prompt_version"] != rag::PROMPT_VERSION {
         return Err("教材生成规则已更新，请重新检索并预览摘录".into());
     }
-    if task["packet"]["learning_unit"].is_object() {
+    if task["packet"]["learning_unit"].is_object() || task["packet"]["status"] == "no_evidence" {
         let wire =
             json!({"op":"learning_version","kb":task["kb"],"version":task["packet"]["version"]});
         tauri::async_runtime::spawn_blocking(move || Runtime::discover()?.call(wire))
@@ -197,6 +232,7 @@ mod tests {
     struct Http {
         calls: Mutex<usize>,
         fail: bool,
+        fallback: bool,
     }
     #[async_trait]
     impl ProviderTransport for Http {
@@ -212,12 +248,20 @@ mod tests {
             if self.fail {
                 return Err(ProviderError::RateLimited);
             }
-            let value = if *calls == 1 {
+            let value = if self.fallback && *calls == 1 {
+                json!({"status":"insufficient","reason":"原文不足"})
+            } else if self.fallback {
+                json!("这是模型提供的通俗解释，可作为学习内容。")
+            } else if *calls == 1 {
                 json!({"status":"answered","question":"存储器有什么作用？","answer":[{"text":"存储器存放程序和数据。","citations":[{"evidence_id":"E1"}]}],"explanation":[{"text":"程序和数据都存放在存储器中。","citations":[{"evidence_id":"E1"}]}],"reason":""})
             } else {
                 json!({"checks":[{"reason":"引用直接说明用途。","supported":true},{"reason":"解释忠实重述引用。","supported":true}],"question_check":{"reason":"回答存储器用途。","answers_question":true}})
             };
-            Ok(TransportResponse{status:200,body:json!({"choices":[{"finish_reason":"stop","message":{"content":value.to_string()}}],"usage":{"total_tokens":50}}).to_string()})
+            let content = value
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| value.to_string());
+            Ok(TransportResponse{status:200,body:json!({"choices":[{"finish_reason":"stop","message":{"content":content}}],"usage":{"total_tokens":50}}).to_string()})
         }
     }
     fn setup(fail: bool) -> (tempfile::TempDir, AppState, Arc<Http>) {
@@ -238,6 +282,7 @@ mod tests {
         let http = Arc::new(Http {
             calls: Mutex::new(0),
             fail,
+            fallback: false,
         });
         let state = AppState {
             database,
@@ -251,16 +296,42 @@ mod tests {
         (dir, state, http)
     }
     #[test]
-    fn rag_command_saves_validated_card_and_completed_request_is_idempotent() {
+    fn rag_command_saves_model_card_and_completed_request_is_idempotent() {
         tauri::async_runtime::block_on(async {
             let (_dir, state, http) = setup(false);
             let result = generate_inner("task".into(), &state).await.unwrap();
             assert_eq!(result["state"], "completed");
-            assert_eq!(result["usage"].as_array().unwrap().len(), 2);
+            assert_eq!(result["usage"].as_array().unwrap().len(), 1);
+            assert_eq!(result["result"]["generation_mode"], "llm");
             assert_eq!(
                 state.database.rag_list("book", true, 0).unwrap()["total"],
                 1
             );
+            assert_eq!(generate_inner("task".into(), &state).await.unwrap(), result);
+            assert_eq!(*http.calls.lock().unwrap(), 1);
+        });
+    }
+    #[test]
+    fn rag_command_persists_prose_fallback_as_a_normal_learning_card() {
+        tauri::async_runtime::block_on(async {
+            let (_dir, mut state, _) = setup(false);
+            let http = Arc::new(Http {
+                calls: Mutex::new(0),
+                fail: false,
+                fallback: true,
+            });
+            state.http = http.clone();
+            let result = generate_inner("task".into(), &state).await.unwrap();
+            assert_eq!(result["state"], "completed");
+            assert_eq!(
+                result["result"]["answer"][0]["text"],
+                "这是模型提供的通俗解释，可作为学习内容。"
+            );
+            assert_eq!(
+                state.database.learning_card("task").unwrap()["result"],
+                result["result"]
+            );
+            assert_eq!(state.database.learning_state("task").unwrap().status, "new");
             assert_eq!(generate_inner("task".into(), &state).await.unwrap(), result);
             assert_eq!(*http.calls.lock().unwrap(), 2);
         });

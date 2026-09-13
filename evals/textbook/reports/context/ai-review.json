@@ -1,0 +1,104 @@
+{
+  "dataset_sha256": "df6b58cb68af4a40e4658346105bdc134de207a77681fb673072c6c72f27b2eb",
+  "rows": [
+    {
+      "id": "d01",
+      "result_sha256": "0f964d035ae4e3b09cb7849367cef43916d243801da487713ff573104fb88a91",
+      "question": "计算机硬件是什么？",
+      "reference_answer": "硬件是计算机的实体部分，由各种电子元器件以及光、电、机设备实物组成。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": true,
+      "grounded": true,
+      "notes": "硬件定义与原文一致，补充系统组成有直接引用。"
+    },
+    {
+      "id": "d05",
+      "result_sha256": "ce0e274a10eeb265d15f963124a8616fccdba24b5edb30daa87346305f2aa5b6",
+      "question": "Cache和主存内容为什么必须一致？",
+      "reference_answer": "写入Cache会改变数据，需要用一致性策略管理与主存的对应关系。写直达法同时更新二者；写回法允许暂时不同，用标志位区分修改过的块，在替换时将修改过的块写回。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": false,
+      "grounded": true,
+      "notes": "明确承认证据不足，没有虚构因果；但没有完成参考答案要求的解释，问题覆盖不通过。"
+    },
+    {
+      "id": "t10",
+      "result_sha256": "308cb4d215b1c911189f0631ffc7dada1a242863a9695e4e73f7130dea131824",
+      "question": "CPU包括哪两大部分？",
+      "reference_answer": "CPU包括运算器和控制器两大部分。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": true,
+      "grounded": true,
+      "notes": "运算器和控制器的两部分定义与第343页一致。"
+    },
+    {
+      "id": "t13",
+      "result_sha256": "66dedd923f433116f94f42a4fde51eb209be67cf6b2ae6897e8467de39429a6b",
+      "question": "参与计算机运算的数可以分为哪两大类？",
+      "reference_answer": "参与运算的数分为无符号数和有符号数。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": true,
+      "grounded": true,
+      "notes": "有符号数和无符号数与第225页正文一致。"
+    },
+    {
+      "id": "x01",
+      "result_sha256": "8df9fa13f3fde804bf64e2d61fc27c73b7eeadff4d500aa4ceb0bfbe5675cc43",
+      "question": "CPU和存储器各负责什么？请结合CPU结构与存储器章节解释。",
+      "reference_answer": "CPU包括运算器和控制器，完成运算与控制；存储器用于保存程序和数据。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": false,
+      "grounded": true,
+      "notes": "有CPU组成、控制器和存储器职责，但未明确解释运算器的运算职责，接口细节偏多；整体有据，回答不完整。"
+    },
+    {
+      "id": "x04",
+      "result_sha256": "05f485b974d6fa45b4041a310b0829dcbaa1f5334ac1466043346f8a008c6045",
+      "question": "Cache写直达法与写回法分别何时更新主存？为什么写回法需要修改标志？",
+      "reference_answer": "写直达同时写Cache和主存；写回先只写Cache，修改过的块替换时才写回主存。清/浊标志区分未修改和已修改的块，未修改块不必写回。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": true,
+      "grounded": true,
+      "notes": "写直达同时写主存、写回在替换时写回以及清浊标志条件与第120页一致。"
+    },
+    {
+      "id": "n01",
+      "result_sha256": "09000c4262c740edaacee75325911624515347801f68acc0109b34685905d43c",
+      "question": "2026年最新酷睿处理器的官方售价是多少？",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": true,
+      "grounded": true,
+      "notes": "承认无2026年售价依据，未编造价格。"
+    },
+    {
+      "id": "n03",
+      "result_sha256": "e72d1dd57d68d74a6c05e8073857abc28a25b37de6dd7516335020fcceaeb845",
+      "question": "Redis Cluster的16384个哈希槽如何迁移？",
+      "reference_answer": "当前教材检索材料无法支持此问题，应明确说明缺少依据，不编造教材描述。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": true,
+      "grounded": true,
+      "notes": "承认无Redis槽迁移依据，没有把Cache映射当作Redis答案。"
+    },
+    {
+      "id": "t05",
+      "result_sha256": "f585dce21cd01beb9ad52a547ed6d8d2ff40f56f38799aee1c5b1d25423cbc25",
+      "question": "串行通信传送一个字节要怎样逐位发送？",
+      "reference_answer": "根据本教材的示例，一个字节通过一条传输线，分八次由低位到高位逐位传送。",
+      "method": "ai",
+      "reviewer": "Codex source comparison 2026-09-12",
+      "correct": true,
+      "grounded": true,
+      "notes": "新增第50页原文支持单线、分8次、低位到高位的完整说明；优化前输出只谈逐位和异步字符格式，未覆盖这两个具体信息。"
+    }
+  ]
+}

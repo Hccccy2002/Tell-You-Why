@@ -31,6 +31,17 @@ py -3.12 -m venv rag-service\.venv
 .\rag-service\.venv\Scripts\python.exe -m tellwhy_kb models verify --data-root data
 ```
 
+“相关原文”的 Top 5 重排还需要准备中文 / 英文交叉编码器（约 1.1 GB，首次下载需联网）：
+
+```powershell
+.\rag-service\.venv\Scripts\python.exe -m tellwhy_kb.indexing.reranker prepare --models-root data/models
+.\rag-service\.venv\Scripts\python.exe -m tellwhy_kb.indexing.reranker verify --models-root data/models
+```
+
+该模型固定为 `BAAI/bge-reranker-base` 的 `2cfc18c9415c912f9d8155881c133215df768a70` 版本，保存在 `data/models/reranker/`，使用独立的 SHA-256 清单。无需重建已有 PDF 索引；重排仅在本地运行，不调用 LLM API。模型缺失或校验失败时，“相关原文”会显示可重试的错误，生成卡片、AI 解释及学习记录仍按原有流程工作。
+
+Top 5 使用生成后的题目查询：BM25 + BGE 向量混合召回 24 个候选分块，取来源正文及同节可用相邻段落，按完整段落去重，再通过交叉编码器逐条评分、降序选出最多 5 条。长段落分窗口评分并保留完整展示文字和 PDF 页码。检索仍遵守教材、版本和章节范围；不靠补造摘录凑满数量。原有生成证据包及引用快照保留用于核对，不被展示结果覆盖。实现与评测见 [Top 5 原文检索](../docs/related-sources-top5.md)。
+
 ## 按阶段执行教材案例
 
 ```powershell

@@ -60,7 +60,14 @@ impl Database {
                 .filter(|c| c.is_alphanumeric())
                 .flat_map(char::to_lowercase)
                 .collect::<String>();
-            let fingerprint = format!("{:x}", Sha256::digest(text.as_bytes()));
+            // An explicit new-card request keeps its model output even if the model
+            // reuses a question. The task claim still makes repeated submits idempotent.
+            let identity = if task["result"]["generation_mode"] == "llm" {
+                format!("{text}:{}", task["id"])
+            } else {
+                text
+            };
+            let fingerprint = format!("{:x}", Sha256::digest(identity.as_bytes()));
             let existing: Option<String> = tx
                 .query_row(
                     "SELECT id FROM rag_cards WHERE kb=? AND fingerprint=?",
@@ -195,6 +202,33 @@ mod tests {
         assert_eq!(db.rag_list("a", true, 0).unwrap()["total"], 0);
     }
 
+    #[test]
+    fn llm_cards_keep_each_requested_output_when_questions_repeat() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(dir.path().join("test.db"));
+        db.initialize().unwrap();
+        for id in ["one", "two"] {
+            let mut task = json!({"id":id,"kb":"book","kind":"card","created_at":chrono::Utc::now().to_rfc3339(),
+                "packet":{"evidence":[]}, "result":{"status":"answered","generation_mode":"llm", "question":"相同问题", "answer":[{"text":id,"citations":[]}]}});
+            db.rag_insert(&task).unwrap();
+            db.rag_claim(id, 10).unwrap();
+            task["state"] = json!("completed");
+            db.rag_finish(&mut task).unwrap();
+            assert_eq!(task["duplicate_card"], false);
+            assert_eq!(task["card_id"], id);
+            assert!(db.rag_finish(&mut task).is_err());
+        }
+        assert_eq!(db.rag_list("book", true, 0).unwrap()["total"], 2);
+        assert_eq!(
+            db.learning_card("one").unwrap()["result"]["answer"][0]["text"],
+            "one"
+        );
+        assert_eq!(
+            db.learning_card("two").unwrap()["result"]["answer"][0]["text"],
+            "two"
+        );
+        assert_eq!(db.learning_state("one").unwrap().shown_count, 0);
+    }
     #[test]
     fn rag_card_and_task_update_roll_back_together() {
         let dir = tempfile::tempdir().unwrap();

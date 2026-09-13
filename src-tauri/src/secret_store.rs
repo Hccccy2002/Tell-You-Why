@@ -23,6 +23,10 @@ pub trait SecretStore: Send + Sync {
 pub struct SecretValue(String);
 
 impl SecretValue {
+    pub(crate) fn simulated() -> Self {
+        Self(String::new())
+    }
+
     pub fn expose(&self) -> &str {
         &self.0
     }

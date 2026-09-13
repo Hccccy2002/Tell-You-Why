@@ -78,7 +78,7 @@ it("opens in search with only the retained tabs and follows a chapter-filtered c
     within(screen.getByLabelText("资料查看方式"))
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["检索", "随机学习", "原文"]);
+  ).toEqual(["检索", "随机学习", "复习 Agent", "原文"]);
   expect(screen.getByRole("button", { name: "检索" })).toHaveAttribute(
     "aria-pressed",
     "true",

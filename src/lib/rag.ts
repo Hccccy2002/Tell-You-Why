@@ -20,6 +20,7 @@ export interface EvidencePacket {
   source_sha256: string;
   query: string;
   chapter: string | null;
+  chapter_path?: string[];
   evidence: Evidence[];
   text_chars: number;
   status: string;
@@ -48,6 +49,7 @@ export interface RagTask {
     answer: RagClaim[];
     explanation: RagClaim[];
     reason: string;
+    generation_mode?: "llm";
   } | null;
   usage: {
     call: number;
@@ -56,6 +58,14 @@ export interface RagTask {
   }[];
 }
 export const ragProviders = () => invoke<RagProvider[]>("rag_providers");
+export interface RelatedSourcesRequest {
+  kb: string;
+  version: string;
+  chapter: string | null;
+  query: string;
+}
+export const ragRelatedSources = (request: RelatedSourcesRequest) =>
+  invoke<EvidencePacket>("rag_related_sources", { request });
 export const ragPrepareRandom = (request: {
   kb: string;
   version: string;

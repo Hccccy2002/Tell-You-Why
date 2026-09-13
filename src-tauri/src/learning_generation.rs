@@ -167,6 +167,35 @@ pub struct RandomRequest {
     region: String,
 }
 
+fn reusable_candidates(mut candidates: Vec<Value>, units: &[Value], seed: u64) -> Vec<Value> {
+    if candidates.is_empty() {
+        candidates = units.to_vec();
+        candidates.sort_by_cached_key(|unit| {
+            format!(
+                "{:x}",
+                Sha256::digest(format!("{seed}:{}", unit["id"]).as_bytes())
+            )
+        });
+        candidates.truncate(5);
+    }
+    candidates
+}
+
+fn model_only_packet(catalog: &Value, chapter: &Option<String>) -> Value {
+    let mut packet = json!({
+        "kb":catalog["kb"], "version":catalog["version"],
+        "filename":catalog["filename"], "source_sha256":catalog["source_sha256"],
+        "chapter":chapter, "chapter_path":catalog["chapter_path"],
+        "query":"围绕所选书籍和章节讲解一个知识点", "evidence":[],
+        "text_chars":0, "status":"no_evidence"
+    });
+    packet["sha256"] = json!(format!(
+        "{:x}",
+        Sha256::digest(packet.to_string().as_bytes())
+    ));
+    packet
+}
+
 #[tauri::command]
 pub async fn rag_prepare_random(
     request: RandomRequest,
@@ -187,20 +216,13 @@ pub async fn rag_prepare_random(
         .await
         .map_err(|e| e.to_string())??;
     let units = catalog["items"].as_array().ok_or("素材目录格式无效")?;
+    let seed = uuid::Uuid::new_v4().as_u128() as u64;
     let candidates = state
         .database
-        .learning_generation_candidates(
-            &request.kb,
-            units,
-            Utc::now(),
-            uuid::Uuid::new_v4().as_u128() as u64,
-        )
+        .learning_generation_candidates(&request.kb, units, Utc::now(), seed)
         .map_err(|e| e.to_string())?;
-    if candidates.is_empty() {
-        return Err("所选范围没有未覆盖且可用的素材：可扩大章节范围或学习已有卡片".into());
-    }
-    let mut last_error = String::new();
-    for unit in candidates {
+    let mut selected = model_only_packet(&catalog, &request.chapter);
+    for unit in reusable_candidates(candidates, units, seed) {
         let wire = json!({"op":"learning_evidence","kb":request.kb,"version":request.version,"chapter":request.chapter,"unit_id":unit["id"]});
         let packet =
             match tauri::async_runtime::spawn_blocking(move || Runtime::discover()?.call(wire))
@@ -208,24 +230,35 @@ pub async fn rag_prepare_random(
                 .map_err(|e| e.to_string())?
             {
                 Ok(p) => p,
-                Err(e) => {
-                    last_error = e;
-                    continue;
-                }
+                Err(_) => continue,
             };
         if packet["evidence"].as_array().map_or(true, Vec::is_empty) {
             continue;
         }
-        let task = json!({"id":uuid::Uuid::new_v4().to_string(),"kb":request.kb,"kind":"card","state":"prepared","created_at":Utc::now().to_rfc3339(),"provider":profile.provider_id,"region":profile.region,"model":profile.model,"packet":packet,"result":null,"usage":[],"prompt_version":rag::PROMPT_VERSION,"error":null});
-        state
-            .database
-            .rag_insert(&task)
-            .map_err(|e| e.to_string())?;
-        return Ok(task);
+        selected = packet;
+        break;
     }
-    Err(format!(
-        "已检查最多 5 个本地素材，未能准备完整证据；未调用模型。{last_error}"
-    ))
+    selected["chapter_path"] = catalog["chapter_path"].clone();
+    selected["previous_questions"] = json!(state
+        .database
+        .rag_list(&request.kb, true, 0)
+        .map_err(|e| e.to_string())?["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|card| card["result"]["question"].as_str())
+        .collect::<Vec<_>>());
+    selected.as_object_mut().unwrap().remove("sha256");
+    selected["sha256"] = json!(format!(
+        "{:x}",
+        Sha256::digest(selected.to_string().as_bytes())
+    ));
+    let task = json!({"id":uuid::Uuid::new_v4().to_string(),"kb":request.kb,"kind":"card","state":"prepared","created_at":Utc::now().to_rfc3339(),"provider":profile.provider_id,"region":profile.region,"model":profile.model,"packet":selected,"result":null,"usage":[],"prompt_version":rag::PROMPT_VERSION,"error":null});
+    state
+        .database
+        .rag_insert(&task)
+        .map_err(|e| e.to_string())?;
+    Ok(task)
 }
 
 #[cfg(test)]
@@ -233,6 +266,34 @@ mod tests {
     use super::*;
     fn unit(id: &str, kb: &str, key: &str) -> Value {
         json!({"id":id,"kb":kb,"version":"v1","source_key":key,"source_keys":[key],"chapter_path":["第一章"],"block_ids":["b1"]})
+    }
+    #[test]
+    fn learning_generation_reuses_covered_sources_and_keeps_empty_scope_metadata() {
+        let (_dir, db, now) = crate::learning_store::tests::setup();
+        let units = vec![unit("u1", "book", "key1")];
+        let mut task = json!({"id":"covered", "kb":"book", "kind":"card", "created_at":Utc::now().to_rfc3339(),
+            "packet":{"learning_unit":units[0]}, "result":{"status":"answered","question":"已生成的问题"}});
+        db.rag_insert(&task).unwrap();
+        db.rag_claim("covered", 10).unwrap();
+        task["state"] = json!("completed");
+        db.rag_finish(&mut task).unwrap();
+        let fresh = db
+            .learning_generation_candidates("book", &units, now, 1)
+            .unwrap();
+        assert!(fresh.is_empty());
+        assert_eq!(reusable_candidates(fresh, &units, 1), units);
+        let catalog = json!({"kb":"book", "version":"v1", "filename":"教材.pdf", "source_sha256":"source", "chapter_path":["第一章"], "items":[]});
+        let packet = model_only_packet(&catalog, &Some("c1".into()));
+        assert_eq!(packet["evidence"], json!([]));
+        assert_eq!(packet["filename"], "教材.pdf");
+        assert!(crate::learning::in_scope(
+            &json!({"packet":packet}),
+            &["第一章".into()]
+        ));
+        assert!(!crate::learning::in_scope(
+            &json!({"packet":packet}),
+            &["其他章节".into()]
+        ));
     }
     #[test]
     fn learning_generation_reserves_previews_expires_them_and_preserves_new_state() {

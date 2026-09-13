@@ -96,3 +96,34 @@ def test_eligible_appendix_text_remains_evidence(desktop):
     with SearchIndex(path.parent) as index:
         packet = assemble(index, library.published("test")[1], "test", "存储器", "c1", "keyword")
     assert packet["evidence"][0]["text"] == block["text"]
+
+
+@pytest.mark.parametrize("boundary", [None, "section", "page", "distance"])
+def test_context_can_bridge_unusable_blocks_without_crossing_boundaries(desktop, boundary):
+    library, root, args = desktop
+    import sqlite3
+
+    path = root / "versions/version1/knowledge.sqlite"
+    with sqlite3.connect(path) as db:
+        count = 4 if boundary == "distance" else 2
+        for i in range(count + 1):
+            bid = f"context-{i}"
+            b = {
+                **args[3][0],
+                "id": bid,
+                "eligible": i == count,
+                "section_id": "c2" if boundary == "section" and i == 1 else "c1",
+                "page": 2 if boundary == "page" and i == count else 1,
+                "text": "同一节的补充说明。" if i == count else "不可用图示",
+                "raw_text": bid,
+            }
+            db.execute(
+                "INSERT INTO blocks VALUES (?,?,?,?,?,?)",
+                (bid, b["page"], bid, bid, int(b["eligible"]), json.dumps(b)),
+            )
+    with SearchIndex(path.parent) as index:
+        packet = assemble(index, library.published("test")[1], "test", "存储器", "c1", "keyword")
+    ids = [e["block_id"] for e in packet["evidence"]]
+    assert (f"context-{count}" in ids) == (boundary is None)
+    assert all(f"context-{i}" not in ids for i in range(count))
+    assert packet["text_chars"] <= 10000

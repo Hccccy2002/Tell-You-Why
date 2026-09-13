@@ -1,0 +1,35 @@
+{
+  "dataset_sha256": "df6b58cb68af4a40e4658346105bdc134de207a77681fb673072c6c72f27b2eb",
+  "compared_cases": 8,
+  "mode": "hybrid",
+  "changes": [],
+  "regressions": [],
+  "before": {
+    "hybrid/validation": {
+      "hit_at_5": 1,
+      "all_at_5": 0.6,
+      "recall_at_5": 0.8,
+      "mrr_at_5": 0.74,
+      "evidence_recall": 0.8,
+      "all_evidence": 0.6,
+      "cases": 8,
+      "supported_cases": 5,
+      "search_median_ms": 21.48605000002135,
+      "search_p95_ms": 36.528100001305575
+    }
+  },
+  "after": {
+    "hybrid/validation": {
+      "hit_at_5": 1,
+      "all_at_5": 0.6,
+      "recall_at_5": 0.8,
+      "mrr_at_5": 0.74,
+      "evidence_recall": 0.8,
+      "all_evidence": 0.6,
+      "cases": 8,
+      "supported_cases": 5,
+      "search_median_ms": 22.681300000840565,
+      "search_p95_ms": 30.094999998254934
+    }
+  }
+}
