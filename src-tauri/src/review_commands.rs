@@ -21,6 +21,10 @@ pub struct StartReview {
     pub region: String,
     #[serde(default)]
     pub due_only: bool,
+    #[serde(default)]
+    pub question_count: Option<usize>,
+    #[serde(default)]
+    pub require_sources: bool,
 }
 
 pub(crate) async fn start_inner(
@@ -31,6 +35,12 @@ pub(crate) async fn start_inner(
     let _permit = state.persistence_gate.try_operation()?;
     if request.goal.trim().is_empty() || request.goal.chars().count() > 1000 {
         return Err("请输入 1–1000 字的复习目标".into());
+    }
+    if request
+        .question_count
+        .is_some_and(|n| !(1..=3).contains(&n) || (request.due_only && n != 1))
+    {
+        return Err("普通复习可选择 1–3 道题，到期复习一次一道题".into());
     }
     let profile = state
         .database
@@ -60,6 +70,11 @@ pub(crate) async fn start_inner(
         &profile.provider_id,
         &profile.region,
     );
+    run.completion.contract.require_sources = request.require_sources;
+    if let Some(count) = request.question_count.or(request.due_only.then_some(1)) {
+        run.completion.contract.min_questions = count;
+        run.completion.contract.max_questions = count;
+    }
     if request.due_only {
         let overview = state
             .database
@@ -99,11 +114,15 @@ pub(crate) async fn continue_inner(
     let _permit = state.persistence_gate.try_operation()?;
     let _lock = GenerationLock::acquire(&state.generation_in_progress)?;
     let existing = state.database.review_load(&id).map_err(|e| e.to_string())?;
-    if existing.state == "completed" || existing.state == "waiting_answer" {
+    if ["completed", "waiting_answer", "stopped"].contains(&existing.state.as_str()) {
         return Ok(existing.public());
     }
-    if ![review_agent::REVIEW_PROMPT_VERSION, "review-agent-v1"]
-        .contains(&existing.prompt_version.as_str())
+    if ![
+        review_agent::REVIEW_PROMPT_VERSION,
+        "review-agent-v2",
+        "review-agent-v1",
+    ]
+    .contains(&existing.prompt_version.as_str())
     {
         return Err("复习规则已更新，请开始新的复习".into());
     }
@@ -120,7 +139,6 @@ pub(crate) async fn continue_inner(
         .secrets
         .get(&profile.credential_ref)
         .map_err(|e| e.to_string())?;
-    library.call(json!({"op":"learning_version","kb":existing.scope.kb,"version":existing.scope.version})).await?;
     let mut run = state
         .database
         .review_claim(&id)
@@ -147,8 +165,14 @@ pub(crate) async fn continue_inner(
     {
         let current = state.database.review_load(&id).map_err(|e| e.to_string())?;
         let trace = std::mem::take(&mut run.trace);
+        let control = run.control.clone();
+        let context_state = run.context.clone();
+        let completion = run.completion.clone();
         run = current;
         run.trace = trace;
+        run.control = control;
+        run.context = context_state;
+        run.completion = completion;
         run.trace_close_open(if run.cancel_requested {
             "interrupted"
         } else {
@@ -164,6 +188,15 @@ pub(crate) async fn continue_inner(
             "复习已暂停，已完成步骤已保存".into()
         } else {
             error
+        });
+        run.control.stop = Some(if run.cancel_requested {
+            crate::harness::policy::StopReason::cancelled()
+        } else {
+            crate::harness::policy::StopReason::new(
+                "invalid_model_output",
+                run.error.as_deref().unwrap_or("执行失败"),
+                true,
+            )
         });
         run.trace_state(&run.state.clone());
         if let Some(event) = run.trace.last_mut() {

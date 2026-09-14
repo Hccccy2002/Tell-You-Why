@@ -74,9 +74,11 @@ Tell You Why 是一款运行在 Windows 10/11 上的轻量知识小窗，适合�
 
 ## 技术栈
 
+复习执行已升级到 [Harness v2](docs/harness-v2-guide.md)：五个工具统一参数、权限、错误和重试规则；暂停与超时会清理本次资料调用的 Python 进程组，并拒绝迟到结果。前两阶段的测试与构建结果见 [v2 验收记录](docs/harness-v2-development.md)。
+
 PDF 随机学习与复习 Agent 的“相关原文”按当前题目检索并重排，只展示最多 5 条。使用本地 BGE Reranker，无额外 LLM API 调用。模型准备命令见 [Python 模块说明](rag-service/README.md#安装与模型准备)，方法和实测结果见 [Top 5 原文检索](docs/related-sources-top5.md)。
 
-PDF 资料准备的 Python 模块位于 `rag-service/`，已接入桌面 APP。点击右上角 **PDF** 或菜单中的 **PDF 知识库**，即可导入、暂停续跑、检索和查看原文。已有的《计算机组成原理》会自动显示。“随机学习”提供简洁知识卡、直接生成新卡、原文对照和模型解释。“复习 Agent”根据学习记录调用工具检索教材、讲解、出题并记录用户实际答题结果，支持失败恢复与执行追踪导出。使用方式见 [复习 Agent](docs/review-agent-guide.md)，质量评测见 [评测说明](evals/review-agent/README.md)，分阶段测试结果见 [开发记录](docs/review-agent-development.md)。自动间隔复习留待后续阶段。PDF 环境说明见 [知识库界面](docs/pdf-desktop-guide.md)，命令行见 [Python 模块说明](rag-service/README.md)。
+PDF 资料准备的 Python 模块位于 `rag-service/`，已接入桌面 APP。点击右上角 **PDF** 或菜单中的 **PDF 知识库**，即可导入、暂停续跑、检索和查看原文。已有的《计算机组成原理》会自动显示。“随机学习”提供简洁知识卡、直接生成新卡、原文对照和模型解释。“复习 Agent”根据学习记录调用工具检索教材、讲解、出题并记录用户实际答题结果，支持到期复习、失败恢复与执行追踪导出。新增 [Harness v1](docs/harness-v1-guide.md) 管理运行预算、有限重试、上下文组装和完成验收，可指定题数及教材依据要求。使用方式见 [复习 Agent](docs/review-agent-guide.md)，质量评测见 [评测说明](evals/review-agent/README.md)，故障注入见 [Harness 评测](evals/harness/README.md)。PDF 环境说明见 [知识库界面](docs/pdf-desktop-guide.md)，命令行见 [Python 模块说明](rag-service/README.md)。
 
 | 层级       | 实现                                         |
 | ---------- | -------------------------------------------- |
@@ -241,11 +243,11 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 最近一次验证结果：
 
-- 前端测试 116 项通过（18 个测试文件）。
-- Rust 常规测试 126 项通过；Python RAG 69 项及两套评测脚本 23 项通过。
-- 6 项实机/真实模型/显式评测入口默认忽略；复习 Agent 受控评测 10 个场景通过，真实教材与到期复习评测也已执行。
-- ESLint、TypeScript、Vite 生产构建和严格 Clippy 通过；修改文件的 Prettier 检查通过，全库仍有 48 个未改动文件的既有格式问题。
-- 适配器和故障切换的常规测试使用 Mock Transport；本次另经授权调用 DeepSeek 官方 API，真实数据及结论见下方评测文档。
+- 前端测试 132 项通过（19 个测试文件）。
+- Rust 常规测试 164 项通过，包含真实 Python 进程与取消集成测试；Python RAG 69 项通过。评测脚本此前 27 项回归通过。
+- 9 项实机/真实模型/显式评测入口默认忽略；另行运行复习 Agent 受控评测，10 个场景通过。Harness 故障注入 8 个场景各重复 3 次，24/24 次通过。
+- ESLint、TypeScript、Vite 生产构建和严格 Clippy 通过；修改文件的 Prettier 检查通过。Vite 提示主脚本略超 500 kB，构建成功。
+- 本次 Harness 验收使用受控模型与独立临时数据库，没有真实模型 API 请求。此前真实教材与模型实测见 [教材评测记录](docs/textbook-agent-roadmap.md)，不与本次流程通过率混算。
 
 ## 构建 Windows 程序
 
@@ -293,6 +295,10 @@ examples/                    JSON/CSV 内容导入模板
 - [技术决策记录](docs/decisions.md)
 - [内容导入与审核流程](docs/content-import.md)
 - [复习 Agent 使用与持久化](docs/review-agent-guide.md)
+- [Harness v1 使用与架构](docs/harness-v1-guide.md)
+- [Harness 分阶段开发与验收](docs/harness-v1-development.md)
+- [Harness v2 工具执行与进程取消](docs/harness-v2-guide.md)
+- [Harness v2 前两阶段验收](docs/harness-v2-development.md)
 - [真实教材评测与持续复习验收](docs/textbook-agent-roadmap.md)
 - [安全复核](docs/security-review.md)
 - [Windows 人工测试清单](docs/manual-test-checklist.md)

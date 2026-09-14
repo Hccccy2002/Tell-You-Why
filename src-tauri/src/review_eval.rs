@@ -96,6 +96,7 @@ fn scripted(case: &Value, reference: &Value) -> Vec<Value> {
     replies.push(tools(saves));
     if scenario == "resume" {
         replies.push(json!("NETWORK_ERROR"));
+        replies.push(json!("NETWORK_ERROR"));
     }
     replies.push(say("请独立思考并选择答案。"));
     replies.push(tools(vec![(
@@ -166,6 +167,8 @@ async fn evaluate_in(
         let timer = Instant::now();
         let id = start_inner(
             StartReview {
+                question_count: None,
+                require_sources: false,
                 due_only: false,
                 kb: "book".into(),
                 version: "v1".into(),
@@ -212,7 +215,9 @@ async fn evaluate_in(
             }
             continue_inner(id.clone(), &state, &environment).await?;
             let run = state.database.review_load(&id).map_err(|e| e.to_string())?;
-            if run.state == "failed" && (live || case["scenario"] != "resume") {
+            if run.state == "stopped"
+                || (run.state == "failed" && (live || case["scenario"] != "resume"))
+            {
                 break;
             }
             if run.model_calls >= crate::review_agent::MAX_MODEL_CALLS {

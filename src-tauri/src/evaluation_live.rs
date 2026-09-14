@@ -191,7 +191,7 @@ pub(crate) async fn run(
         persistence_gate: Default::default(),
     };
     let timer = Instant::now();
-    let id = start_inner(StartReview { due_only: false, kb: "computer-organization".into(), version: source["knowledge_version"].as_str().ok_or("缺少教材版本")?.into(), chapter: None,
+    let id = start_inner(StartReview { question_count: Some(1), require_sources: false, due_only: false, kb: "computer-organization".into(), version: source["knowledge_version"].as_str().ok_or("缺少教材版本")?.into(), chapter: None,
         goal: "复习Cache写直达与写回的区别。查阅教材后出且仅出一道选择题，答题后记录结果、讲解并结束，不再出题。".into(), provider: profile.provider_id, region: profile.region }, &state, &LocalReviewLibrary).await?["id"].as_str().ok_or("缺少复习编号")?.to_string();
     for _ in 0..6 {
         if control.check().is_err() {

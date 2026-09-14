@@ -83,6 +83,27 @@ const props = () => ({
   active: true,
   onPage: vi.fn(),
 });
+
+it("shows a terminal stop without offering an ineffective resume", async () => {
+  vi.mocked(api.reviewLatest).mockResolvedValue({
+    ...waiting,
+    state: "stopped",
+    can_resume: false,
+    error: "本次复习剩余用量预算不足，请开始新的复习",
+    stop_reason: {
+      code: "token_limit",
+      message: "用量预算不足",
+      resumable: false,
+    },
+  });
+  render(<ReviewAgentPanel {...props()} />);
+  expect(await screen.findByText("本次复习已停止")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "继续复习" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "开始新的复习" })).toBeEnabled();
+  expect(api.reviewContinue).not.toHaveBeenCalled();
+});
 const dueMemory: api.ReviewMemoryOverview = {
   total: 1,
   due_count: 1,
@@ -143,6 +164,92 @@ it("starts a due review and shows actual counts without inventing mastery", asyn
   );
   expect(api.reviewAnswer).not.toHaveBeenCalled();
 });
+
+it("starts with the selected question count and textbook requirement", async () => {
+  render(<ReviewAgentPanel {...props()} />);
+  const user = userEvent.setup();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "开始复习" })).toBeEnabled(),
+  );
+  await user.selectOptions(screen.getByLabelText("本次题目数"), "2");
+  await user.selectOptions(screen.getByLabelText("资料依据"), "required");
+  await user.click(screen.getByRole("button", { name: "开始复习" }));
+  await waitFor(() =>
+    expect(api.reviewStart).toHaveBeenCalledWith(
+      expect.objectContaining({ question_count: 2, require_sources: true }),
+    ),
+  );
+});
+it("distinguishes budget estimates and workflow checks from content correctness", async () => {
+  vi.mocked(api.reviewLatest).mockResolvedValue(waiting);
+  vi.mocked(api.reviewTrace).mockResolvedValue({
+    schema_version: "review-trace-v1",
+    prompt_version: "review-agent-v3",
+    run: {
+      id: waiting.id,
+      kb: "book",
+      version: "v1",
+      goal: waiting.goal,
+      state: waiting.state,
+      created_at: waiting.created_at,
+      provider: waiting.provider,
+      model: waiting.model,
+      question_count: 1,
+    },
+    model_requests: 4,
+    tool_calls: 4,
+    reported_total_tokens: 120,
+    usage_reported_requests: 4,
+    events: [],
+    harness: {
+      version: "review-harness-v1",
+      policy: {
+        max_model_calls: 16,
+        max_tool_calls: 32,
+        max_token_charge: 400000,
+        max_active_ms: 300000,
+      },
+      charged_tokens: 900,
+      charged_active_ms: 300,
+      stop_reason: null,
+      completion_repairs: 1,
+      context: {
+        input_units: 8000,
+        full_input_units: 35000,
+        max_input_units: 24000,
+        retained_history_messages: 6,
+        omitted_history_messages: 20,
+        compacted: true,
+        estimate_method: "utf8_bytes_plus_protocol_allowance_not_tokenizer",
+      },
+      completion: {
+        version: "review-completion-v1",
+        outcome: "awaiting_answer",
+        verified_submissions: 0,
+        content_quality: "not_assessed",
+        checks: [
+          {
+            code: "answers_recorded",
+            label: "所有题目均已提交并记录",
+            status: "pending",
+          },
+        ],
+      },
+    },
+  });
+  render(<ReviewAgentPanel {...props()} />);
+  await screen.findByText("存储器保存什么？", { selector: "h3" });
+  const user = userEvent.setup();
+  await user.click(screen.getByText("执行记录"));
+  expect(await screen.findByText(/预算占用含估算/)).toBeInTheDocument();
+  expect(screen.getByText(/省略 20 条/)).toBeInTheDocument();
+  await user.click(screen.getByText(/完成条件检查/));
+  expect(
+    screen.getByText("所有题目均已提交并记录：待满足"),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/内容事实正确性待核验/)).toBeInTheDocument();
+});
+
 it("keeps an empty due queue disabled and discards a stale chapter result", async () => {
   let finish!: (value: api.ReviewMemoryOverview) => void;
   vi.mocked(api.reviewMemory).mockImplementationOnce(

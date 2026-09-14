@@ -133,6 +133,8 @@ pub fn setup(replies: Vec<Value>) -> (tempfile::TempDir, AppState, Arc<Model>, L
 pub async fn start(state: &AppState, library: &Library) -> String {
     start_inner(
         StartReview {
+            question_count: None,
+            require_sources: false,
             due_only: false,
             kb: "book".into(),
             version: "v1".into(),
@@ -311,6 +313,7 @@ fn review_checkpoint_survives_failure_and_resume_does_not_save_question_twice() 
         let (_dir, state, _, library) = setup(vec![
             tools(vec![("save1", "save_review_question", quiz(json!([])))]),
             json!("NETWORK_ERROR"),
+            json!("NETWORK_ERROR"),
             say("继续回答已保存的题目。"),
         ]);
         let id = start(&state, &library).await;
@@ -463,5 +466,30 @@ fn review_trace_excludes_private_messages_answers_and_raw_tool_payloads() {
             legacy.trace_document()["reported_total_tokens"],
             Value::Null
         );
+    });
+}
+
+#[test]
+fn review_invalid_model_message_never_executes_tools() {
+    tauri::async_runtime::block_on(async {
+        let valid = tools(vec![("save", "save_review_question", quiz(json!([])))]);
+        let mut wrong_role = valid.clone();
+        wrong_role["role"] = json!("system");
+        let mut wrong_calls = valid.clone();
+        wrong_calls["tool_calls"] = json!({"id":"save"});
+        let mut wrong_type = valid;
+        wrong_type["tool_calls"][0]["type"] = json!("custom");
+        for reply in [wrong_role, wrong_calls, wrong_type] {
+            let (_dir, state, model, library) = setup(vec![reply]);
+            let id = start(&state, &library).await;
+            let result = continue_inner(id.clone(), &state, &library).await.unwrap();
+            assert_eq!(result["state"], "failed");
+            assert_eq!(result["stop_reason"]["code"], "invalid_model_output");
+            assert_eq!(model.requests.lock().unwrap().len(), 1);
+            let saved = state.database.review_load(&id).unwrap();
+            assert!(saved.questions.is_empty() && saved.pending.is_empty());
+            assert_eq!(saved.tool_calls, 0);
+            assert!(saved.messages.iter().all(|m| m["tool_calls"].is_null()));
+        }
     });
 }

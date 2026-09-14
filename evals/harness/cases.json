@@ -1,0 +1,55 @@
+{
+  "version": "review-harness-faults-v1",
+  "mode": "scripted_model_isolated_database",
+  "trials_per_case": 3,
+  "cases": [
+    {
+      "id": "transient_retry",
+      "expected_state": "completed",
+      "expected_grade_events": 1,
+      "purpose": "一次临时模型故障后自动重试"
+    },
+    {
+      "id": "no_progress",
+      "expected_state": "stopped",
+      "expected_grade_events": 0,
+      "purpose": "重复查询不产生无限循环"
+    },
+    {
+      "id": "token_limit",
+      "expected_state": "stopped",
+      "expected_grade_events": 0,
+      "purpose": "预算不足时不发送模型请求"
+    },
+    {
+      "id": "context_compaction",
+      "expected_state": "completed",
+      "expected_grade_events": 1,
+      "purpose": "长历史采用有界视图且不改写原始记录"
+    },
+    {
+      "id": "premature_finish",
+      "expected_state": "completed",
+      "expected_grade_events": 1,
+      "purpose": "提前结束被纠正后满足实际完成条件"
+    },
+    {
+      "id": "tool_timeout",
+      "expected_state": "completed",
+      "expected_grade_events": 1,
+      "purpose": "只读检索超时后模型换词重试"
+    },
+    {
+      "id": "checkpoint_redelivery",
+      "expected_state": "completed",
+      "expected_grade_events": 1,
+      "purpose": "记分提交后故障、重启、工具重复投递仍只记一次"
+    },
+    {
+      "id": "inflight_pause",
+      "expected_state": "paused",
+      "expected_grade_events": 0,
+      "purpose": "工具等待期间暂停并保留待执行步骤"
+    }
+  ]
+}

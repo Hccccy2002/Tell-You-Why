@@ -17,6 +17,52 @@ pub(crate) struct Runtime {
 }
 
 impl Runtime {
+    pub(crate) async fn call_controlled(
+        &self,
+        request: Value,
+        control: crate::harness::execution::ExecutionControl,
+    ) -> Result<Value, crate::harness::tools::ToolError> {
+        use crate::harness::{
+            process,
+            tools::{ErrorCode, ToolError},
+        };
+        // Only the review agent's read operations use process-tree cancellation.
+        // Import workers have their own durable job and cancellation protocol.
+        if !matches!(
+            request["op"].as_str(),
+            Some("evidence" | "learning_version" | "learning_units")
+        ) {
+            return Err(ToolError::new(
+                ErrorCode::PermissionDenied,
+                "当前资料执行器仅允许复习读取操作",
+            ));
+        }
+        let mut command = process::python_command(
+            &self.python,
+            "import runpy\nrunpy.run_module('tellwhy_kb.desktop', run_name='__main__')",
+        );
+        command
+            .current_dir(&self.service)
+            .env("PYTHONPATH", self.service.join("src"))
+            .env("PYTHONUTF8", "1")
+            .env("HF_HUB_OFFLINE", "1")
+            .env("TRANSFORMERS_OFFLINE", "1")
+            .env("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True");
+        let output = process::execute(command, self.payload(request), control.clone()).await?;
+        control.check()?;
+        if !output.status.success() {
+            return Err(ToolError::new(
+                ErrorCode::DependencyFailed,
+                "本地资料组件异常退出",
+            ));
+        }
+        parse_reply(&output.stdout).map_err(|_| {
+            ToolError::new(
+                ErrorCode::InvalidResult,
+                "资料服务未返回有效结果，请检查资料版本与状态",
+            )
+        })
+    }
     pub(crate) fn discover() -> Result<Self, String> {
         let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let service = std::env::var_os("TELLWHY_RAG_SERVICE")
@@ -301,6 +347,50 @@ pub async fn kb_pause(kb: String, job: String) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn controlled_runtime_uses_framed_protocol_and_rejects_write_operations() {
+        tauri::async_runtime::block_on(async {
+            let folder = tempfile::tempdir().unwrap();
+            let package = folder.path().join("src/tellwhy_kb");
+            std::fs::create_dir_all(&package).unwrap();
+            std::fs::write(package.join("__init__.py"), "").unwrap();
+            std::fs::write(package.join("desktop.py"),"import sys,json\npayload=json.load(sys.stdin)\nprint('TELLWHY_DESKTOP:'+json.dumps({'ok':True,'data':payload['request']}),flush=True)\n").unwrap();
+            let runtime = Runtime {
+                service: folder.path().to_owned(),
+                python: Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .unwrap()
+                    .join("rag-service/.venv/Scripts/python.exe"),
+                data: folder.path().join("data"),
+                models: folder.path().join("models"),
+            };
+            let scope = crate::harness::execution::ExecutionScope::new(10_000);
+            let request = json!({"op":"learning_version","kb":"book","version":"v1"});
+            assert_eq!(
+                runtime
+                    .call_controlled(request.clone(), scope.control.clone())
+                    .await
+                    .unwrap(),
+                request
+            );
+            scope.finish().await.unwrap();
+            let scope = crate::harness::execution::ExecutionScope::new(10_000);
+            assert_eq!(
+                runtime
+                    .call_controlled(
+                        json!({"op":"cancel","kb":"book","job":"existing-import"}),
+                        scope.control.clone()
+                    )
+                    .await
+                    .unwrap_err()
+                    .code,
+                crate::harness::tools::ErrorCode::PermissionDenied
+            );
+            scope.finish().await.unwrap();
+        });
+    }
 
     #[test]
     fn framed_protocol_ignores_model_logs_and_reports_failures() {

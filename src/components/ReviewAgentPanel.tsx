@@ -26,6 +26,7 @@ const stateLabels: Record<ReviewRun["state"], string> = {
   completed: "本次复习已完成",
   paused: "已暂停",
   failed: "复习暂时中断",
+  stopped: "本次复习已停止",
 };
 export function ReviewAgentPanel({
   book,
@@ -42,6 +43,8 @@ export function ReviewAgentPanel({
     "结合我的学习记录，选一个需要巩固的知识点，讲解后出题带我复习。",
   );
   const [chapter, setChapter] = useState("");
+  const [questionCount, setQuestionCount] = useState("auto");
+  const [requireSources, setRequireSources] = useState(false);
   const [run, setRun] = useState<ReviewRun | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -183,6 +186,12 @@ export function ReviewAgentPanel({
         provider: provider.id,
         region: provider.region,
         due_only: dueOnly,
+        question_count: dueOnly
+          ? 1
+          : questionCount === "auto"
+            ? null
+            : Number(questionCount),
+        require_sources: requireSources,
       });
       setChoices({});
       return continueRun(value);
@@ -260,6 +269,34 @@ export function ReviewAgentPanel({
             onChange={(event) => setGoal(event.target.value)}
           />
         </label>
+        <div className="review-options">
+          <label className="kb-field">
+            本次题目数
+            <select
+              value={questionCount}
+              disabled={locked}
+              onChange={(event) => setQuestionCount(event.target.value)}
+            >
+              <option value="auto">由 Agent 安排（1–3 题）</option>
+              <option value="1">1 题</option>
+              <option value="2">2 题</option>
+              <option value="3">3 题</option>
+            </select>
+          </label>
+          <label className="kb-field">
+            资料依据
+            <select
+              value={requireSources ? "required" : "optional"}
+              disabled={locked}
+              onChange={(event) =>
+                setRequireSources(event.target.value === "required")
+              }
+            >
+              <option value="optional">允许模型补充</option>
+              <option value="required">必须引用教材</option>
+            </select>
+          </label>
+        </div>
         <div className="review-controls">
           <label className="kb-field">
             复习章节范围
@@ -426,15 +463,20 @@ export function ReviewAgentPanel({
               )}
             </article>
           ))}
-          {["paused", "failed", "ready"].includes(run.state) && (
-            <button
-              className="secondary-button"
-              disabled={locked || run.model_calls >= 16 || run.tool_calls >= 32}
-              onClick={() => void perform(() => continueRun(run))}
-            >
-              继续复习
-            </button>
-          )}
+          {["paused", "failed", "ready"].includes(run.state) &&
+            run.can_resume !== false && (
+              <button
+                className="secondary-button"
+                disabled={
+                  locked ||
+                  (run.can_resume == null &&
+                    (run.model_calls >= 16 || run.tool_calls >= 32))
+                }
+                onClick={() => void perform(() => continueRun(run))}
+              >
+                继续复习
+              </button>
+            )}
           <details
             className="review-sources"
             onToggle={(event) => setSourcesOpen(event.currentTarget.open)}

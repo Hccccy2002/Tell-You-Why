@@ -92,7 +92,12 @@ impl ReviewRun {
         json!({"schema_version":"review-trace-v1","run":self.summary(),"prompt_version":self.prompt_version,
             "model_requests":self.model_calls,"tool_calls":self.tool_calls,
             "reported_total_tokens":if reported.is_empty(){None}else{Some(reported.iter().sum::<u64>())},
-            "usage_reported_requests":reported.len(),"events":self.trace})
+            "usage_reported_requests":reported.len(),"events":self.trace,
+            "harness":{"version":crate::harness::VERSION,"policy":self.control.policy,
+                "tool_runtime_version":crate::harness::tools::VERSION,"tool_permissions":self.control.tool_permissions,
+                "charged_tokens":self.control.charged_tokens,"charged_active_ms":self.control.charged_active_ms,"stop_reason":self.control.stop,
+                "context":self.context.last_report,"completion":self.completion.last_report,
+                "completion_repairs":self.completion.repair_attempts,"contract":self.completion.contract}})
     }
 
     pub fn summary(&self) -> Value {
@@ -117,7 +122,7 @@ pub fn tool_details(call: &ToolCall) -> Value {
     let args: Value = serde_json::from_str(&call.arguments).unwrap_or(Value::Null);
     let allowed: &[&str] = match call.name.as_str() {
         "search_textbook" => &["query", "mode"],
-        "read_source" => &["source_id"],
+        "read_source" => &["source_id", "start_char", "max_chars"],
         "save_review_question" => &["topic", "source_ids", "card_id", "memory_id"],
         "record_quiz_result" => &["question_id"],
         _ => &[],
@@ -129,6 +134,9 @@ pub fn tool_details(call: &ToolCall) -> Value {
 
 pub fn tool_result(name: &str, output: &Value) -> Value {
     if output["ok"] != true {
+        if let Some(code) = output["error_code"].as_str() {
+            return json!({"error_code":code,"retryable":output["retryable"],"message":"工具执行失败，错误已返回模型以便修正"});
+        }
         let error = output["error"].as_str().unwrap_or("");
         let category = if error.contains("参数") {
             "invalid_arguments"

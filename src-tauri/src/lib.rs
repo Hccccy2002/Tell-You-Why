@@ -7,6 +7,7 @@ mod evaluation;
 mod evaluation_fixture;
 mod evaluation_live;
 mod evaluation_review;
+mod harness;
 mod knowledge_base;
 mod learning;
 mod learning_commands;
@@ -31,6 +32,7 @@ mod review_memory_tests;
 mod review_store;
 #[cfg(test)]
 mod review_tests;
+mod review_tools;
 mod review_trace;
 mod secret_store;
 #[cfg(test)]

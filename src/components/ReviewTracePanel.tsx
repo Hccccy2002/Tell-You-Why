@@ -23,6 +23,11 @@ const labels: Record<string, string> = {
   completed: "复习完成",
   paused: "暂停",
   failed: "执行中断",
+  stopped: "停止执行",
+  retry_scheduled: "等待重试",
+  tool_retry_scheduled: "重试只读工具",
+  verify_textbook: "校验教材版本",
+  completion_check: "检查完成条件",
 };
 const statuses = {
   started: "进行中",
@@ -114,6 +119,62 @@ export function ReviewTracePanel({
                   ? "模型用量未返回"
                   : `已报告 ${trace.reported_total_tokens} tokens（${trace.usage_reported_requests}/${trace.model_requests} 次请求）`}
               </p>
+              {trace.harness && (
+                <div className="review-harness" aria-label="运行策略与验收">
+                  <p className="kb-muted">{trace.harness.version}</p>
+                  <p>
+                    用量预算占用 {trace.harness.charged_tokens.toLocaleString()}{" "}
+                    / {trace.harness.policy.max_token_charge.toLocaleString()}
+                    {" · "}执行时间预算占用{" "}
+                    {(trace.harness.charged_active_ms / 1000).toFixed(1)} /{" "}
+                    {(trace.harness.policy.max_active_ms / 1000).toFixed(0)} 秒
+                  </p>
+                  <p className="kb-muted">
+                    预算占用含估算与未确认请求的预留；实际 token
+                    用量以上方供应商报告为准。
+                  </p>
+                  {trace.harness.context && (
+                    <p>
+                      当前上下文保留{" "}
+                      {trace.harness.context.retained_history_messages}{" "}
+                      条历史，省略{" "}
+                      {trace.harness.context.omitted_history_messages} 条。
+                      输入估算单位{" "}
+                      {trace.harness.context.input_units.toLocaleString()} /{" "}
+                      {trace.harness.context.max_input_units.toLocaleString()}
+                      ；完整历史输入为{" "}
+                      {trace.harness.context.full_input_units.toLocaleString()}
+                      。
+                    </p>
+                  )}
+                  {trace.harness.completion && (
+                    <details>
+                      <summary>
+                        完成条件检查 · 已核对{" "}
+                        {trace.harness.completion.verified_submissions} 次提交
+                      </summary>
+                      <ul className="review-checks">
+                        {trace.harness.completion.checks.map((check) => (
+                          <li key={check.code}>
+                            {check.label}：
+                            {
+                              {
+                                passed: "通过",
+                                pending: "待满足",
+                                failed: "未通过",
+                              }[check.status]
+                            }
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="kb-muted">
+                        已进行 {trace.harness.completion_repairs}{" "}
+                        次步骤修正。内容事实正确性待核验。
+                      </p>
+                    </details>
+                  )}
+                </div>
+              )}
               <ol className="review-timeline">
                 {trace.events.map((event) => (
                   <li key={event.sequence}>

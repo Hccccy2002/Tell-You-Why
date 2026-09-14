@@ -125,6 +125,11 @@ impl Database {
             run.trace_state("recovered");
             run.state = "paused".into();
             run.error = Some("上次执行中断，已恢复保存的步骤，可继续复习".into());
+            run.control.stop = Some(crate::harness::policy::StopReason::new(
+                "interrupted",
+                "上次执行中断，已恢复保存的步骤，可继续复习",
+                true,
+            ));
             self.review_save(&run, None)?;
         }
         Ok(())
@@ -171,6 +176,7 @@ impl Database {
         run.trace_finish(seq, "succeeded");
         run.state = "ready".into();
         run.error = None;
+        run.completion.last_report = None;
         tx.execute("UPDATE review_runs SET state='ready',record=?,cancel_requested=0,updated_at=? WHERE id=?",params![serde_json::to_string(&run)?,chrono::Utc::now().to_rfc3339(),id])?;
         tx.commit()?;
         Ok(run)

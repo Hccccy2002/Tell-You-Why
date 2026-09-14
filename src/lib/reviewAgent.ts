@@ -2,6 +2,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { withAutoHideGuard } from "./autoHideGuard";
 import type { Evidence } from "./rag";
 
+export interface CompletionReport {
+  version: string;
+  outcome: "awaiting_answer" | "completed" | "needs_repair" | "rejected";
+  checks: {
+    code: string;
+    label: string;
+    status: "passed" | "pending" | "failed";
+  }[];
+  verified_submissions: number;
+  content_quality: "not_assessed";
+}
+
 export interface ReviewQuestion {
   id: string;
   topic: string;
@@ -24,7 +36,13 @@ export interface ReviewRun {
   };
   goal: string;
   state:
-    "ready" | "running" | "waiting_answer" | "completed" | "paused" | "failed";
+    | "ready"
+    | "running"
+    | "waiting_answer"
+    | "completed"
+    | "paused"
+    | "failed"
+    | "stopped";
   provider: string;
   model: string;
   created_at: string;
@@ -33,6 +51,15 @@ export interface ReviewRun {
   cancel_requested: boolean;
   model_calls: number;
   tool_calls: number;
+  can_resume?: boolean;
+  completion?: CompletionReport | null;
+  contract?: {
+    min_questions: number;
+    max_questions: number;
+    require_sources: boolean;
+    max_repairs: number;
+  };
+  stop_reason?: { code: string; message: string; resumable: boolean } | null;
   questions: ReviewQuestion[];
   sources: Evidence[];
 }
@@ -44,6 +71,8 @@ export const reviewStart = (request: {
   provider: string;
   region: string;
   due_only?: boolean;
+  question_count?: number | null;
+  require_sources?: boolean;
 }) => invoke<ReviewRun>("review_start", { request });
 export const reviewContinue = (id: string) =>
   withAutoHideGuard("review-agent", () =>
@@ -80,9 +109,32 @@ export interface ReviewTrace {
   tool_calls: number;
   reported_total_tokens: number | null;
   usage_reported_requests: number;
+  harness?: {
+    version: string;
+    policy: {
+      max_model_calls: number;
+      max_tool_calls: number;
+      max_token_charge: number;
+      max_active_ms: number;
+    };
+    charged_tokens: number;
+    charged_active_ms: number;
+    stop_reason: ReviewRun["stop_reason"];
+    completion: CompletionReport | null;
+    completion_repairs: number;
+    context: {
+      input_units: number;
+      full_input_units: number;
+      max_input_units: number;
+      retained_history_messages: number;
+      omitted_history_messages: number;
+      compacted: boolean;
+      estimate_method: string;
+    } | null;
+  };
   events: {
     sequence: number;
-    kind: "model" | "tool" | "state" | "user";
+    kind: "model" | "tool" | "state" | "user" | "policy" | "validation";
     name: string;
     status: "started" | "succeeded" | "failed" | "interrupted";
     started_at: string;

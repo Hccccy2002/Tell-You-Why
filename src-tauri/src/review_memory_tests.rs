@@ -202,6 +202,8 @@ fn due_agent_reuses_memory_after_actual_submission_and_updates_the_queue() {
         use crate::review_tests::{say, tools};
         let (_dir, state, model, library) = setup(vec![]);
         let request = || StartReview {
+            question_count: None,
+            require_sources: false,
             kb: "book".into(),
             version: "v1".into(),
             chapter: Some("chapter1".into()),
@@ -229,10 +231,13 @@ fn due_agent_reuses_memory_after_actual_submission_and_updates_the_queue() {
             name: "save_review_question".into(),
             arguments: crate::review_tests::quiz(json!([])).to_string(),
         };
-        assert!(execute_tool(&state.database, &library, &mut pending, &bad)
-            .await
-            .unwrap_err()
-            .contains("到期知识点"));
+        assert_eq!(
+            execute_tool(&state.database, &library, &mut pending, &bad)
+                .await
+                .unwrap_err()
+                .code,
+            crate::harness::tools::ErrorCode::PreconditionFailed
+        );
         let mut question = crate::review_tests::quiz(json!(["S1"]));
         question["memory_id"] = memory_id.clone();
         question["topic"] = json!("存储器用途（再次巩固）");
