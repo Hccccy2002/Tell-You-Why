@@ -7,6 +7,7 @@ import {
   testProviderConnection,
 } from "../lib/api";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
+import { PdfModelOverview } from "../components/PdfModelOverview";
 import type { ProviderSpec } from "../types";
 
 interface ProviderKeyDeleteConfirmation {
@@ -36,6 +37,7 @@ export function ModelSettingsScreen({
   initialProviders,
   onProvidersChanged,
 }: Props) {
+  const [section, setSection] = useState<"online" | "pdf">("online");
   const [providers, setProviders] = useState(() =>
     structuredClone(initialProviders),
   );
@@ -196,159 +198,200 @@ export function ModelSettingsScreen({
     }
   }
 
-  if (!active) return <main className="page-view">供应商注册表暂不可用。</main>;
-
   return (
     <main className="page-view model-settings">
       <div className="page-heading">
-        <span className="eyebrow">可选功能 · BYOK</span>
+        <span className="eyebrow">在线生成 · 本地识别与检索</span>
         <h1>模型设置</h1>
-        <p>
-          不配置模型也能完整使用。真实 Key
-          只能在这里输入，请不要发送到聊天或日志。
-        </p>
+        <p>配置生成与追问使用的在线模型，查看 PDF 知识库使用的本地模型。</p>
       </div>
-      <div className="provider-tabs" role="tablist" aria-label="模型供应商">
-        {providers.map((provider) => (
-          <button
-            key={provider.id}
-            role="tab"
-            disabled={controlsLocked}
-            aria-selected={provider.id === active.id}
-            className={provider.id === active.id ? "active" : ""}
-            onClick={() => {
-              setActiveId(provider.id);
-              setApiKey("");
-              setMessage(null);
-            }}
-          >
-            {provider.label}
-            {provider.keyConfigured ? (
-              <span className="configured-dot" aria-label="已配置" />
+      <div
+        className="segmented-control model-section-switcher"
+        role="group"
+        aria-label="模型设置分类"
+      >
+        <button
+          type="button"
+          className={section === "online" ? "active" : ""}
+          aria-pressed={section === "online"}
+          aria-controls="online-model-settings"
+          disabled={controlsLocked}
+          onClick={() => setSection("online")}
+        >
+          在线生成模型
+        </button>
+        <button
+          type="button"
+          className={section === "pdf" ? "active" : ""}
+          aria-pressed={section === "pdf"}
+          aria-controls="pdf-model-settings"
+          disabled={controlsLocked}
+          onClick={() => setSection("pdf")}
+        >
+          PDF 知识库模型
+        </button>
+      </div>
+      <div id="pdf-model-settings" hidden={section !== "pdf"}>
+        <PdfModelOverview />
+      </div>
+      <div id="online-model-settings" hidden={section !== "online"}>
+        {active ? (
+          <>
+            <div
+              className="provider-tabs"
+              role="tablist"
+              aria-label="模型供应商"
+            >
+              {providers.map((provider) => (
+                <button
+                  key={provider.id}
+                  role="tab"
+                  disabled={controlsLocked}
+                  aria-selected={provider.id === active.id}
+                  className={provider.id === active.id ? "active" : ""}
+                  onClick={() => {
+                    setActiveId(provider.id);
+                    setApiKey("");
+                    setMessage(null);
+                  }}
+                >
+                  {provider.label}
+                  {provider.keyConfigured ? (
+                    <span className="configured-dot" aria-label="已配置" />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+            <section className="settings-card">
+              <label className="field-label">
+                服务通道
+                <select
+                  disabled={controlsLocked}
+                  value={active.selectedRegion}
+                  onChange={(event) =>
+                    updateActive({
+                      selectedRegion: event.target.value,
+                      connectionVerified: false,
+                    })
+                  }
+                >
+                  {active.regions.map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                模型
+                <select
+                  disabled={controlsLocked}
+                  value={active.selectedModel}
+                  onChange={(event) =>
+                    updateActive({
+                      selectedModel: event.target.value,
+                      connectionVerified: false,
+                    })
+                  }
+                >
+                  {active.models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                      {model.recommended ? "（推荐）" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                API Key
+                <input
+                  type="password"
+                  disabled={controlsLocked}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={apiKey}
+                  placeholder={
+                    active.keyConfigured
+                      ? `已配置 · •••• ${active.keyLast4 ?? ""}`
+                      : "输入完整 Key"
+                  }
+                  onChange={(event) => setApiKey(event.target.value)}
+                />
+              </label>
+              <p className="security-note">
+                <span aria-hidden="true">▣</span>
+                Key 由 Rust 保存到 Windows Credential Manager；SQLite
+                和前端都不保存原文。
+              </p>
+              <button
+                className="secondary-button wide"
+                disabled={controlsLocked}
+                onClick={requestSaveProfile}
+              >
+                {busy === "save" ? "正在安全保存…" : "保存配置"}
+              </button>
+              {active.keyConfigured ? (
+                <div className="connection-row">
+                  <span
+                    className={
+                      active.connectionVerified ? "status success" : "status"
+                    }
+                  >
+                    {active.connectionVerified ? "连接已验证" : "尚未验证连接"}
+                  </span>
+                  <button
+                    className="text-button"
+                    disabled={controlsLocked}
+                    onClick={() => void testConnection()}
+                  >
+                    {busy === "test" ? "正在测试…" : "测试连接"}
+                  </button>
+                </div>
+              ) : null}
+            </section>
+            <p className="model-call-note">
+              在线模型用于知识卡生成、追问，以及 PDF
+              中的生成、解释和复习。仅在你主动使用这些功能时调用，不会后台自动补充。
+            </p>
+            {message && !deleteConfirmation && !replaceConfirmation ? (
+              <p className="form-message" role="status">
+                {message}
+              </p>
             ) : null}
-          </button>
-        ))}
+            {active.keyConfigured ? (
+              <button
+                className="danger-text-button"
+                disabled={controlsLocked}
+                onClick={() => {
+                  setMessage(null);
+                  setDeleteConfirmation({
+                    providerId: active.id,
+                    region: active.selectedRegion,
+                    regionLabel:
+                      active.regions.find(
+                        (region) => region.id === active.selectedRegion,
+                      )?.label ?? active.selectedRegion,
+                    label: active.label,
+                    keyLast4: active.keyLast4,
+                  });
+                }}
+              >
+                {busy === "delete"
+                  ? "正在删除…"
+                  : `删除 ${active.label} API Key`}
+              </button>
+            ) : null}
+            <p className="ai-disclosure">
+              模型生成的卡片统一标记为“AI
+              生成，未经外部核验”，模型自行给出的链接不会显示为已核验来源。
+            </p>
+          </>
+        ) : (
+          <p className="form-message" role="status">
+            供应商注册表暂不可用。
+          </p>
+        )}
       </div>
-      <section className="settings-card">
-        <label className="field-label">
-          服务通道
-          <select
-            disabled={controlsLocked}
-            value={active.selectedRegion}
-            onChange={(event) =>
-              updateActive({
-                selectedRegion: event.target.value,
-                connectionVerified: false,
-              })
-            }
-          >
-            {active.regions.map((region) => (
-              <option key={region.id} value={region.id}>
-                {region.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field-label">
-          模型
-          <select
-            disabled={controlsLocked}
-            value={active.selectedModel}
-            onChange={(event) =>
-              updateActive({
-                selectedModel: event.target.value,
-                connectionVerified: false,
-              })
-            }
-          >
-            {active.models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.label}
-                {model.recommended ? "（推荐）" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field-label">
-          API Key
-          <input
-            type="password"
-            disabled={controlsLocked}
-            autoComplete="off"
-            spellCheck={false}
-            value={apiKey}
-            placeholder={
-              active.keyConfigured
-                ? `已配置 · •••• ${active.keyLast4 ?? ""}`
-                : "输入完整 Key"
-            }
-            onChange={(event) => setApiKey(event.target.value)}
-          />
-        </label>
-        <p className="security-note">
-          <span aria-hidden="true">▣</span>
-          Key 由 Rust 保存到 Windows Credential Manager；SQLite
-          和前端都不保存原文。
-        </p>
-        <button
-          className="secondary-button wide"
-          disabled={controlsLocked}
-          onClick={requestSaveProfile}
-        >
-          {busy === "save" ? "正在安全保存…" : "保存配置"}
-        </button>
-        {active.keyConfigured ? (
-          <div className="connection-row">
-            <span
-              className={
-                active.connectionVerified ? "status success" : "status"
-              }
-            >
-              {active.connectionVerified ? "连接已验证" : "尚未验证连接"}
-            </span>
-            <button
-              className="text-button"
-              disabled={controlsLocked}
-              onClick={() => void testConnection()}
-            >
-              {busy === "test" ? "正在测试…" : "测试连接"}
-            </button>
-          </div>
-        ) : null}
-      </section>
-      <p className="model-call-note">
-        仅在你点击知识小窗中的生成按钮时调用模型，不会后台自动补充。
-      </p>
-      {message && !deleteConfirmation && !replaceConfirmation ? (
-        <p className="form-message" role="status">
-          {message}
-        </p>
-      ) : null}
-      {active.keyConfigured ? (
-        <button
-          className="danger-text-button"
-          disabled={controlsLocked}
-          onClick={() => {
-            setMessage(null);
-            setDeleteConfirmation({
-              providerId: active.id,
-              region: active.selectedRegion,
-              regionLabel:
-                active.regions.find(
-                  (region) => region.id === active.selectedRegion,
-                )?.label ?? active.selectedRegion,
-              label: active.label,
-              keyLast4: active.keyLast4,
-            });
-          }}
-        >
-          {busy === "delete" ? "正在删除…" : `删除 ${active.label} API Key`}
-        </button>
-      ) : null}
-      <p className="ai-disclosure">
-        模型生成的卡片统一标记为“AI
-        生成，未经外部核验”，模型自行给出的链接不会显示为已核验来源。
-      </p>
       {deleteConfirmation ? (
         <ConfirmationDialog
           id="provider-key-delete-confirmation"

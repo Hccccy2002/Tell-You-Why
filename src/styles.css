@@ -2128,6 +2128,112 @@ input[type="checkbox"] {
   margin-bottom: 12px;
 }
 
+.model-section-switcher {
+  margin-bottom: 18px;
+}
+
+.pdf-model-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-model-heading h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.pdf-model-badge {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 10px;
+}
+
+.pdf-model-intro,
+.pdf-model-group-note,
+.pdf-model-list p {
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.pdf-model-intro {
+  margin: 10px 0 18px;
+}
+
+.pdf-model-group {
+  margin-bottom: 18px;
+}
+
+.pdf-model-group h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.pdf-model-group-note {
+  margin: 4px 0 8px;
+}
+
+.pdf-model-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+
+.pdf-model-list li {
+  padding: 12px 14px;
+}
+
+.pdf-model-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.pdf-model-role,
+.pdf-model-name {
+  display: block;
+}
+
+.pdf-model-role {
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
+.pdf-model-name {
+  margin-top: 3px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.pdf-model-list p {
+  margin: 5px 0 0;
+}
+
+.pdf-model-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.pdf-model-download:hover {
+  color: var(--accent-strong);
+}
+
+.pdf-model-download:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus) 50%, transparent);
+  outline-offset: 2px;
+}
+
 .provider-tabs button {
   display: flex;
   align-items: center;
