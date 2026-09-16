@@ -174,6 +174,14 @@ def model_report(dataset, retrieval, runs, requests, input_sha256):
                 "result": r,
                 "reference_answer": by_id[r["id"]]["reference_answer"],
                 "evidence": packets[r["id"]]["evidence"],
+                "evaluation": {
+                    "split": by_id[r["id"]].get("split"),
+                    "kind": by_id[r["id"]].get("kind"),
+                    "expected_behavior": by_id[r["id"]].get("expected_behavior"),
+                    "acceptance_criteria": by_id[r["id"]].get("acceptance_criteria"),
+                    "label_review": by_id[r["id"]].get("review"),
+                    "reference_evidence": by_id[r["id"]].get("evidence", []),
+                },
             },
         }
         for r in runs["cases"]
@@ -243,30 +251,57 @@ def main():
             {"completed": done, "total": total, "message": f"正在评测 {case}"},
         )
 
-    dataset = read(ROOT / "textbook/dataset.json")
+    dataset_path = args.out / "dataset.json"
+    dataset = read(
+        dataset_path if dataset_path.exists() else ROOT / "textbook/dataset.json"
+    )
+    selection = read(args.out / "selection.json") if dataset_path.exists() else None
+    if selection:
+        from dataset import digest
+
+        if digest(dataset) != selection["release"]:
+            raise ValueError("封存题库快照与本轮选择不匹配")
+
+    def save_report(report):
+        if selection:
+            report["benchmark"] = selection
+            report["notes"].append(
+                f"人工标注基准 · {selection['split']} · {len(selection['case_ids'])} 题。"
+                "小样本不能代表泛化表现；人工标注与人工评价模型输出是两项独立工作。"
+            )
+            report["notes"].append(selection["note"])
+            if selection["used_before"]:
+                report["notes"].append(
+                    f"本轮 {selection['used_before']} 道题已使用过，不能称为新的盲测。"
+                )
+        write(args.out / "report.json", report)
+
     if args.action == "top5":
         from evaluate_top5 import run
 
-        raw = run(dataset, args.data, progress)
-        write(args.out / "report.json", top5_report(raw))
+        raw = run(
+            dataset, args.data, progress, selection["case_ids"] if selection else None
+        )
+        save_report(top5_report(raw))
     elif args.action == "prepare-model":
         from retrieve import run
 
         raw = run(
             dataset,
             args.data,
-            ["development", "regression", "validation"],
+            [selection["split"]]
+            if selection
+            else ["development", "regression", "validation"],
             ["hybrid"],
             progress,
-            MODEL_CASES,
+            selection["case_ids"] if selection else MODEL_CASES,
         )
         write(args.out / "retrieval.json", raw)
     elif args.action == "score-review":
         write(args.out / "report.json", review_report(read(args.out / "runs.json")))
     else:
         input_path = args.out / "retrieval.json"
-        write(
-            args.out / "report.json",
+        save_report(
             model_report(
                 dataset,
                 read(input_path),

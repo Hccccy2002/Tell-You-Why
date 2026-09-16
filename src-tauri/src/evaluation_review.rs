@@ -11,6 +11,8 @@ pub struct ReviewInput {
     pub correct: Option<bool>,
     pub complete: Option<bool>,
     pub grounded: Option<bool>,
+    #[serde(default)]
+    pub behavior_appropriate: Option<bool>,
     pub notes: String,
 }
 impl ReviewInput {
@@ -77,6 +79,20 @@ fn targets(report: &Value) -> Vec<(&str, &str)> {
         .collect()
 }
 
+fn metadata<'a>(report: &'a Value, id: &str) -> &'a Value {
+    report["rows"]
+        .as_array()
+        .and_then(|rows| rows.iter().find(|r| r["id"] == id))
+        .map(|row| &row["details"]["evaluation"])
+        .unwrap_or(&Value::Null)
+}
+
+fn finished(report: &Value, id: &str, input: &ReviewInput) -> bool {
+    input.finished()
+        && (metadata(report, id)["expected_behavior"].as_str().is_none()
+            || input.behavior_appropriate.is_some())
+}
+
 fn load(dir: &Path, report: &Value) -> Result<Annotations, String> {
     let report_sha256 = digest(report)?;
     let dataset_sha256 = report["raw"]["review_template"]["dataset_sha256"]
@@ -107,7 +123,7 @@ fn load(dir: &Path, report: &Value) -> Result<Annotations, String> {
             || !eligible.contains(&(row.id.as_str(), row.result_sha256.as_str()))
             || row.revision == 0
             || row.review.reviewer.trim().is_empty()
-            || row.method.as_deref() != row.review.finished().then_some("human")
+            || row.method.as_deref() != finished(report, &row.id, &row.review).then_some("human")
         {
             return Err("人工复核记录与当前题目不匹配；原评测报告仍可查看。".into());
         }
@@ -142,10 +158,11 @@ pub fn save(dir: &Path, report: &Value, request: SaveReview) -> Result<(), Strin
     if review.notes.chars().count() > 5000 {
         return Err("复核备注最多 5000 字。".into());
     }
+    let method = finished(report, &request.case_id, &review).then(|| "human".to_owned());
     let annotation = Annotation {
         id: request.case_id,
         result_sha256: (*result_sha256).to_owned(),
-        method: review.finished().then(|| "human".to_owned()),
+        method,
         review,
         revision: revision.checked_add(1).ok_or("复核版本号超出范围")?,
         updated_at: chrono::Utc::now().to_rfc3339(),
@@ -183,10 +200,50 @@ pub fn decorate(dir: &Path, report: &mut Value) -> Result<(), String> {
     let complete = count(|r| r.complete);
     let grounded = count(|r| r.grounded);
     let rate = |n: usize| (reviewed > 0).then(|| n as f64 / reviewed as f64);
+    let behavior: Vec<_> = finished
+        .iter()
+        .filter(|r| r.review.behavior_appropriate.is_some())
+        .collect();
+    let refusals: Vec<_> = behavior
+        .iter()
+        .filter(|r| metadata(report, &r.id)["expected_behavior"] == "refuse")
+        .collect();
+    let refusal_passed = refusals
+        .iter()
+        .filter(|r| r.review.behavior_appropriate == Some(true))
+        .count();
+    let refusal_rate =
+        (!refusals.is_empty()).then(|| refusal_passed as f64 / refusals.len() as f64);
+    let mut groups = vec![];
+    for field in ["kind", "split"] {
+        let names: std::collections::BTreeSet<_> = eligible
+            .iter()
+            .filter_map(|(id, _)| metadata(report, id)[field].as_str())
+            .collect();
+        for name in names {
+            let members: Vec<_> = finished
+                .iter()
+                .filter(|r| metadata(report, &r.id)[field] == name)
+                .collect();
+            let passed = members
+                .iter()
+                .filter(|r| {
+                    r.review.correct == Some(true)
+                        && r.review.complete == Some(true)
+                        && r.review.grounded == Some(true)
+                        && r.review.behavior_appropriate != Some(false)
+                })
+                .count();
+            groups.push(json!({"dimension":field,"name":name,"reviewed":members.len(),"passed":passed,
+                "total":eligible.iter().filter(|(id, _)| metadata(report, id)[field] == name).count(),
+                "pass_rate":(!members.is_empty()).then(|| passed as f64 / members.len() as f64)}));
+        }
+    }
     let display = |n: usize| match rate(n) {
         Some(value) => format!("{:.1}%", value * 100.0),
         None => "待复核".to_owned(),
     };
+    let is_benchmark = report["benchmark"].is_object();
     if let Some(metrics) = report["metrics"].as_array_mut() {
         metrics.retain(|m| m["label"] != "内容正确率");
         metrics.push(
@@ -200,12 +257,17 @@ pub fn decorate(dir: &Path, report: &mut Value) -> Result<(), String> {
             metrics.push(json!({"label":label,"value":display(count),"baseline":null,
                 "detail":(reviewed > 0).then(|| format!("符合 {count} / {reviewed} 道"))}));
         }
+        if is_benchmark {
+            metrics.push(json!({"label":"应拒答题通过率（人工）","value":refusal_rate.map(|r| format!("{:.1}%",r*100.0)).unwrap_or("待复核".into()),"baseline":null,
+                "detail":format!("行为符合 {refusal_passed} / {} 道已复核应拒答题",refusals.len())}));
+        }
     }
     report["human_review"] = json!({
         "report_sha256":annotations.report_sha256,
         "reviewed":reviewed,"total":total,"drafts":annotations.rows.len()-reviewed,
         "error":null
     });
+    report["human_review"]["groups"] = json!(groups);
     if let Some(rows) = report["rows"].as_array_mut() {
         for row in rows {
             let Some((id, hash)) = eligible.iter().find(|(id, _)| row["id"] == *id) else {
@@ -214,11 +276,12 @@ pub fn decorate(dir: &Path, report: &mut Value) -> Result<(), String> {
             let annotation = annotations.rows.iter().find(|r| &r.id == id);
             row["human_review"] = json!({"result_sha256":hash,"annotation":annotation});
             if let Some(annotation) = annotation {
-                let completed = annotation.review.finished();
+                let completed = annotation.method.as_deref() == Some("human");
                 let passed = completed
                     && annotation.review.correct == Some(true)
                     && annotation.review.complete == Some(true)
-                    && annotation.review.grounded == Some(true);
+                    && annotation.review.grounded == Some(true)
+                    && annotation.review.behavior_appropriate != Some(false);
                 row["status"] = json!(if passed {
                     "passed"
                 } else if completed {
@@ -227,7 +290,7 @@ pub fn decorate(dir: &Path, report: &mut Value) -> Result<(), String> {
                     "unreviewed"
                 });
                 row["note"] = json!(if completed {
-                    "已人工复核 · 三项判断全部符合才标记通过"
+                    "已人工复核 · 所有必填判断符合才标记通过"
                 } else {
                     "复核草稿 · 尚未计入质量分数"
                 });
@@ -239,7 +302,7 @@ pub fn decorate(dir: &Path, report: &mut Value) -> Result<(), String> {
             !n.as_str()
                 .is_some_and(|s| s.starts_with("回答正确性和证据支持度尚未复核"))
         });
-        notes.push(json!("人工质量分数仅统计完成三项判断并填写备注的问答；草稿和未复核题目不计分。Agent 条目仍表示执行流程状态。"));
+        notes.push(json!("人工质量分数仅统计完成所有必填判断并填写备注的问答；草稿和未复核题目不计分。Agent 条目仍表示执行流程状态。"));
     }
     report["raw"]["report"]["quality_reviews"]["human"] = if reviewed == 0 {
         Value::Null
@@ -247,6 +310,19 @@ pub fn decorate(dir: &Path, report: &mut Value) -> Result<(), String> {
         json!({"reviewed":reviewed,"planned":planned,"correct":rate(correct),
             "complete":rate(complete),"complete_reviewed":reviewed,"grounded":rate(grounded)})
     };
+    if reviewed > 0 && report["benchmark"].is_object() {
+        let quality = &mut report["raw"]["report"]["quality_reviews"]["human"];
+        quality["behavior_reviewed"] = json!(behavior.len());
+        quality["behavior_appropriate"] = json!((!behavior.is_empty()).then(|| behavior
+            .iter()
+            .filter(|r| r.review.behavior_appropriate == Some(true))
+            .count()
+            as f64
+            / behavior.len() as f64));
+        quality["refusal_reviewed"] = json!(refusals.len());
+        quality["appropriate_refusal"] = json!(refusal_rate);
+        quality["groups"] = json!(groups);
+    }
     report["raw"]["human_review"] = serde_json::to_value(annotations).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -285,6 +361,7 @@ pub(crate) mod tests {
                 correct: Some(false),
                 complete: Some(true),
                 grounded: Some(true),
+                behavior_appropriate: None,
                 notes: "回答与原文矛盾".into(),
             },
         }
@@ -367,6 +444,41 @@ pub(crate) mod tests {
                 .contains("已变化"));
             assert!(save(dir.path(), &changed, request(&changed)).is_err());
         }
+    }
+
+    #[test]
+    fn benchmark_requires_behavior_judgment_and_separates_refusal_denominator() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut original = report();
+        original["benchmark"] = json!({"split":"holdout"});
+        original["rows"][0]["details"]["evaluation"] =
+            json!({"kind":"absent","split":"holdout","expected_behavior":"refuse"});
+        original["rows"][1]["details"]["evaluation"] =
+            json!({"kind":"single","split":"holdout","expected_behavior":"answer"});
+        save(dir.path(), &original, request(&original)).unwrap();
+        let mut view = original.clone();
+        decorate(dir.path(), &mut view).unwrap();
+        assert_eq!(view["human_review"]["reviewed"], 0);
+        assert_eq!(view["human_review"]["drafts"], 1);
+        let mut completed = request(&original);
+        completed.expected_revision = 1;
+        completed.review.behavior_appropriate = Some(false);
+        save(dir.path(), &original, completed).unwrap();
+        let mut view = original.clone();
+        decorate(dir.path(), &mut view).unwrap();
+        assert_eq!(view["human_review"]["reviewed"], 1);
+        assert_eq!(view["human_review"]["total"], 2);
+        assert_eq!(view["rows"][0]["status"], "failed");
+        let quality = &view["raw"]["report"]["quality_reviews"]["human"];
+        assert_eq!(quality["refusal_reviewed"], 1);
+        assert_eq!(quality["appropriate_refusal"], 0.0);
+        assert_eq!(quality["groups"][0]["reviewed"], 1);
+        assert!(quality["groups"][1]["pass_rate"].is_null());
+        assert_eq!(quality["groups"][2]["total"], 2);
+        assert_eq!(
+            view["raw"]["report"]["quality_reviews"]["ai"]["correct"],
+            0.5
+        );
     }
 
     #[test]

@@ -253,6 +253,18 @@ textarea:disabled {
   text-align: center;
 }
 
+.developer-menu {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.developer-menu > summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
 .menu-item:hover,
 .menu-item.active {
   background: var(--surface-muted);

@@ -20,6 +20,13 @@ import {
 } from "../lib/evaluation";
 import { ragProviders, type Evidence, type RagProvider } from "../lib/rag";
 import "../evaluation.css";
+import { BenchmarkPanel } from "../components/BenchmarkPanel";
+import {
+  behaviorLabels,
+  kindLabels,
+  splitLabels,
+  type BenchmarkConfig,
+} from "../lib/benchmark";
 
 const suites: {
   id: EvaluationKind;
@@ -37,12 +44,12 @@ const suites: {
     id: "top5",
     title: "RAG Top 5",
     description: "对比原检索与重排后的 5 条原文，检查命中率和排名。",
-    badge: "40 道教材题 · 本地运行",
+    badge: "内置 40 题 / 人工基准 · 本地运行",
   },
   {
     id: "model",
     title: "真实模型",
-    description: "生成 8 道教材题的回答，并执行一次完整复习 Agent。",
+    description: "内置套件含 8 道教材题和复习 Agent；也可选择人工基准问答。",
     badge: "真实 API · 可能产生费用",
   },
 ];
@@ -83,6 +90,10 @@ export function EvaluationScreen() {
   const [providerError, setProviderError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [benchmark, setBenchmark] = useState<BenchmarkConfig>({
+    selection: null,
+    valid: true,
+  });
   const [refresh, setRefresh] = useState(0);
   const actionPending = useRef(false);
   const [reviewDrafts] = useState(() => new Map<string, ReviewDraft>());
@@ -190,9 +201,13 @@ export function EvaluationScreen() {
     }
   }
   function start() {
+    if (kind !== "review" && !benchmark.valid) return;
     void perform(async () => {
       const job = await evaluationStart({
         kind,
+        ...(kind !== "review" && benchmark.selection
+          ? { benchmark: benchmark.selection }
+          : {}),
         ...(kind === "model" && provider
           ? { provider: provider.id, region: provider.region }
           : {}),
@@ -276,6 +291,7 @@ export function EvaluationScreen() {
               </label>
             ))}
           </fieldset>
+          <BenchmarkPanel kind={kind} onChange={setBenchmark} />
           {kind === "model" ? (
             <div className="evaluation-model">
               <label className="evaluation-field">
@@ -308,7 +324,7 @@ export function EvaluationScreen() {
                 </p>
               )}
               <p className="evaluation-note">
-                开始后会将《计算机组成原理》的检索摘录发送至所选模型的官方
+                开始后会将所选评测资料的检索摘录发送至所选模型的官方
                 API，每轮最多 40 次请求，可能产生费用。
               </p>
             </div>
@@ -316,7 +332,7 @@ export function EvaluationScreen() {
             <p className="evaluation-muted">
               {kind === "review"
                 ? "使用固定样例与模拟模型回复，验证真实 Agent 流程。"
-                : "使用已建立索引的《计算机组成原理》和本地重排模型，通常需要几分钟。"}
+                : "使用所选题库对应的已发布 PDF 索引和本地重排模型，通常需要几分钟。"}
             </p>
           )}
           {unavailable && (
@@ -332,6 +348,7 @@ export function EvaluationScreen() {
                 busy ||
                 !!activeJob ||
                 !!unavailable ||
+                (kind !== "review" && !benchmark.valid) ||
                 (kind === "model" && !provider)
               }
               onClick={start}
@@ -552,6 +569,28 @@ function ReportView({
           <option value="passed">通过</option>
         </select>
       </label>
+      {!!report.human_review?.groups?.length && (
+        <div className="evaluation-metrics" aria-label="分类人工评测结果">
+          {report.human_review.groups.map((group) => (
+            <div key={`${group.dimension}/${group.name}`}>
+              <span>
+                {group.dimension === "kind"
+                  ? kindLabels[group.name as keyof typeof kindLabels]
+                  : splitLabels[group.name as keyof typeof splitLabels]}
+              </span>
+              <strong>
+                {group.pass_rate === null
+                  ? "待复核"
+                  : `${(group.pass_rate * 100).toFixed(1)}%`}
+              </strong>
+              <small>
+                全部判断符合 {group.passed} / {group.reviewed} 道 · 已复核{" "}
+                {group.reviewed} / {group.total}
+              </small>
+            </div>
+          ))}
+        </div>
+      )}
       {!rows.length && <p className="evaluation-muted">没有符合条件的结果。</p>}
       <div className="evaluation-cases">
         {rows.map((row) => (
@@ -576,6 +615,7 @@ function ReportView({
                   caseId={row.id}
                   reportHash={report.human_review.report_sha256}
                   annotation={row.human_review.annotation}
+                  expectedBehavior={row.details.evaluation?.expected_behavior}
                   drafts={drafts}
                   onSave={onSave}
                 />
@@ -650,9 +690,47 @@ function CaseDetails({ row }: { row: EvaluationReport["rows"][number] }) {
       )}
       {details.reference_answer && (
         <details>
-          <summary>参考答案（AI 核验，未人工复核）</summary>
+          <summary>
+            {details.evaluation?.label_review?.method === "human"
+              ? "参考答案（人工已核对标注）"
+              : "参考答案（AI 核验，未人工复核）"}
+          </summary>
           <p>{details.reference_answer}</p>
+          {details.evaluation?.label_review?.method === "human" && (
+            <p>
+              标注人：{details.evaluation.label_review.human_reviewer} ·{" "}
+              {details.evaluation.label_review.date}
+            </p>
+          )}
         </details>
+      )}
+      {details.evaluation?.expected_behavior && (
+        <div className="evaluation-note">
+          <p>
+            题型：
+            {kindLabels[details.evaluation.kind as keyof typeof kindLabels] ??
+              details.evaluation.kind}{" "}
+            · 分组：
+            {splitLabels[
+              details.evaluation.split as keyof typeof splitLabels
+            ] ?? details.evaluation.split}
+          </p>
+          <p>
+            预期行为：
+            {
+              behaviorLabels[
+                details.evaluation
+                  .expected_behavior as keyof typeof behaviorLabels
+              ]
+            }
+          </p>
+          <p>验收标准：{details.evaluation.acceptance_criteria}</p>
+          {details.evaluation.reference_evidence?.map((e) => (
+            <blockquote key={e.block_id}>
+              参考证据 · 第 {e.page} 页：{e.quote}
+            </blockquote>
+          ))}
+        </div>
       )}
       {run?.questions.map((question) => (
         <article key={question.id}>

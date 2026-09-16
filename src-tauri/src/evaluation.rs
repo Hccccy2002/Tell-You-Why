@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     fs,
+    io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
@@ -301,6 +302,62 @@ pub(crate) struct Python {
     models: PathBuf,
 }
 impl Python {
+    fn benchmark(
+        &self,
+        root: &Path,
+        output: Option<&Path>,
+        request: &Value,
+    ) -> Result<Value, String> {
+        let mut command = Command::new(&self.executable);
+        crate::pdf_runtime::configure(&mut command, &self.service, &self.data, &self.models);
+        command
+            .args(["-X", "utf8", "-u"])
+            .arg(
+                self.script
+                    .parent()
+                    .ok_or("评测路径无效")?
+                    .join("textbook/benchmark.py"),
+            )
+            .arg("--root")
+            .arg(root)
+            .arg("--data")
+            .arg(&self.data)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(output) = output {
+            command.arg("--out").arg(output);
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        let mut child = command
+            .spawn()
+            .map_err(|e| format!("无法启动题库组件：{e}"))?;
+        let payload = serde_json::to_vec(request).map_err(|e| e.to_string())?;
+        if let Err(error) = child
+            .stdin
+            .take()
+            .ok_or("题库输入不可用")?
+            .write_all(&payload)
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error.to_string());
+        }
+        let output = child.wait_with_output().map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err("题库组件异常退出，请检查本地 Python 环境".into());
+        }
+        let reply: Value =
+            serde_json::from_slice(&output.stdout).map_err(|_| "题库组件返回格式错误")?;
+        if reply["ok"] != true {
+            return Err(reply["error"].as_str().unwrap_or("题库操作失败").into());
+        }
+        Ok(reply["result"].clone())
+    }
     pub(crate) fn discover() -> Result<Self, String> {
         let paths = crate::pdf_runtime::Layout::discover()?;
         let script = paths.evals.join("panel.py");
@@ -345,6 +402,13 @@ impl Python {
         }
         let mut child = command.spawn().map_err(|e| format!("无法启动评测：{e}"))?;
         let progress = control.dir.join("progress.json");
+        let preparing_total = if control.dir.join("selection.json").exists() {
+            read_json(&control.dir.join("selection.json"))?["case_ids"]
+                .as_array()
+                .map_or(9, Vec::len)
+        } else {
+            9
+        };
         let mut last = Value::Null;
         loop {
             if cancellable && control.check().is_err() {
@@ -365,7 +429,7 @@ impl Python {
                         };
                         if let Err(error) = control.progress(
                             if preparing { 0 } else { done },
-                            if preparing { 9 } else { total },
+                            if preparing { preparing_total } else { total },
                             &message,
                         ) {
                             let _ = child.kill();
@@ -408,6 +472,76 @@ pub struct StartEvaluation {
     pub kind: Suite,
     pub provider: Option<String>,
     pub region: Option<String>,
+    #[serde(default)]
+    pub benchmark: Option<Value>,
+}
+
+#[tauri::command]
+pub async fn evaluation_benchmark(
+    request: Value,
+    state: State<'_, EvaluationState>,
+) -> Result<Value, String> {
+    if !matches!(
+        request["action"].as_str(),
+        Some("read" | "save" | "freeze" | "source-page" | "bind-source")
+    ) {
+        return Err("无效的题库操作".into());
+    }
+    if request.to_string().len() > 500_000 {
+        return Err("题库请求过大".into());
+    }
+    let manager = state.manager()?.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = manager.registry.lock().map_err(|e| e.to_string())?;
+        Python::discover()?.benchmark(&manager.root.join("benchmark"), None, &request)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn evaluation_benchmark_export(
+    release: String,
+    app: tauri::AppHandle,
+    state: State<'_, EvaluationState>,
+) -> Result<Option<String>, String> {
+    let manager = state.manager()?.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let dataset = {
+            let _guard = manager.registry.lock().map_err(|e| e.to_string())?;
+            Python::discover()?.benchmark(
+                &manager.root.join("benchmark"),
+                None,
+                &json!({"action":"export","release":release}),
+            )?
+        };
+        let mut dialog = app
+            .dialog()
+            .file()
+            .set_title("导出封存评测题库")
+            .add_filter("JSON", &["json"])
+            .set_file_name(format!(
+                "{}.json",
+                dataset["dataset_version"]
+                    .as_str()
+                    .unwrap_or("human-benchmark")
+            ));
+        if let Some(window) = app.get_webview_window("main") {
+            dialog = dialog.set_parent(&window);
+        }
+        let Some(selected) = dialog.blocking_save_file() else {
+            return Ok(None);
+        };
+        let path = selected.into_path().map_err(|_| "请选择本地文件路径")?;
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&dataset).map_err(|e| e.to_string())?,
+        )
+        .map_err(|_| "无法保存题库，请检查目录权限")?;
+        Ok(Some(path.to_string_lossy().to_string()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -437,6 +571,9 @@ pub fn evaluation_start(
     state: State<'_, EvaluationState>,
     app_state: State<'_, AppState>,
 ) -> Result<Job, String> {
+    if request.kind == Suite::Review && request.benchmark.is_some() {
+        return Err("Agent 流程使用受控场景，不使用人工题库".into());
+    }
     let python = Python::discover()?;
     let profile: Option<ProviderProfileRecord> = if request.kind == Suite::Model {
         let _permit = app_state.persistence_gate.try_operation()?;
@@ -467,6 +604,24 @@ pub fn evaluation_start(
     tauri::async_runtime::spawn(async move {
         let result = tauri::async_runtime::spawn_blocking(move || {
             tauri::async_runtime::block_on(async {
+                if let Some(mut selection) = request.benchmark {
+                    if !selection.is_object() {
+                        return Err("无效的题库选择".into());
+                    }
+                    selection["action"] = json!("prepare");
+                    selection["kind"] = json!(request.kind);
+                    control.check()?;
+                    let prepared = {
+                        let _guard = control.manager.registry.lock().map_err(|e| e.to_string())?;
+                        python.benchmark(
+                            &control.manager.root.join("benchmark"),
+                            Some(&control.dir),
+                            &selection,
+                        )?
+                    };
+                    let count = prepared["case_ids"].as_array().ok_or("缺少评测题目")?.len();
+                    control.progress(0, count, "已绑定封存题库，正在准备评测…")?;
+                }
                 match request.kind {
                     Suite::Review => {
                         let result = crate::review_eval::evaluate_desktop(&control).await;
@@ -477,7 +632,15 @@ pub fn evaluation_start(
                     }
                     Suite::Top5 => {
                         python.run("top5", &control, true)?;
-                        control.progress(40, 40, "评测完成")
+                        let count = if control.dir.join("selection.json").exists() {
+                            read_json(&control.dir.join("selection.json"))?["case_ids"]
+                                .as_array()
+                                .ok_or("缺少评测题目")?
+                                .len()
+                        } else {
+                            40
+                        };
+                        control.progress(count, count, "评测完成")
                     }
                     Suite::Model => {
                         python.run("prepare-model", &control, true)?;
@@ -536,6 +699,134 @@ pub async fn evaluation_export(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "local indexed PDF and Python runtime; isolated synthetic labels, no model API"]
+    fn desktop_benchmark_snapshot_smoke() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = Arc::new(EvaluationManager::open(dir.path().to_path_buf()).unwrap());
+        let root = dir.path().join("benchmark");
+        let python = Python::discover().unwrap();
+        let document = python
+            .benchmark(&root, None, &json!({"action":"read"}))
+            .unwrap();
+        assert_eq!(document["dataset"]["cases"].as_array().unwrap().len(), 40);
+        let kb = document["sources"][0]["kb"]
+            .as_str()
+            .expect("需要至少一份已发布的本地 PDF");
+        let bound = python
+            .benchmark(
+                &root,
+                None,
+                &json!({"action":"bind-source","revision":0,"kb":kb}),
+            )
+            .unwrap();
+        let page = python
+            .benchmark(&root, None, &json!({"action":"source-page","page":1}))
+            .unwrap();
+        let evidence = page["blocks"][0].clone();
+        assert!(evidence.is_object());
+        let quote = evidence["quote"].as_str().unwrap();
+        let case = json!({"id":"smoke_case","question":format!("请解释：{}",quote.chars().take(100).collect::<String>()),
+            "reference_answer":quote,"acceptance_criteria":"自动化测试，不构成质量判断", "split":"regression", "kind":"single", "expected_behavior":"answer", "evidence":[evidence],
+            "review":{"human_reviewer":"自动化联调样例，非真实人工评审","notes":"仅验证封存和快照，不构成事实质量结论"}});
+        let saved = python
+            .benchmark(
+                &root,
+                None,
+                &json!({"action":"save","revision":bound["revision"],"case":case,"confirm_human":true}),
+            )
+            .unwrap();
+        let frozen = python
+            .benchmark(
+                &root,
+                None,
+                &json!({"action":"freeze","revision":saved["revision"]}),
+            )
+            .unwrap();
+        let release = &frozen["releases"][0]["id"];
+        let (job, control) = manager.create(Suite::Top5, None).unwrap();
+        let selection = python
+            .benchmark(
+                &root,
+                Some(&control.dir),
+                &json!({"action":"prepare","release":release,"split":"regression","kind":"top5"}),
+            )
+            .unwrap();
+        assert_eq!(selection["case_ids"], json!([case["id"]]));
+        assert_eq!(
+            read_json(&control.dir.join("dataset.json")).unwrap()["cases"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        let export = python
+            .benchmark(&root, None, &json!({"action":"export","release":release}))
+            .unwrap();
+        assert_eq!(
+            export,
+            read_json(&control.dir.join("dataset.json")).unwrap()
+        );
+        python.run("top5", &control, true).unwrap();
+        manager.finish(&job.id, Ok(())).unwrap();
+        let document = manager.document(&job.id).unwrap();
+        assert_eq!(document["report"]["rows"].as_array().unwrap().len(), 1);
+        assert_eq!(document["report"]["benchmark"]["release"], *release);
+        assert_eq!(document["report"]["raw"]["human_reviewed"], 1);
+        assert_eq!(document["job"]["total"], 1);
+
+        // Real local evidence preparation, then a synthetic answer: never send an API request.
+        let (model_job, model_control) = manager.create(Suite::Model, None).unwrap();
+        python
+            .benchmark(
+                &root,
+                Some(&model_control.dir),
+                &json!({"action":"prepare","release":release,"split":"regression","kind":"model"}),
+            )
+            .unwrap();
+        python.run("prepare-model", &model_control, true).unwrap();
+        let retrieval_path = model_control.dir.join("retrieval.json");
+        let retrieval = read_json(&retrieval_path).unwrap();
+        use sha2::{Digest, Sha256};
+        write_json(&model_control.dir.join("runs.json"), &json!({
+            "binding":{"dataset_sha256":retrieval["dataset_sha256"],"input_sha256":format!("{:x}", Sha256::digest(fs::read(&retrieval_path).unwrap())),"ids":["smoke_case"]},
+            "cases":[{"id":"smoke_case","state":"completed","draft":{"status":"insufficient","reason":"自动化测试输出，非真实模型回答"}}],"agent":null
+        })).unwrap();
+        write_json(&model_control.dir.join("requests.json"), &json!([])).unwrap();
+        python.run("score-model", &model_control, false).unwrap();
+        manager.finish(&model_job.id, Ok(())).unwrap();
+        let model_doc = manager.document(&model_job.id).unwrap();
+        assert_eq!(
+            model_doc["report"]["rows"][0]["details"]["evaluation"]["expected_behavior"],
+            "answer"
+        );
+        assert_eq!(model_doc["report"]["human_review"]["reviewed"], 0);
+        let reviewed = manager
+            .save_review(crate::evaluation_review::SaveReview {
+                id: model_job.id,
+                case_id: "smoke_case".into(),
+                report_sha256: model_doc["report"]["human_review"]["report_sha256"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
+                expected_revision: 0,
+                review: crate::evaluation_review::ReviewInput {
+                    reviewer: "自动化联调样例，非真实人工评审".into(),
+                    correct: Some(false),
+                    complete: Some(false),
+                    grounded: Some(false),
+                    behavior_appropriate: Some(false),
+                    notes: "测试误拒答计分与导出，不构成质量结论".into(),
+                },
+            })
+            .unwrap();
+        assert_eq!(reviewed["report"]["human_review"]["reviewed"], 1);
+        assert_eq!(reviewed["report"]["rows"][0]["status"], "failed");
+        assert_eq!(
+            reviewed["report"]["raw"]["report"]["quality_reviews"]["human"]["behavior_appropriate"],
+            0.0
+        );
+    }
     #[test]
     fn human_reviews_survive_restart_and_export_without_changing_execution() {
         let dir = tempfile::tempdir().unwrap();
@@ -641,6 +932,7 @@ mod tests {
                 correct: Some(false),
                 complete,
                 grounded: Some(true),
+                behavior_appropriate: None,
                 notes: "仅验证保存与统计流程，不构成对真实回答的人工评价。".into(),
             },
         };

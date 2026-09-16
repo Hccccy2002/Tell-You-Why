@@ -8,6 +8,7 @@ export type AppView =
   | "library"
   | "settings"
   | "knowledge-base"
+  | "study"
   | "evaluation";
 
 interface Props {
@@ -24,7 +25,6 @@ const menuItems: Array<[AppView, string, string]> = [
   ["models", "模型设置", "◎"],
   ["library", "收藏与历史", "☆"],
   ["knowledge-base", "PDF 知识库", "▤"],
-  ["evaluation", "质量评测", "▥"],
   ["settings", "通用设置", "⚙"],
 ];
 
@@ -105,6 +105,21 @@ export function AppHeader({
                 {label}
               </button>
             ))}
+            <details
+              className="developer-menu"
+              open={view === "evaluation" ? true : undefined}
+            >
+              <summary>开发者工具</summary>
+              <button
+                className={
+                  view === "evaluation" ? "menu-item active" : "menu-item"
+                }
+                disabled={navigationLocked}
+                onClick={() => onNavigate("evaluation")}
+              >
+                <span aria-hidden="true">▥</span>质量评测
+              </button>
+            </details>
           </nav>
         </div>
       ) : null}

@@ -24,6 +24,11 @@ def review_template(dataset, runs):
                 "correct": None,
                 "complete": None,
                 "grounded": None,
+                **(
+                    {"behavior_appropriate": None}
+                    if dataset.get("schema_version") == 2
+                    else {}
+                ),
                 "notes": "",
             }
             for r in runs["cases"]
@@ -139,6 +144,8 @@ def score(
             method = annotation["method"]
             if method is None:
                 continue
+            if rows[cid]["state"] != "completed":
+                raise ValueError("Cannot review an unfinished or failed generation")
             if (
                 method not in accepted
                 or not annotation["reviewer"]
@@ -155,6 +162,11 @@ def score(
                 and type(annotation["complete"]) is not bool
             ):
                 raise ValueError("Completeness review must be a boolean")
+            if dataset.get("schema_version") == 2 and (
+                type(annotation.get("complete")) is not bool
+                or type(annotation.get("behavior_appropriate")) is not bool
+            ):
+                raise ValueError("Human benchmark requires all four explicit judgments")
             accepted[method].append(annotation)
         for method, reviews in accepted.items():
             if reviews:
@@ -169,6 +181,59 @@ def score(
                     "complete": statistics.mean(completeness) if completeness else None,
                     "complete_reviewed": len(completeness),
                 }
+                if dataset.get("schema_version") == 2:
+                    cases = {c["id"]: c for c in dataset["cases"]}
+                    refusal_reviews = [
+                        r
+                        for r in reviews
+                        if cases[r["id"]]["expected_behavior"] == "refuse"
+                    ]
+                    groups = []
+                    eligible = [r["id"] for r in completed]
+                    for field in ("kind", "split"):
+                        for name in sorted({cases[cid][field] for cid in eligible}):
+                            members = [
+                                r for r in reviews if cases[r["id"]][field] == name
+                            ]
+                            passed = sum(
+                                all(
+                                    r[key]
+                                    for key in (
+                                        "correct",
+                                        "complete",
+                                        "grounded",
+                                        "behavior_appropriate",
+                                    )
+                                )
+                                for r in members
+                            )
+                            groups.append(
+                                {
+                                    "dimension": field,
+                                    "name": name,
+                                    "reviewed": len(members),
+                                    "total": sum(
+                                        cases[cid][field] == name for cid in eligible
+                                    ),
+                                    "passed": passed,
+                                    "pass_rate": passed / len(members)
+                                    if members
+                                    else None,
+                                }
+                            )
+                    result["quality_reviews"][method].update(
+                        behavior_reviewed=len(reviews),
+                        behavior_appropriate=statistics.mean(
+                            r["behavior_appropriate"] for r in reviews
+                        ),
+                        refusal_reviewed=len(refusal_reviews),
+                        appropriate_refusal=statistics.mean(
+                            r["behavior_appropriate"] for r in refusal_reviews
+                        )
+                        if refusal_reviews
+                        else None,
+                        groups=groups,
+                    )
     return result
 
 

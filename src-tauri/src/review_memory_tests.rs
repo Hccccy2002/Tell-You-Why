@@ -186,7 +186,7 @@ fn migration_backfills_actual_answers_once_and_ignores_unanswered_questions() {
                 rusqlite::params![serde_json::to_string(&run).unwrap(), id],
             )
             .unwrap();
-        state.database.connect().unwrap().execute_batch("DROP TABLE review_memory_events;DROP TABLE review_memory;DELETE FROM schema_migrations WHERE version=10;").unwrap();
+        state.database.connect().unwrap().execute_batch("DROP TABLE review_memory_events;DROP TABLE review_memory;DROP TABLE study_doubts;DROP TABLE study_highlights;DROP TABLE study_memory;DROP TABLE study_sessions;DELETE FROM schema_migrations WHERE version>=10;").unwrap();
         state.database.initialize().unwrap();
         state.database.initialize().unwrap();
         let memory = overview(&state, &run, Utc::now().timestamp() + 3600);

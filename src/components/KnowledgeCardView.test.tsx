@@ -102,6 +102,38 @@ describe("KnowledgeCardView", () => {
     baseHandlers.onLoadFollowUps.mockReset().mockResolvedValue([]);
   });
 
+  it("starts study with the displayed card rather than a previously displayed card", async () => {
+    const user = userEvent.setup();
+    const start = vi.fn();
+    const props = {
+      availableCardCount: 12,
+      busy: false,
+      canGoPrevious: false,
+      ...baseHandlers,
+      onStartStudy: start,
+    };
+    const view = render(
+      <KnowledgeCardView key="first" card={fallbackCards[0]!} {...props} />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "我想好了，揭晓答案" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /围绕这张卡学一会儿/ }),
+    );
+    expect(start).toHaveBeenLastCalledWith(fallbackCards[0], false);
+    view.rerender(
+      <KnowledgeCardView key="second" card={fallbackCards[1]!} {...props} />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "我想好了，揭晓答案" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /围绕这张卡学一会儿/ }),
+    );
+    expect(start).toHaveBeenLastCalledWith(fallbackCards[1], false);
+  });
+
   it("shows the new main actions, then replaces them with answer actions", async () => {
     const user = userEvent.setup();
     render(

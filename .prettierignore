@@ -5,6 +5,9 @@ src-tauri/target
 package-lock.json
 Tell You Why - MVP设计方案.md
 rag-service/.venv
+**/.pytest_cache
+**/.ruff_cache
+**/__pycache__
 data
 tmp
 

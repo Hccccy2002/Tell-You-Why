@@ -239,6 +239,8 @@ function MarkdownAnswer({ children }: { children: string }) {
   );
 }
 
+import { CardStudyActivity } from "./CardStudyActivity";
+
 interface Props {
   card: KnowledgeCard;
   availableCardCount: number;
@@ -259,6 +261,10 @@ interface Props {
   onMaster: () => Promise<void>;
   onGenerateSameTopic: () => Promise<void>;
   onGenerateRandomTopic: () => Promise<void>;
+  onStartStudy?: (card: KnowledgeCard, expanded: boolean) => void;
+  onOpenStudy?: (id: string, sourceId?: string) => void;
+  initialRevealed?: boolean;
+  initialExpanded?: boolean;
 }
 
 export function KnowledgeCardView({
@@ -277,9 +283,13 @@ export function KnowledgeCardView({
   onMaster,
   onGenerateSameTopic,
   onGenerateRandomTopic,
+  onStartStudy,
+  onOpenStudy,
+  initialRevealed = false,
+  initialExpanded = false,
 }: Props) {
-  const [revealed, setRevealed] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [revealed, setRevealed] = useState(initialRevealed);
+  const [expanded, setExpanded] = useState(initialExpanded);
   const [followUpDraft, setFollowUpDraft] = useState("");
   const [followUpThread, setFollowUpThread] = useState<FollowUpMessage[]>([]);
   const [loadedFollowUpCardId, setLoadedFollowUpCardId] = useState<
@@ -735,6 +745,26 @@ export function KnowledgeCardView({
                     </button>
                   ))}
                 </section>
+              ) : null}
+              {onStartStudy ? (
+                <button
+                  className="study-entry"
+                  disabled={cardBusy}
+                  onClick={() => onStartStudy(card, expanded)}
+                >
+                  <span>
+                    <strong>围绕这张卡学一会儿</strong>
+                    <small>从这张卡开始，按你的反馈慢慢展开</small>
+                  </span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              ) : null}
+              {onOpenStudy ? (
+                <CardStudyActivity
+                  cardId={card.id}
+                  onOpen={onOpenStudy}
+                  disabled={cardBusy}
+                />
               ) : null}
               <section
                 ref={followUpPanelRef}

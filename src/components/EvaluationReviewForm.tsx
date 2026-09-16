@@ -41,6 +41,7 @@ export function EvaluationReviewForm({
   caseId,
   reportHash,
   annotation,
+  expectedBehavior,
   drafts,
   onSave,
 }: {
@@ -48,9 +49,22 @@ export function EvaluationReviewForm({
   caseId: string;
   reportHash: string;
   annotation: HumanReview | null;
+  expectedBehavior?: string | null;
   drafts: Map<string, ReviewDraft>;
   onSave: (request: SaveHumanReview) => Promise<EvaluationDocument>;
 }) {
+  const fields = expectedBehavior
+    ? [
+        ...judgments,
+        {
+          key: "behavior_appropriate" as const,
+          label: "回答行为是否恰当",
+          hint: "对照本题预期行为判断：该回答时是否回答、该拒答时是否说明不足、错误前提是否得到纠正。",
+          yes: "符合：行为符合本题要求",
+          no: "不符合：误拒答、强答或未纠正前提",
+        },
+      ]
+    : judgments;
   const cacheKey = `${jobId}/${reportHash}/${caseId}`;
   const formId = useId();
   const savedDraft: ReviewDraft = {
@@ -59,6 +73,9 @@ export function EvaluationReviewForm({
       correct: annotation?.correct ?? null,
       complete: annotation?.complete ?? null,
       grounded: annotation?.grounded ?? null,
+      ...(expectedBehavior
+        ? { behavior_appropriate: annotation?.behavior_appropriate ?? null }
+        : {}),
       notes: annotation?.notes ?? "",
     },
     revision: annotation?.revision ?? 0,
@@ -74,7 +91,7 @@ export function EvaluationReviewForm({
   const [notice, setNotice] = useState<string | null>(null);
   const pending = useRef(false);
   const complete =
-    judgments.every(({ key }) => draft.input[key] !== null) &&
+    fields.every(({ key }) => typeof draft.input[key] === "boolean") &&
     !!draft.input.notes.trim();
   function change(patch: Partial<HumanReviewInput>) {
     const next = { ...draft, input: { ...draft.input, ...patch }, dirty: true };
@@ -105,6 +122,9 @@ export function EvaluationReviewForm({
           correct: saved.correct,
           complete: saved.complete,
           grounded: saved.grounded,
+          ...(expectedBehavior
+            ? { behavior_appropriate: saved.behavior_appropriate ?? null }
+            : {}),
           notes: saved.notes,
         },
         revision: saved.revision,
@@ -140,7 +160,7 @@ export function EvaluationReviewForm({
       <fieldset disabled={busy}>
         <legend className="sr-only">复核内容</legend>
         <div className="evaluation-judgments">
-          {judgments.map(({ key, label, hint, yes, no }) => (
+          {fields.map(({ key, label, hint, yes, no }) => (
             <div className="evaluation-field" key={key}>
               <label htmlFor={`${formId}-${key}`}>{label}</label>
               <select
@@ -194,7 +214,7 @@ export function EvaluationReviewForm({
             ? `上次保存：${new Date(annotation.updated_at).toLocaleString()}`
             : "尚未复核。"}
         {!complete &&
-          " 完成三项判断并填写备注后才计入质量分数；也可以先保存草稿。"}
+          ` 完成${expectedBehavior ? "四" : "三"}项判断并填写备注后才计入质量分数；也可以先保存草稿。`}
       </p>
       {error && (
         <p role="alert" className="evaluation-error">

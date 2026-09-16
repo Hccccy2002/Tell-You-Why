@@ -36,6 +36,13 @@ mod review_tests;
 mod review_tools;
 mod review_trace;
 mod secret_store;
+mod study;
+mod study_agent;
+mod study_commands;
+mod study_doubts;
+mod study_store;
+#[cfg(test)]
+mod study_tests;
 #[cfg(test)]
 mod textbook_eval;
 
@@ -90,6 +97,9 @@ pub fn run() {
             database
                 .review_recover()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            database
+                .study_recover()
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
             let http = RestrictedHttpClient::new()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             app.manage(AppState {
@@ -137,12 +147,34 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            study_commands::study_start,
+            study_commands::study_continue,
+            study_commands::study_latest,
+            study_commands::study_home,
+            study_commands::study_start_review,
+            study_commands::study_start_card,
+            study_commands::study_start_card_view,
+            study_commands::study_card_sessions,
+            study_commands::study_save_highlight,
+            study_commands::study_highlights,
+            study_commands::study_remove_highlight,
+            study_commands::study_question_feedback,
+            study_commands::study_start_doubt,
+            study_commands::study_source_card,
+            study_commands::study_ask,
+            study_commands::study_read,
+            study_commands::study_feedback,
+            study_commands::study_pause,
+            study_commands::study_history,
+            study_commands::study_reset,
             evaluation::evaluation_list,
             evaluation::evaluation_start,
             evaluation::evaluation_read,
             evaluation::evaluation_cancel,
             evaluation::evaluation_export,
             evaluation::evaluation_save_review,
+            evaluation::evaluation_benchmark,
+            evaluation::evaluation_benchmark_export,
             knowledge_base::kb_read,
             knowledge_base::kb_import,
             knowledge_base::kb_resume,

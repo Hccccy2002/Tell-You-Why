@@ -1,9 +1,8 @@
 """Compare five displayed source blocks, at equal budget, with the pinned local reranker."""
 
-import os
-
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -16,7 +15,7 @@ from tellwhy_kb.search import SearchIndex
 from tellwhy_kb.util import file_hash
 
 
-def run(dataset, data, progress=None):
+def run(dataset, data, progress=None, case_ids=None):
     folder, manifest, blocks = load_source(dataset, data)
     validation = validate(dataset, blocks)
     model_root = (
@@ -35,10 +34,15 @@ def run(dataset, data, progress=None):
     )
     warmup_ms = (time.perf_counter() - started) * 1000
     records = []
+    cases = [c for c in dataset["cases"] if case_ids is None or c["id"] in case_ids]
+    if not cases or (
+        case_ids is not None and {c["id"] for c in cases} != set(case_ids)
+    ):
+        raise ValueError("Unknown or empty evaluation case IDs")
     with SearchIndex(folder, encoder) as index:
-        for case in dataset["cases"]:
+        for case in cases:
             if progress:
-                progress(len(records) // 2, len(dataset["cases"]), case["id"])
+                progress(len(records) // 2, len(cases), case["id"])
             for mode in ["baseline_top5", "reranked_top5"]:
                 started = time.perf_counter()
                 packet = assemble(
@@ -78,7 +82,7 @@ def run(dataset, data, progress=None):
                 flush=True,
             )
             if progress:
-                progress(len(records) // 2, len(dataset["cases"]), case["id"])
+                progress(len(records) // 2, len(cases), case["id"])
     return {
         "schema_version": 1,
         **validation,

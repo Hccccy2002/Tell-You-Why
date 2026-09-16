@@ -2,6 +2,41 @@
   min-width: 0;
   overflow-x: hidden;
 }
+.benchmark-panel {
+  margin-top: 14px;
+}
+.benchmark-panel section,
+.benchmark-selection {
+  margin-top: 12px;
+}
+.benchmark-editor {
+  min-width: 0;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.benchmark-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.benchmark-checkbox input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  flex: 0 0 16px;
+  margin-top: 3px;
+}
+.benchmark-page-preview {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: 12px;
+}
 .evaluation-content {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -262,7 +297,9 @@
   gap: 0 12px;
 }
 .evaluation-review-form input,
-.evaluation-review-form textarea {
+.evaluation-review-form textarea,
+.benchmark-panel .evaluation-field input,
+.benchmark-panel .evaluation-field textarea {
   width: 100%;
   min-width: 0;
   max-width: 100%;

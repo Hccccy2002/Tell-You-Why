@@ -24,8 +24,10 @@ def normalized(text):
     )
 
 
-def validate(dataset, blocks=None):
-    if dataset.get("schema_version") != 1 or not dataset.get("dataset_version"):
+def validate(dataset, blocks=None, allow_drafts=False):
+    if dataset.get("schema_version") not in {1, 2} or not dataset.get(
+        "dataset_version"
+    ):
         raise ValueError("Unknown dataset schema/version")
     if len(dataset.get("source_sha256", "")) != 64 or not dataset.get(
         "knowledge_version"
@@ -33,13 +35,18 @@ def validate(dataset, blocks=None):
         raise ValueError("Missing source/version pin")
     ids, questions, gaps = set(), set(), []
     for case in dataset["cases"]:
+        draft = (
+            allow_drafts
+            and dataset["schema_version"] == 2
+            and case["review"]["method"] == "unreviewed"
+        )
         cid = case["id"]
         question = normalized(case["question"])
         if cid in ids or not cid or not question or question in questions:
             raise ValueError("Duplicate or empty case")
         ids.add(cid)
         questions.add(question)
-        if case["split"] not in {"development", "validation", "regression"}:
+        if case["split"] not in {"development", "validation", "regression", "holdout"}:
             raise ValueError("Unknown evaluation split")
         if case["kind"] not in {
             "single",
@@ -47,18 +54,40 @@ def validate(dataset, blocks=None):
             "contrast",
             "absent",
             "unsupported_visual",
+            "ocr_error",
+            "false_premise",
         }:
             raise ValueError("Unknown question kind")
-        if not case["reference_answer"].strip():
+        if not draft and not case["reference_answer"].strip():
             raise ValueError("Missing reference answer")
         if case["review"]["method"] == "human" and not case["review"].get(
             "human_reviewer"
         ):
             raise ValueError("Human review requires attribution")
         negative = case["kind"] in {"absent", "unsupported_visual"}
-        if negative == bool(case["evidence"]):
+        if dataset["schema_version"] == 2:
+            if case.get("expected_behavior") not in {
+                "answer",
+                "refuse",
+                "correct_premise",
+            }:
+                raise ValueError("Missing expected answer behavior")
+            if not draft and not case.get("acceptance_criteria", "").strip():
+                raise ValueError("Missing acceptable-answer criteria")
+            if case["review"]["method"] == "human" and (
+                not case["review"].get("date")
+                or not case["review"].get("notes", "").strip()
+            ):
+                raise ValueError("Human labels require date and rationale")
+            if not draft and negative and case["expected_behavior"] != "refuse":
+                raise ValueError("Unanswerable cases must expect refusal")
+            negative = case["expected_behavior"] == "refuse"
+        if not draft and (
+            (not negative and not case["evidence"])
+            or (dataset["schema_version"] == 1 and negative and case["evidence"])
+        ):
             raise ValueError("Evidence labels disagree with question kind")
-        if case["kind"] == "multi" and len(case["evidence"]) < 2:
+        if not draft and case["kind"] == "multi" and len(case["evidence"]) < 2:
             raise ValueError("Multi-source question needs two source blocks")
         seen = set()
         for evidence in case["evidence"]:

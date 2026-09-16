@@ -336,6 +336,40 @@ async function openReview(user: ReturnType<typeof userEvent.setup>) {
   return within(screen.getByRole("form", { name: "人工复核 d01" }));
 }
 
+it("requires a fourth judgment for a human benchmark and shows label provenance", async () => {
+  const value = structuredClone(modelReport);
+  value.rows[0]!.details.evaluation = {
+    kind: "single",
+    split: "regression",
+    expected_behavior: "answer",
+    acceptance_criteria: "覆盖程序和数据",
+    label_review: {
+      method: "human",
+      human_reviewer: "测试标注人",
+      date: "2026-09-16",
+    },
+  };
+  vi.mocked(api.evaluationList).mockResolvedValue({
+    jobs: [modelJob],
+    unavailable_reason: null,
+  });
+  vi.mocked(api.evaluationRead).mockResolvedValue({
+    job: modelJob,
+    report: value,
+  });
+  const user = userEvent.setup();
+  render(<EvaluationScreen />);
+  const form = await openReview(user);
+  expect(screen.getByText("参考答案（人工已核对标注）")).toBeVisible();
+  for (const field of ["事实正确性", "回答完整性", "证据支持情况"])
+    await user.selectOptions(form.getByLabelText(field), "true");
+  await user.type(form.getByLabelText("复核备注"), "测试复核备注");
+  expect(form.getByRole("button", { name: "保存草稿" })).toBeEnabled();
+  expect(form.getByLabelText("回答行为是否恰当")).toHaveValue("");
+  await user.selectOptions(form.getByLabelText("回答行为是否恰当"), "false");
+  expect(form.getByRole("button", { name: "保存复核" })).toBeEnabled();
+});
+
 it("saves a partial draft, restores it after reopening and scores only a completed review", async () => {
   showModelReport();
   const user = userEvent.setup();

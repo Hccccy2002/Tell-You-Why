@@ -22,6 +22,10 @@ describe("AppHeader", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "当前操作正在进行，完成后可切换页面。",
     );
+    const developerTools = screen.getByText("开发者工具").closest("details");
+    expect(developerTools).not.toHaveAttribute("open");
+    await user.click(screen.getByText("开发者工具"));
+    expect(developerTools).toHaveAttribute("open");
     const navigationButtons = [
       "知识小窗",
       "兴趣设置",

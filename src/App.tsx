@@ -3,6 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import { AppHeader, type AppView } from "./components/AppHeader";
 import { KnowledgeCardView } from "./components/KnowledgeCardView";
 import { KnowledgeHome } from "./components/KnowledgeHome";
+import { StudyPanel } from "./components/StudyPanel";
+import type { StudyDueItem, StudyDoubtItem } from "./lib/study";
 import { Onboarding } from "./components/Onboarding";
 import {
   askFollowUp,
@@ -74,6 +76,20 @@ function generationProgressMessage(
 export default function App() {
   const [data, setData] = useState<BootstrapData | null>(null);
   const [view, setView] = useState<AppView>("home");
+  const [studySessionId, setStudySessionId] = useState<string | null>(null);
+  const [studyCardExpanded, setStudyCardExpanded] = useState(false);
+  const [studyFocusSource, setStudyFocusSource] = useState<string | null>(null);
+  const [studyDoubtTarget, setStudyDoubtTarget] =
+    useState<StudyDoubtItem | null>(null);
+  const [returnedCard, setReturnedCard] = useState<{
+    id: string;
+    expanded: boolean;
+  } | null>(null);
+  const [studyCardTarget, setStudyCardTarget] = useState<KnowledgeCard | null>(
+    null,
+  );
+  const [studyReviewTarget, setStudyReviewTarget] =
+    useState<StudyDueItem | null>(null);
   const [homeMode, setHomeMode] = useState<"landing" | "card">("landing");
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -723,8 +739,9 @@ export default function App() {
     }
   }
 
-  function openCard(card: KnowledgeCard) {
+  function openCard(card: KnowledgeCard, reveal = false, expanded = false) {
     if (!data) return;
+    setReturnedCard(reveal ? { id: card.id, expanded } : null);
     if (card.hiddenFromFeed) {
       setDismissedCardIds((ids) => {
         const next = new Set(ids);
@@ -861,6 +878,10 @@ export default function App() {
         <KnowledgeCardView
           key={data.card.id}
           card={data.card}
+          initialRevealed={returnedCard?.id === data.card.id}
+          initialExpanded={
+            returnedCard?.id === data.card.id && returnedCard.expanded
+          }
           availableCardCount={data.availableCardCount}
           busy={busy}
           canGoPrevious={backStack.some(
@@ -879,6 +900,23 @@ export default function App() {
           onMaster={masterCurrent}
           onGenerateSameTopic={generateFromCurrentTopic}
           onGenerateRandomTopic={generateFromRandomTopic}
+          onStartStudy={(card, expanded) => {
+            setStudyDoubtTarget(null);
+            setStudyFocusSource(null);
+            setStudyCardExpanded(expanded);
+            setStudyCardTarget(card);
+            setStudySessionId(null);
+            setStudyReviewTarget(null);
+            navigate("study");
+          }}
+          onOpenStudy={(id, sourceId) => {
+            setStudyDoubtTarget(null);
+            setStudyFocusSource(sourceId ?? null);
+            setStudyCardTarget(null);
+            setStudyReviewTarget(null);
+            setStudySessionId(id);
+            navigate("study");
+          }}
         />
       ) : null}
       {view === "home" && (homeMode === "landing" || !data.card) ? (
@@ -894,6 +932,30 @@ export default function App() {
           onGenerate={generateFromSelectedTopic}
           onGenerateRandom={generateBatchFromRandomTopic}
           onOpenModelSettings={() => navigate("models")}
+          onStartStudy={(id) => {
+            setStudyDoubtTarget(null);
+            setStudyFocusSource(null);
+            setStudyCardTarget(null);
+            setStudySessionId(id ?? null);
+            setStudyReviewTarget(null);
+            navigate("study");
+          }}
+          onReviewStudy={(target) => {
+            setStudyDoubtTarget(null);
+            setStudyFocusSource(null);
+            setStudyCardTarget(null);
+            setStudySessionId(null);
+            setStudyReviewTarget(target);
+            navigate("study");
+          }}
+          onDoubtStudy={(target) => {
+            setStudyDoubtTarget(target);
+            setStudyCardTarget(null);
+            setStudySessionId(null);
+            setStudyReviewTarget(null);
+            setStudyFocusSource(null);
+            navigate("study");
+          }}
           onGenerationProviderChange={selectGenerationProvider}
           onContinueGeneration={async () => {
             if (!pendingGeneration) return;
@@ -916,6 +978,27 @@ export default function App() {
         />
       ) : null}
       {view === "knowledge-base" ? <KnowledgeBaseScreen /> : null}
+      {view === "study" ? (
+        <StudyPanel
+          key={
+            studySessionId ??
+            studyDoubtTarget?.id ??
+            studyReviewTarget?.concept_key ??
+            (studyCardTarget ? `card:${studyCardTarget.id}` : "latest")
+          }
+          cardTarget={studyCardTarget}
+          focusSourceId={studyFocusSource}
+          doubtTarget={studyDoubtTarget}
+          cardExpanded={studyCardExpanded}
+          onOpenCard={(card, expanded) => openCard(card, true, expanded)}
+          sessionId={studySessionId}
+          reviewTarget={studyReviewTarget}
+          topics={data.topics}
+          providers={data.providers}
+          onExit={() => navigate("home")}
+          onModelSettings={() => navigate("models")}
+        />
+      ) : null}
       {view === "evaluation" ? <EvaluationScreen /> : null}
       {view === "interests" ? (
         <InterestSettingsScreen

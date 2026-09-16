@@ -145,3 +145,60 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(result["quality_reviews"]["human"]["correct"], 1)
         self.assertIsNone(result["quality_reviews"]["human"]["complete"])
         self.assertEqual(result["quality_reviews"]["human"]["complete_reviewed"], 0)
+
+    def test_benchmark_refusal_and_groups_use_reviewed_denominators(self):
+        self.dataset["schema_version"] = 2
+        self.dataset["cases"][0].update(
+            kind="absent", split="holdout", expected_behavior="refuse"
+        )
+        self.retrieval["dataset_sha256"] = digest(self.dataset)
+        self.runs["binding"]["dataset_sha256"] = digest(self.dataset)
+        annotations = review_template(self.dataset, self.runs)
+        row = annotations["rows"][0]
+        row.update(
+            method="human",
+            reviewer="测试评审",
+            notes="测试：错误地强行回答",
+            correct=False,
+            complete=True,
+            grounded=False,
+        )
+        with self.assertRaisesRegex(ValueError, "four"):
+            score(self.dataset, self.retrieval, self.runs, annotations=annotations)
+        row["behavior_appropriate"] = False
+        report = score(self.dataset, self.retrieval, self.runs, annotations=annotations)
+        human = report["quality_reviews"]["human"]
+        self.assertEqual(human["refusal_reviewed"], 1)
+        self.assertEqual(human["appropriate_refusal"], 0)
+        self.assertEqual(
+            human["groups"][0],
+            {
+                "dimension": "kind",
+                "name": "absent",
+                "reviewed": 1,
+                "total": 1,
+                "passed": 0,
+                "pass_rate": 0,
+            },
+        )
+        self.assertIsNone(report["quality_reviews"]["ai"])
+        row["method"] = None
+        self.assertIsNone(
+            score(self.dataset, self.retrieval, self.runs, annotations=annotations)[
+                "quality_reviews"
+            ]["human"]
+        )
+
+    def test_failed_generation_cannot_receive_quality_scores(self):
+        self.runs["cases"][0]["state"] = "failed"
+        annotations = review_template(self.dataset, self.runs)
+        annotations["rows"][0].update(
+            method="human",
+            reviewer="test",
+            notes="test",
+            correct=True,
+            complete=True,
+            grounded=True,
+        )
+        with self.assertRaisesRegex(ValueError, "unfinished or failed"):
+            score(self.dataset, self.retrieval, self.runs, annotations=annotations)

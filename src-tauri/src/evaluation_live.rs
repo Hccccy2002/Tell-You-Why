@@ -92,7 +92,25 @@ pub(crate) async fn run(
     if source["source_checked"] != true {
         return Err("教材和索引尚未通过校验".into());
     }
-    let ids = ["d01", "d05", "t10", "t13", "x01", "x04", "n01", "n03"];
+    let selection = if control.dir.join("selection.json").exists() {
+        Some(crate::evaluation::read_json(
+            &control.dir.join("selection.json"),
+        )?)
+    } else {
+        None
+    };
+    let ids: Vec<String> = if let Some(selection) = &selection {
+        serde_json::from_value(selection["case_ids"].clone()).map_err(|_| "题号格式错误")?
+    } else {
+        ["d01", "d05", "t10", "t13", "x01", "x04", "n01", "n03"]
+            .into_iter()
+            .map(String::from)
+            .collect()
+    };
+    if ids.is_empty() || ids.len() > 8 {
+        return Err("真实模型每轮需要 1–8 道题".into());
+    }
+    let total = ids.len() + usize::from(selection.is_none());
     let records = source["records"].as_array().ok_or("缺少教材检索结果")?;
     let selected: Vec<_> = ids
         .iter()
@@ -125,10 +143,11 @@ pub(crate) async fn run(
     for (position, item) in selected.iter().enumerate() {
         control.progress(
             position,
-            9,
+            total,
             &format!(
-                "正在生成第 {} / 8 题（{}）",
+                "正在生成第 {} / {} 题（{}）",
                 position + 1,
+                ids.len(),
                 item["id"].as_str().unwrap_or("")
             ),
         )?;
@@ -168,10 +187,18 @@ pub(crate) async fn run(
             }
         }
         write_json(&path, &report)?;
-        control.progress(position + 1, 9, "已保存本题结果")?;
+        control.progress(position + 1, total, "已保存本题结果")?;
         if transport.halted.load(Ordering::SeqCst) {
             return Err("模型请求失败或达到 40 次上限，本轮已停止；已完成结果已保留。".into());
         }
+    }
+    if selection.is_some() {
+        control.progress(
+            total,
+            total,
+            "人工基准问答已完成；Agent 流程在独立套件中评测",
+        )?;
+        return Ok(());
     }
     control.progress(8, 9, "正在执行真实教材复习 Agent…")?;
     report["agent"] = json!({"state":"started"});

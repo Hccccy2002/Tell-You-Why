@@ -2,6 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { withAutoHideGuard } from "./autoHideGuard";
 import type { Evidence, RagTask } from "./rag";
 import type { ReviewRun, ReviewTrace } from "./reviewAgent";
+import type {
+  BenchmarkSelection,
+  LabelEvidence,
+  LabelReview,
+} from "./benchmark";
 
 export type EvaluationKind = "review" | "top5" | "model";
 export interface EvaluationJob {
@@ -24,6 +29,12 @@ export interface EvaluationJob {
   model: string | null;
 }
 export interface EvaluationReport {
+  benchmark?: {
+    split: string;
+    used_before: number;
+    dataset_version: string;
+    holdout_status: string;
+  };
   title: string;
   dataset: string;
   notes: string[];
@@ -38,6 +49,14 @@ export interface EvaluationReport {
     reviewed?: number;
     total?: number;
     drafts?: number;
+    groups?: {
+      dimension: string;
+      name: string;
+      reviewed: number;
+      total: number;
+      passed: number;
+      pass_rate: number | null;
+    }[];
     error: string | null;
   };
   rows: {
@@ -56,6 +75,14 @@ export interface EvaluationReport {
       after?: { sources: Evidence[] };
       result?: { draft?: RagTask["result"]; error?: string };
       reference_answer?: string;
+      evaluation?: {
+        split?: string;
+        kind?: string;
+        expected_behavior?: string | null;
+        acceptance_criteria?: string;
+        label_review?: LabelReview;
+        reference_evidence?: LabelEvidence[];
+      };
       evidence?: Evidence[];
       run?: ReviewRun;
       trace?: ReviewTrace;
@@ -67,6 +94,7 @@ export interface HumanReviewInput {
   correct: boolean | null;
   complete: boolean | null;
   grounded: boolean | null;
+  behavior_appropriate?: boolean | null;
   notes: string;
 }
 export interface HumanReview extends HumanReviewInput {
@@ -99,6 +127,7 @@ export const evaluationStart = (request: {
   kind: EvaluationKind;
   provider?: string;
   region?: string;
+  benchmark?: BenchmarkSelection;
 }) => invoke<EvaluationJob>("evaluation_start", { request });
 export const evaluationCancel = (id: string) =>
   invoke<void>("evaluation_cancel", { id });

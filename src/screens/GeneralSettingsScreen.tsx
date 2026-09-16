@@ -452,7 +452,8 @@ export function GeneralSettingsScreen({
         退出 Tell You Why
       </button>
       <p className="privacy-footnote">
-        兴趣、历史和反馈默认只保存在本机。不读取屏幕、浏览器记录、工作文件或剪贴板。
+        兴趣、历史和反馈保存在本机。使用 AI
+        功能时，会将相关问题、卡片及启用个性化时的相关学习记录发送给所选模型。不读取屏幕、浏览器记录、工作文件或剪贴板。
       </p>
       {clearConfirmation ? (
         <ConfirmationDialog
