@@ -94,3 +94,5 @@ Debug 模式保留项目 .venv/data 布局，Release 不回退到构建机路径
 复测结果：修复后的 Windows PowerShell 5.1 启动脚本校验已完成的真实 GitHub 下载文件，成功安装到默认的 `%LOCALAPPDATA%/Programs/Tell You Why`。再次运行 `start.cmd -NoLaunch` 仅用 0.44 秒确认已安装版本，没有重新下载或安装；这不是 GUI 启动耗时。安装后实际 EXE 的 `--check-pdf` 返回 `ok=true`、`models_ready=true`，资料列表为空、错误列表为空。结果见 `fresh-source-launcher.json` 和 `default-installed-adapter.json`。
 
 安装后的实际 GUI 已打开“PDF 知识库”，选择 PDF 按钮可用、我的资料为 0，未出现组件缺失错误。截图：`docs/validation/windows-release-0.1.1/installed-pdf-ready.png`。该界面检查没有调用付费模型或导入用户资料。
+
+最终再次从 GitHub 克隆 `v0.1.1`（`3e5636323e256b1f653f135a5b5f6ed0a45fe556`），未修改下载的源码，直接执行 **`start.cmd`**：退出码 0，已安装版 GUI 正常启动。此轮复用了已安装版本，没有重新下载。证据：`final-source-launch.json`。Release 的两个资产已核对服务端 SHA256，仓库仍为私有。
