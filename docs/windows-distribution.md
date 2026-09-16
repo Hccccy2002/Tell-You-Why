@@ -84,3 +84,13 @@ Debug 模式保留项目 .venv/data 布局，Release 不回退到构建机路径
 | 导入内容完整性                 | 部分就绪；需要人工复核，不能标为全文质量通过             | 同上，`partial_ready` / `needs_review` |
 
 上述证据位于 `docs/validation/windows-release-0.1.1/`。没有把开发虚拟环境复制为安装运行时；没有修改 Windows 系统区域设置。
+
+### 在线一键启动的兼容性修正
+
+从私有 GitHub 克隆发布源码并实际运行 `start.cmd -NoLaunch`。首次通过 Git Credential Manager 完成了 1,754,396,463 字节下载，但 Windows PowerShell 5.1 在下载函数返回后无法解析 `Get-FileHash`，因此校验阶段停止，未执行安装。已保留该失败结论，不能把这次尝试标为一键启动成功。
+
+启动脚本改为使用 .NET SHA256 流式计算，不依赖该 PowerShell 函数的模块自动加载。对于已完整下载的 `.partial` 文件，仅在长度和 SHA256 都一致后复用；不完整或不匹配的文件重新下载。修复后的损坏文件测试仍在执行安装前拒绝。安装包无需重建，文件大小与哈希均不变。
+
+复测结果：修复后的 Windows PowerShell 5.1 启动脚本校验已完成的真实 GitHub 下载文件，成功安装到默认的 `%LOCALAPPDATA%/Programs/Tell You Why`。再次运行 `start.cmd -NoLaunch` 仅用 0.44 秒确认已安装版本，没有重新下载或安装；这不是 GUI 启动耗时。安装后实际 EXE 的 `--check-pdf` 返回 `ok=true`、`models_ready=true`，资料列表为空、错误列表为空。结果见 `fresh-source-launcher.json` 和 `default-installed-adapter.json`。
+
+安装后的实际 GUI 已打开“PDF 知识库”，选择 PDF 按钮可用、我的资料为 0，未出现组件缺失错误。截图：`docs/validation/windows-release-0.1.1/installed-pdf-ready.png`。该界面检查没有调用付费模型或导入用户资料。

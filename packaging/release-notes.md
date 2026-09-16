@@ -12,3 +12,5 @@ Windows x64 完整安装包，包含独立 Python 3.12.14、PDF/OCR 依赖、OCR
 安装包未签名，请核对同页 SHA256SUMS.txt。建议预留 10 GB 磁盘空间。安装包不含个人 PDF、知识库或 API Key；本地 PDF 处理可离线运行，AI 功能仍需用户自行配置模型通道。
 
 这是 MVP 预发布版；内置知识卡为演示内容。实测范围和限制见源码中的 `docs/windows-distribution.md`。
+
+一键入口已针对 Windows PowerShell 5.1 完成 SHA256 校验兼容修正。中断后已完整下载的文件在长度及哈希一致时可复用，损坏文件不会执行。

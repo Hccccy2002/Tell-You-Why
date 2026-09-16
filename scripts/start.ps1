@@ -20,6 +20,14 @@ if ($CheckOnly) {
     exit 0
 }
 
+# Avoid depending on Get-FileHash module auto-loading in Windows PowerShell.
+function Get-InstallerSha256([string]$path) {
+    $stream = [IO.File]::OpenRead($path)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-','').ToLowerInvariant() }
+    finally { $algorithm.Dispose(); $stream.Dispose() }
+}
+
 function Get-GitHubToken {
     if ($env:GH_TOKEN) { return $env:GH_TOKEN }
     if ($env:GITHUB_TOKEN) { return $env:GITHUB_TOKEN }
@@ -90,11 +98,16 @@ if (-not $installed) {
     if (-not (Test-Path -LiteralPath $installer)) {
         Write-Host "Downloading the full PDF installer. This may take several minutes..."
         $partial = $installer + '.partial'
-        Download-Installer $partial
-        if ((Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash -ne $manifest.sha256) { throw 'Installer checksum failed; it will not be executed.' }
+        # Recover a fully downloaded file if a prior run stopped before installation.
+        $complete = (Test-Path -LiteralPath $partial) -and
+            (Get-Item -LiteralPath $partial).Length -eq $manifest.size -and
+            (Get-InstallerSha256 $partial) -eq $manifest.sha256
+        if ($complete) { Write-Host 'Reusing the completed, verified download.' }
+        else { Download-Installer $partial }
+        if ((Get-InstallerSha256 $partial) -ne $manifest.sha256) { throw 'Installer checksum failed; it will not be executed.' }
         Move-Item -LiteralPath $partial -Destination $installer -Force
     }
-    if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne $manifest.sha256) { throw 'Installer checksum failed; it will not be executed. Download the release again.' }
+    if ((Get-InstallerSha256 $installer) -ne $manifest.sha256) { throw 'Installer checksum failed; it will not be executed. Download the release again.' }
     # Require a normal exit before updating files in the selected installation.
     if (Get-Process -Name 'tell-you-why' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }) {
         throw 'Tell You Why is running. Exit it from the tray menu, then run start.cmd again.'

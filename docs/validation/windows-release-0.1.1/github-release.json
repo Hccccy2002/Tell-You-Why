@@ -1,0 +1,20 @@
+{
+  "url": "https://github.com/Hccccy2002/Tell-You-Why/releases/tag/v0.1.1",
+  "draft": false,
+  "private": true,
+  "tag": "v0.1.1",
+  "assets": [
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 113,
+      "digest": "sha256:f54f3328f4c66bb25025ffa172fbcab3204236c4b84ca784ce364d0a1aa920ce",
+      "url": "https://github.com/Hccccy2002/Tell-You-Why/releases/download/v0.1.1/SHA256SUMS.txt"
+    },
+    {
+      "name": "Tell-You-Why_0.1.1_windows-x64-full-setup.exe",
+      "size": 1754396463,
+      "digest": "sha256:3752601b786aa59955f528441baa88a71059fdc233cb8c8937697db090c83cd1",
+      "url": "https://github.com/Hccccy2002/Tell-You-Why/releases/download/v0.1.1/Tell-You-Why_0.1.1_windows-x64-full-setup.exe"
+    }
+  ]
+}
