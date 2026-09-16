@@ -14,7 +14,7 @@
 
 切换 APP 页面或关闭到托盘不影响导入；导入进程也可在完全退出 APP 后继续运行。重新打开 APP 可看到进度。如果机器关机或进程意外中断，任务会显示为可继续，成功保存的页面不会丢失。需要停止处理时请先在界面点击暂停。
 
-已完成的《计算机组成原理》自动显示在“我的资料”中。再次选择同一 PDF 会打开已有知识库，不重新 OCR，也不会覆盖已经验收的章节修正。当前界面不提供重新配置已发布资料的重建入口；需要不同处理配置时仍可使用 CLI 创建任务。
+只有本机保留了已发布的知识库数据，资料才会显示在“我的资料”中；源代码和根目录 PDF 文件不会自动成为已导入资料。再次选择同一 PDF 会打开已有知识库，不重新 OCR，也不会覆盖已经验收的章节修正。当前界面不提供重新配置已发布资料的重建入口；需要不同处理配置时仍可使用 CLI 创建任务。
 
 ## 内容状态
 
@@ -44,20 +44,11 @@ React PDF 知识库页面
 
 ## 当前运行环境与分发边界
 
-这次完成的是当前 Windows 项目的完整桌面接入。本机 Python 虚拟环境与 OCR / 向量模型已经配置，用户日常操作无需输入 Python 命令。
+0.1.1 完整安装包包含独立 Python 3.12.14、锁定依赖和五组本地模型，安装后即可选择自己的 PDF；源码开发环境仍按 [README](../README.md#pdf-知识库运行环境) 准备。
 
-Release 程序默认使用构建项目中的 `rag-service/.venv/Scripts/python.exe`、`rag-service/src` 和项目 `data/`。Python 环境、模型及教材知识库尚未打包进 MSI / NSIS 安装包；把单独的 EXE 或现有安装包复制到另一台电脑，不能自动获得 PDF 处理能力。面向其他用户分发时，还需要完成运行环境和模型的安装 / 更新流程。
+安装版从 EXE 同级 `pdf-runtime/` 查找 Python、服务和模型，导入资料与缓存保存在 `%LOCALAPPDATA%/com.tellyouwhy.desktop/pdf-data/`。源码开发版继续使用项目 `rag-service/.venv` 和 `data/`。安装版不会自动迁移开发目录的知识库。不要只复制 EXE 而丢弃资源目录。
 
-开发或部署到不同目录时，可在启动 APP 前设置以下环境变量（不是页面输入项）：
-
-| 变量                  | 用途                | 默认值                                |
-| --------------------- | ------------------- | ------------------------------------- |
-| `TELLWHY_RAG_SERVICE` | Python 服务源码目录 | 构建项目的 `rag-service/`             |
-| `TELLWHY_PYTHON`      | Python 可执行文件   | 服务目录的 `.venv/Scripts/python.exe` |
-| `TELLWHY_KB_DATA`     | 资料与知识库根目录  | 服务目录同级的 `data/`                |
-| `TELLWHY_KB_MODELS`   | 本地模型目录        | 数据根目录的 `models/`                |
-
-若本机组件或模型缺失，界面会提示安装准备，具体步骤见 [Python 模块说明](../rag-service/README.md)。现有通用设置中的知识卡数据清理不删除 PDF 知识库；当前 PDF 界面也不提供删除资料的操作。
+可用环境变量覆盖 `TELLWHY_RAG_SERVICE`、`TELLWHY_PYTHON`、`TELLWHY_KB_DATA`、`TELLWHY_KB_MODELS`、`TELLWHY_EVALS`；正常安装无需设置。PDF 界面尚不提供删除资料，通用知识卡清理不删除 PDF 知识库。
 
 ## 开发验证
 
@@ -70,4 +61,4 @@ rag-service\.venv\Scripts\python.exe -m pytest rag-service/tests -q
 npm.cmd run tauri -- build --no-bundle -- --offline
 ```
 
-Tauri 构建命令会先构建前端并嵌入 Release 程序，使根目录启动脚本打开更新后的界面，无需运行 Vite 开发服务器。
+源码开发使用 `scripts/start-source.ps1`；完整分发构建使用 `scripts/build-windows.ps1`；根目录 `start.cmd` 安装并启动已发布的固定版本。

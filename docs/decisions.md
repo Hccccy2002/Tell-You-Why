@@ -178,3 +178,19 @@
 - 决定：确认框、主菜单、选词查询、文件选择器、原生下拉控件和 Web 内容鼠标按住使用引用计数暂停器统一保护；窗口移动、缩放和 DPI 变化由原生窗口事件延长保护期。普通 AI 生成或追问不暂停自动收起，隐藏后请求继续执行。
 - 决定：第一次自动收起显示一次系统提示，说明可通过当前全局快捷键恢复并可在通用设置关闭。清除全部本地数据后开关和提示状态都恢复默认。
 - 原因：当前窗口带 Windows 原生标题栏和边框，单独依赖 DOM 离开事件会把标题栏误判为窗口外；单独依赖失焦又无法表达“鼠标移出”。原生完整边界、延迟和交互暂停可在保持快速收起的同时降低误触风险。
+
+## D-032 Windows 完整包与可迁移 PDF 运行时（2026-09-16）
+
+- 决定：0.1.1 使用 Inno Setup 7 EXE 完整包，内含独立 CPython 3.12.14、锁定 Python 依赖、固定修订的 OCR / Embedding / Reranker 模型、本地 MSVC DLL 和 WebView2 离线安装组件。依赖与模型许可随资源保留；不复制个人 PDF、知识库、账号或 API Key。
+- 决定：Windows Release 只从 EXE 同级的 `pdf-runtime/` 解析资源，不回退到编译机路径。Debug 保留项目 `.venv`；显式环境变量可覆盖。安装版 PDF 数据和推理缓存位于用户 LOCALAPPDATA，代码和模型目录只需读取。
+- 决定：`start.cmd` 运行源码版本固定的 Release，先校验 SHA256 再安装；源码开发由 `scripts/start-source.ps1` 另行编译。仓库按用户要求保持私有，下载复用 Git / GitHub CLI 登录，或读取用户手动下载的本地安装包。访问令牌只发往 GitHub API，不转发 CDN。
+- 决定：大体积二进制上传 GitHub Release，不进入 Git 历史。`packaging/release.json` 与上传资产绑定；安装包、SHA256、版本源码一起发布。
+- 选择依据：NSIS 在完整资源压缩时发生内存映射失败，因此改用 Inno Setup 7.1.0 x64；失败记录一并保留。
+- 验证与限制：见 [Windows 分发记录](windows-distribution.md)。当前构建未签名，本机验证不能代替干净 Windows 虚拟机兼容性验收。
+- 依据：[Tauri 资源分发](https://v2.tauri.app/develop/resources/)、[Python standalone](https://github.com/astral-sh/python-build-standalone)、[GitHub Release](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)。
+
+## D-033 PDF 原生推理进程的 UTF-8 文件路径（2026-09-16）
+
+- 依据：真实中文安装路径触发 Paddle 原生配置文件读取失败，英文路径通过；路径存在且哈希相同，进程 ACP 为 936。
+- 决定：仅修改随包 Python / pythonw 的应用清单，启用进程 UTF-8 代码页，保留 UAC、长路径和兼容性清单。通过 Windows SDK mt.exe 实现，构建时断言 GetACP() 为 65001；系统要求 Windows 10 1903+。
+- 验证：同一路径修复后真实 OCR、Embedding 和重排通过；最终安装包需重新安装复测后才发布。系统区域设置和用户的全局 Python 不变。

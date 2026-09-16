@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-16",
+  "project": "D:\\Tell-You-Why",
+  "python": "D:\\Tell-You-Why\\rag-service\\.venv\\Scripts\\python.exe",
+  "basePython": "C:\\Users\\test\\miniconda3\\envs\\cjj\\python.exe",
+  "pythonVersion": "3.12.13",
+  "modelsBytes": 1409479304.0,
+  "pythonTests": 69,
+  "pythonTestsPassed": 69,
+  "firstRun": {
+    "errors": 44,
+    "passed": 25,
+    "reason": "Existing system pytest temp folder access denied; rerun with fresh project-local basetemp."
+  },
+  "pdfQuality": "OCR runtime executed and expected text was recognized. The sample page remains needs_review; this is not a textbook quality acceptance.",
+  "gui": "Component and model warnings gone; file picker opens and was cancelled. PDF page inspection verified through the same desktop adapter protocol.",
+  "lockedRequirementsSha256": "55482D33898B328975D7F4B219614230788D1373EBDF80F5A805848317ABA3FA"
+}

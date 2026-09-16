@@ -298,27 +298,20 @@ pub(crate) struct Python {
     service: PathBuf,
     data: PathBuf,
     script: PathBuf,
+    models: PathBuf,
 }
 impl Python {
     pub(crate) fn discover() -> Result<Self, String> {
-        let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let service = std::env::var_os("TELLWHY_RAG_SERVICE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| checkout.join("rag-service"));
-        let executable = std::env::var_os("TELLWHY_PYTHON")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| service.join(".venv/Scripts/python.exe"));
-        let script = checkout.join("evals/panel.py");
-        if !executable.is_file() || !script.is_file() {
-            return Err("评测组件未就绪，请按项目说明安装 Python 环境并保留 evals 目录。".into());
+        let paths = crate::pdf_runtime::Layout::discover()?;
+        let script = paths.evals.join("panel.py");
+        if !script.is_file() {
+            return Err("评测组件缺失，请重新安装完整包。".into());
         }
-        let data = std::env::var_os("TELLWHY_KB_DATA")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| service.parent().unwrap_or(checkout).join("data"));
         Ok(Self {
-            executable,
-            service,
-            data,
+            executable: paths.python,
+            service: paths.service,
+            data: paths.data,
+            models: paths.models,
             script,
         })
     }
@@ -329,6 +322,7 @@ impl Python {
         let log_path = control.dir.join(format!("{action}.log"));
         let log = fs::File::create(&log_path).map_err(|e| e.to_string())?;
         let mut command = Command::new(&self.executable);
+        crate::pdf_runtime::configure(&mut command, &self.service, &self.data, &self.models);
         command
             .args(["-X", "utf8", "-u"])
             .arg(&self.script)

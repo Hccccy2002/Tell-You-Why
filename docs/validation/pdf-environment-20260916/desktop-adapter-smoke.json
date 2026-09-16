@@ -1,0 +1,20 @@
+{
+  "catalog": {
+    "ok": true,
+    "data": {
+      "items": [],
+      "errors": [],
+      "models_ready": true,
+      "import_running": false
+    }
+  },
+  "inspect": {
+    "ok": true,
+    "data": {
+      "filename": "environment-smoke.pdf",
+      "pages": 1,
+      "bytes": 1731,
+      "sha256": "dfaf29b0e216784fc1661f5a9d0c29c85a6fa3b5544a9ed81a2a96fee11adbd1"
+    }
+  }
+}

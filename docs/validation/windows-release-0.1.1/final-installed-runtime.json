@@ -1,0 +1,19 @@
+{
+  "python": "3.12.14 (main, Sep  1 2026, 14:17:39) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "D:\\Tell-You-Why\\tmp\\完整安装 复测\\Tell You Why\\pdf-runtime\\python\\python.exe",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "checks": {
+    "model_hashes": true,
+    "windows_code_page": 65001,
+    "pdf_render": [1190, 1684],
+    "ocr": {
+      "passed": true,
+      "page_status": "success",
+      "blocks": 2,
+      "text": "The CPU processes instructions.\nMemory stores instructions and data."
+    },
+    "embedding": [2, 512],
+    "reranker": [3.5639700889587402, -10.193482398986816]
+  },
+  "ok": true
+}

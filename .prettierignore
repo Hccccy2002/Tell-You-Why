@@ -8,3 +8,7 @@ rag-service/.venv
 data
 tmp
 
+
+src-tauri/pdf-runtime/
+release-artifacts/
+src-tauri/windows-crt/

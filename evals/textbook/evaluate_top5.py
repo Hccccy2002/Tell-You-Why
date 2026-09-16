@@ -1,5 +1,7 @@
 """Compare five displayed source blocks, at equal budget, with the pinned local reranker."""
 
+import os
+
 import argparse
 import json
 import time
@@ -17,7 +19,9 @@ from tellwhy_kb.util import file_hash
 def run(dataset, data, progress=None):
     folder, manifest, blocks = load_source(dataset, data)
     validation = validate(dataset, blocks)
-    model_root = (data / "models/embedding").resolve()
+    model_root = (
+        Path(os.environ.get("TELLWHY_KB_MODELS", data / "models")) / "embedding"
+    ).resolve()
     for relative, expected in manifest["models"]["embedding"]["files"].items():
         resource = (model_root / relative).resolve()
         if not resource.is_relative_to(model_root) or file_hash(resource) != expected:
@@ -25,7 +29,10 @@ def run(dataset, data, progress=None):
     if file_hash(folder / "embeddings.npy") != manifest["files"]["embeddings.npy"]:
         raise ValueError("Embedding index checksum mismatch")
     started = time.perf_counter()
-    encoder, reranker = Encoder(data / "models"), Reranker(data / "models")
+    encoder, reranker = (
+        Encoder(Path(os.environ.get("TELLWHY_KB_MODELS", data / "models"))),
+        Reranker(Path(os.environ.get("TELLWHY_KB_MODELS", data / "models"))),
+    )
     warmup_ms = (time.perf_counter() - started) * 1000
     records = []
     with SearchIndex(folder, encoder) as index:

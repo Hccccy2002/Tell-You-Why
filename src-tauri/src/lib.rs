@@ -16,6 +16,7 @@ mod learning_generation;
 mod learning_live_tests;
 mod learning_store;
 mod models;
+mod pdf_runtime;
 mod persistence_gate;
 mod providers;
 mod rag;
@@ -197,4 +198,29 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("Tell You Why 启动失败");
+}
+
+/// Check the installed PDF adapter and write a diagnostic JSON report.
+pub fn check_pdf(output: &std::path::Path) -> Result<(), String> {
+    let result = (|| {
+        let paths = pdf_runtime::Layout::discover()?;
+        let catalog =
+            knowledge_base::Runtime::discover()?.call(serde_json::json!({"op":"catalog"}))?;
+        if catalog["models_ready"] != true {
+            return Err("本地模型不完整".to_string());
+        }
+        Ok(
+            serde_json::json!({"ok":true,"python":paths.python,"service":paths.service,"data":paths.data,"models":paths.models,"catalog":catalog}),
+        )
+    })();
+    let value = match &result {
+        Ok(v) => v.clone(),
+        Err(e) => serde_json::json!({"ok":false,"error":e}),
+    };
+    std::fs::write(
+        output,
+        serde_json::to_vec_pretty(&value).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    result.map(|_| ())
 }

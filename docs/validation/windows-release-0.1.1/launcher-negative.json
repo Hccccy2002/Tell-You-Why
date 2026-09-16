@@ -1,0 +1,7 @@
+{
+  "powershell": "Windows PowerShell 5.1",
+  "case": "corrupt installer",
+  "exit": 1,
+  "blocked": true,
+  "installationCreated": false
+}

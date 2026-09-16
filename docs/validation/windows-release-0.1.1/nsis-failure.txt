@@ -1,0 +1,12 @@
+    Finished `release` profile [optimized] target(s) in 1m 45s
+       Built application at: D:\Tell-You-Why\src-tauri\target\release\tell-you-why.exe
+        Info Patching D:\Tell-You-Why\src-tauri\target\release\tell-you-why.exe with bundle type information: nsis
+        Info Target: x64
+ Downloading https://go.microsoft.com/fwlink/?linkid=2124701
+     Running makensis to produce D:\Tell-You-Why\src-tauri\target\release\bundle\nsis\Tell You Why_0.1.1_x64-setup.exe
+
+
+Note: you may have one or two (large) stale temporary file(s) left in your temporary directory (Generally this only happens on Windows 9x).
+Internal compiler error #12345: error mmapping datablock to 2735420.
+failed to bundle project: `Failed to bundle app with makensis`
+       Error failed to bundle project: `Failed to bundle app with makensis`

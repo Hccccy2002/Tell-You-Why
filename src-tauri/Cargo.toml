@@ -1,6 +1,6 @@
 [package]
 name = "tell-you-why"
-version = "0.1.0"
+version = "0.1.1"
 description = "工作电脑上的安静知识小窗"
 authors = ["Tell You Why contributors"]
 edition = "2021"

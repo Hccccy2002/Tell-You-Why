@@ -6,7 +6,7 @@
 
 ## 已验证环境
 
-- Windows x64、Python 3.12.14，CPU 推理。
+- Windows x64、CPU 推理。原开发验收为 Python 3.12.14；2026-09-16 本机独立环境采用 Python 3.12.13。模块要求 Python >=3.11,<3.13，不能使用默认的 Python 3.14。
 - PaddleOCR 3.7.0、PaddleX 3.7.2、PaddlePaddle **3.0.0**。
 - Sentence Transformers 6.0.1、PyTorch 2.14.0。
 - pypdf / PDFium、SQLite FTS5 / jieba、NumPy。
@@ -16,7 +16,7 @@
 
 ## 安装与模型准备
 
-以下命令均在项目根目录 `D:\Tell-You-Why` 执行。已经配置好的环境可直接使用第三段命令。
+以下命令均在项目根目录 `D:\Tell-You-Why` 执行。完整的 Python / Conda 安装分支、依赖检查和错误排查见 [根目录 README](../README.md#pdf-知识库运行环境)。已有环境先执行 `python.exe --version` 和 `python.exe -m pip check`；依赖安装完成后仍需准备并验证模型。
 
 ```powershell
 py -3.12 -m venv rag-service\.venv

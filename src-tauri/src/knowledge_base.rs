@@ -1,7 +1,9 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -41,13 +43,7 @@ impl Runtime {
             &self.python,
             "import runpy\nrunpy.run_module('tellwhy_kb.desktop', run_name='__main__')",
         );
-        command
-            .current_dir(&self.service)
-            .env("PYTHONPATH", self.service.join("src"))
-            .env("PYTHONUTF8", "1")
-            .env("HF_HUB_OFFLINE", "1")
-            .env("TRANSFORMERS_OFFLINE", "1")
-            .env("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True");
+        crate::pdf_runtime::configure(&mut command, &self.service, &self.data, &self.models);
         let output = process::execute(command, self.payload(request), control.clone()).await?;
         control.check()?;
         if !output.status.success() {
@@ -64,42 +60,20 @@ impl Runtime {
         })
     }
     pub(crate) fn discover() -> Result<Self, String> {
-        let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let service = std::env::var_os("TELLWHY_RAG_SERVICE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| checkout.join("rag-service"));
-        let python = std::env::var_os("TELLWHY_PYTHON")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| service.join(".venv/Scripts/python.exe"));
-        if !python.is_file() || !service.join("src/tellwhy_kb/desktop.py").is_file() {
-            return Err(
-                "本机 PDF 处理组件未就绪。请按项目 README 安装 Python 运行环境后重试。".into(),
-            );
-        }
-        let data = std::env::var_os("TELLWHY_KB_DATA")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| service.parent().unwrap_or(checkout).join("data"));
-        let models = std::env::var_os("TELLWHY_KB_MODELS")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| data.join("models"));
+        let paths = crate::pdf_runtime::Layout::discover()?;
         Ok(Self {
-            service,
-            python,
-            data,
-            models,
+            service: paths.service,
+            python: paths.python,
+            data: paths.data,
+            models: paths.models,
         })
     }
 
     fn command(&self) -> Command {
         let mut command = Command::new(&self.python);
+        crate::pdf_runtime::configure(&mut command, &self.service, &self.data, &self.models);
         command
             .args(["-X", "utf8", "-u", "-m", "tellwhy_kb.desktop"])
-            .current_dir(&self.service)
-            .env("PYTHONPATH", self.service.join("src"))
-            .env("PYTHONUTF8", "1")
-            .env("HF_HUB_OFFLINE", "1")
-            .env("TRANSFORMERS_OFFLINE", "1")
-            .env("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
             .stdin(Stdio::piped());
         #[cfg(windows)]
         {

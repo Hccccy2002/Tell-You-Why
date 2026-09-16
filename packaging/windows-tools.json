@@ -1,0 +1,11 @@
+{
+  "inno": {
+    "version": "7.1.0",
+    "url": "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe",
+    "sha256": "0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f"
+  },
+  "webview2": {
+    "url": "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/5bdafa0b-8f06-4cab-b664-252bfeca6c75/MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+    "sha256": "ebebc5ec130378ff1ab513f3917be791a9cf84f849e970b1695ff01801a9d348"
+  }
+}

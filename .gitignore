@@ -26,3 +26,9 @@ rag-service/**/*.egg-info/
 data/models/
 data/knowledge-bases/
 tmp/
+
+# Generated Windows distribution resources
+src-tauri/pdf-runtime/
+release-artifacts/
+src-tauri/windows-crt/
+/Tell-You-Why_*_windows-x64-full-setup.exe

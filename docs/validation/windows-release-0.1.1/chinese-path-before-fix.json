@@ -1,0 +1,11 @@
+{
+  "python": "3.12.14 (main, Sep  1 2026, 14:17:39) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "D:\\Tell-You-Why\\tmp\\安装 验证\\Tell You Why\\pdf-runtime\\python\\python.exe",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "checks": {
+    "model_hashes": true,
+    "pdf_render": [1190, 1684]
+  },
+  "ok": false,
+  "error": "RuntimeError('(NotFound) Cannot open file D:\\\\Tell-You-Why\\\\tmp\\\\安装 验证\\\\Tell You Why\\\\pdf-runtime\\\\models\\\\det\\\\inference.json, please confirm whether the file is normal.\\n  [Hint: Expected paddle::inference::IsFileExists(prog_file_) == true, but received paddle::inference::IsFileExists(prog_file_):0 != true:1.] (at ..\\\\paddle\\\\fluid\\\\inference\\\\api\\\\analysis_config.cc:117)\\n')"
+}

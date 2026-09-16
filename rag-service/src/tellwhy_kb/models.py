@@ -23,7 +23,8 @@ PINNED_REVISIONS = {
 
 
 def local_environment(root: Path) -> None:
-    # All model caches stay in the user-selected data directory.
+    # Bundled weights can be read-only; runtime caches belong to the current user.
+    root = Path(os.environ.get("TELLWHY_MODEL_CACHE", root))
     os.environ["PADDLE_PDX_CACHE_HOME"] = str(root / "paddlex-cache")
     os.environ["HF_HOME"] = str(root / "hf-cache")
     os.environ["HF_HUB_DISABLE_XET"] = "1"

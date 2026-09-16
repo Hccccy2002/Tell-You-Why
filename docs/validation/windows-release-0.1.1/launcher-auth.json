@@ -1,0 +1,6 @@
+{
+  "powershell": "5.1.26100.9444",
+  "credentialSource": "existing GitHub login",
+  "httpStatus": 200,
+  "private": true
+}

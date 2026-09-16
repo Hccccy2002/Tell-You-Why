@@ -1,5 +1,7 @@
 """Offline evaluation against the published PDF index, with no model API calls."""
 
+import os
+
 import argparse
 import hashlib
 import json
@@ -18,11 +20,16 @@ def run(dataset, data, splits, modes, progress=None, case_ids=None):
     folder, manifest, blocks = load_source(dataset, data)
     validation = validate(dataset, blocks)
     models = json.loads(
-        (data / "models/model-manifest.json").read_text(encoding="utf-8")
+        (
+            Path(os.environ.get("TELLWHY_KB_MODELS", data / "models"))
+            / "model-manifest.json"
+        ).read_text(encoding="utf-8")
     )
     if models["embedding"] != manifest["models"]["embedding"]:
         raise ValueError("Query embedding model differs from the published index")
-    embedding_root = (data / "models/embedding").resolve()
+    embedding_root = (
+        Path(os.environ.get("TELLWHY_KB_MODELS", data / "models")) / "embedding"
+    ).resolve()
     for relative, expected in models["embedding"]["files"].items():
         path = (embedding_root / relative).resolve()
         if (
@@ -36,7 +43,11 @@ def run(dataset, data, splits, modes, progress=None, case_ids=None):
     ):
         raise ValueError("Embedding index checksum mismatch")
     started = time.perf_counter()
-    encoder = Encoder(data / "models") if set(modes) != {"keyword"} else None
+    encoder = (
+        Encoder(Path(os.environ.get("TELLWHY_KB_MODELS", data / "models")))
+        if set(modes) != {"keyword"}
+        else None
+    )
     warmup_ms = (time.perf_counter() - started) * 1000
     records = []
     cases = [
@@ -79,7 +90,10 @@ def run(dataset, data, splits, modes, progress=None, case_ids=None):
         "source_sha256": dataset["source_sha256"],
         "embedding_index_sha256": manifest["files"]["embeddings.npy"],
         "embedding_model_manifest_sha256": hashlib.sha256(
-            (data / "models/model-manifest.json").read_bytes()
+            (
+                Path(os.environ.get("TELLWHY_KB_MODELS", data / "models"))
+                / "model-manifest.json"
+            ).read_bytes()
         ).hexdigest(),
         "warmup_ms": warmup_ms,
         "metrics": summarize(records),

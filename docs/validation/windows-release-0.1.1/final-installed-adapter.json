@@ -1,0 +1,13 @@
+{
+  "catalog": {
+    "errors": [],
+    "import_running": false,
+    "items": [],
+    "models_ready": true
+  },
+  "data": "C:\\Users\\test\\AppData\\Local\\com.tellyouwhy.desktop/pdf-data",
+  "models": "D:\\Tell-You-Why\\tmp\\完整安装 复测\\Tell You Why\\pdf-runtime\\models",
+  "ok": true,
+  "python": "D:\\Tell-You-Why\\tmp\\完整安装 复测\\Tell You Why\\pdf-runtime\\python/python.exe",
+  "service": "D:\\Tell-You-Why\\tmp\\完整安装 复测\\Tell You Why\\pdf-runtime\\rag-service"
+}
