@@ -3,7 +3,32 @@ import { withAutoHideGuard } from "./autoHideGuard";
 import type { KnowledgeCard } from "../types";
 
 export type StudyFeedback =
-  "continue" | "confused" | "easy" | "example" | "skip" | "answer";
+  | "continue"
+  | "understood"
+  | "confused"
+  | "easy"
+  | "example"
+  | "skip"
+  | "answer";
+export interface StudyGoalPlan {
+  objectives: {
+    id: string;
+    title: string;
+    criterion: string;
+    taught: boolean;
+    self_reported_understood: boolean;
+    needs_help: boolean;
+    verified: boolean;
+    correct: boolean | null;
+    lesson_step_ids: string[];
+  }[];
+  checkin_prompt: string;
+  checkin_reply: string | null;
+  remediation_used: boolean;
+  verification_status:
+    "not_offered" | "awaiting_answer" | "submitted" | "skipped";
+  finished: boolean;
+}
 export interface StudyStep {
   id: string;
   kind: "concept" | "prerequisite" | "example" | "deeper" | "quiz";
@@ -21,6 +46,10 @@ export interface StudyStep {
   } | null;
 }
 export interface StudySession {
+  goal_mode?: boolean;
+  goal_plan?: StudyGoalPlan | null;
+  can_finish_goal?: boolean;
+  can_reopen_goal?: boolean;
   id: string;
   goal: string;
   topic: string;
@@ -36,7 +65,7 @@ export interface StudySession {
   review_target: { concept_key: string; title: string } | null;
   source_card: { card_id: string; title: string } | null;
   source_expanded?: boolean;
-  doubt_target?: { id: string; question: string } | null;
+  doubt_target?: { id: string; question: string; reason?: string } | null;
   questions: StudyQuestion[];
   can_ask: boolean;
   question_limit: number;
@@ -49,6 +78,8 @@ export interface StudyQuestion {
   created_at: string;
   feedback?: "understood" | "unresolved" | null;
   doubt_id?: string | null;
+  reply_to_question_id?: string | null;
+  clarification_replies?: { prompt: string; reply: string }[];
   answer: {
     kind: "explanation" | "comparison" | "example" | "clarification";
     text: string;
@@ -56,6 +87,9 @@ export interface StudyQuestion {
   } | null;
 }
 export interface StudyClient {
+  startGoal: (goal: string) => Promise<StudySession>;
+  goalCheckin: (id: string, reply: string) => Promise<StudySession>;
+  reopenGoal: (id: string) => Promise<StudySession>;
   questionFeedback: (
     id: string,
     questionId: string,
@@ -86,6 +120,7 @@ export interface StudyClient {
     stepId: string,
     question: string,
     requestId: string,
+    replyToQuestionId?: string,
   ) => Promise<StudySession>;
   read: (id: string) => Promise<StudySession>;
   continue: (id: string) => Promise<StudySession>;
@@ -98,6 +133,7 @@ export interface StudyClient {
   pause: (id: string, finish: boolean) => Promise<StudySession>;
 }
 export interface StudyHomeData {
+  goals?: { id: string; title: string }[];
   doubts?: StudyDoubtItem[];
   due: StudyDueItem[];
   due_count: number;
@@ -119,6 +155,7 @@ export interface StudyDoubtItem {
   question: string;
   topic: string;
   session_id: string;
+  reason?: string;
 }
 export interface StudyDueItem {
   concept_key: string;
@@ -145,6 +182,9 @@ export interface StudyHighlight {
   created_at: string;
 }
 export const studyClient: StudyClient = {
+  startGoal: (goal) => invoke("study_start_goal", { goal }),
+  goalCheckin: (id, reply) => invoke("study_goal_checkin", { id, reply }),
+  reopenGoal: (id) => invoke("study_reopen_goal", { id }),
   questionFeedback: (id, questionId, feedback) =>
     invoke("study_question_feedback", { id, questionId, feedback }),
   startDoubt: (doubtId) => invoke("study_start_doubt", { doubtId }),
@@ -184,8 +224,14 @@ export const studyClient: StudyClient = {
   startReview: (conceptKey) => invoke("study_start_review", { conceptKey }),
   startCard: (cardId, expanded = false) =>
     invoke("study_start_card_view", { cardId, expanded }),
-  ask: (id, stepId, question, requestId) =>
-    invoke("study_ask", { id, stepId, question, requestId }),
+  ask: (id, stepId, question, requestId, replyToQuestionId) =>
+    invoke("study_ask", {
+      id,
+      stepId,
+      question,
+      requestId,
+      replyToQuestionId: replyToQuestionId ?? null,
+    }),
   read: (id) => invoke("study_read", { id }),
   continue: (id) =>
     withAutoHideGuard("study-companion", () =>

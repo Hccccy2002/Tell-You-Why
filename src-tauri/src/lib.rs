@@ -40,6 +40,9 @@ mod study;
 mod study_agent;
 mod study_commands;
 mod study_doubts;
+mod study_goal;
+#[cfg(test)]
+mod study_goal_tests;
 mod study_store;
 #[cfg(test)]
 mod study_tests;
@@ -148,6 +151,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             study_commands::study_start,
+            study_commands::study_start_goal,
+            study_commands::study_goal_checkin,
+            study_commands::study_reopen_goal,
             study_commands::study_continue,
             study_commands::study_latest,
             study_commands::study_home,

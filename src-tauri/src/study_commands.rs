@@ -68,6 +68,47 @@ pub(crate) fn start_inner(goal: String, topic: String, state: &AppState) -> Resu
     Ok(run.public())
 }
 
+pub(crate) fn start_goal_inner(goal: String, state: &AppState) -> Result<Value, String> {
+    let _permit = state.persistence_gate.try_operation()?;
+    let topic: String = goal.trim().chars().take(80).collect();
+    let mut run = new_session(goal, topic, state)?;
+    run.goal_mode = true;
+    state
+        .database
+        .study_insert(&run)
+        .map_err(|e| e.to_string())?;
+    Ok(run.public())
+}
+
+#[tauri::command]
+pub fn study_start_goal(goal: String, state: State<'_, AppState>) -> Result<Value, String> {
+    start_goal_inner(goal, &state)
+}
+
+#[tauri::command]
+pub fn study_goal_checkin(
+    id: String,
+    reply: String,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let _permit = state.persistence_gate.try_operation()?;
+    state
+        .database
+        .study_goal_checkin(&id, &reply)
+        .map(|r| r.public())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn study_reopen_goal(id: String, state: State<'_, AppState>) -> Result<Value, String> {
+    let _permit = state.persistence_gate.try_operation()?;
+    state
+        .database
+        .study_reopen_goal(&id)
+        .map(|r| r.public())
+        .map_err(|e| e.to_string())
+}
+
 pub(crate) fn start_review_inner(concept_key: String, state: &AppState) -> Result<Value, String> {
     let _permit = state.persistence_gate.try_operation()?;
     let target = state
@@ -158,12 +199,13 @@ pub(crate) async fn continue_inner(id: String, state: &AppState) -> Result<Value
     if ["waiting", "completed"].contains(&existing.state.as_str()) {
         return Ok(existing.public());
     }
-    if existing.review_target.is_some()
-        && existing.pending_question().is_none()
-        && existing
-            .steps
-            .iter()
-            .any(|s| s.quiz.is_some() && s.feedback.is_some())
+    if (existing.goal_mode && existing.goal_finished())
+        || (existing.review_target.is_some()
+            && existing.pending_question().is_none()
+            && existing
+                .steps
+                .iter()
+                .any(|s| s.quiz.is_some() && s.feedback.is_some()))
     {
         existing.state = "completed".into();
         existing.next_topic = None;
@@ -317,14 +359,20 @@ pub fn study_ask(
     step_id: String,
     question: String,
     request_id: String,
+    reply_to_question_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     let _permit = state.persistence_gate.try_operation()?;
-    state
-        .database
-        .study_ask(&id, &step_id, &question, &request_id)
-        .map(|r| r.public())
-        .map_err(|e| e.to_string())
+    let result = if let Some(reply_to) = reply_to_question_id {
+        state
+            .database
+            .study_ask_with_reply(&id, &step_id, &question, &request_id, Some(&reply_to))
+    } else {
+        state
+            .database
+            .study_ask(&id, &step_id, &question, &request_id)
+    };
+    result.map(|r| r.public()).map_err(|e| e.to_string())
 }
 #[tauri::command]
 pub fn study_latest(state: State<'_, AppState>) -> Result<Option<Value>, String> {

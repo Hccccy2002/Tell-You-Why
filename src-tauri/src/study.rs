@@ -27,12 +27,30 @@ pub struct StudyQuestion {
     pub doubt_id: Option<String>,
     #[serde(default)]
     pub previous_answers: Vec<StudyAnswer>,
+    #[serde(default)]
+    pub reply_to_question_id: Option<String>,
+    #[serde(default)]
+    pub clarification_replies: Vec<StudyClarification>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StudyClarification {
+    pub prompt: String,
+    pub reply: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StudyDoubtTarget {
     pub id: String,
     pub question: String,
+    #[serde(default)]
+    pub reason: String,
+}
+
+impl StudyQuestion {
+    pub(crate) fn doubt_reason(&self) -> String {
+        format!("你上次对“{}”反馈“还没懂”。", self.question)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -151,6 +169,10 @@ pub struct StudySession {
     pub questions: Vec<StudyQuestion>,
     #[serde(default)]
     pub doubt_target: Option<StudyDoubtTarget>,
+    #[serde(default)]
+    pub goal_mode: bool,
+    #[serde(default)]
+    pub goal_plan: Option<crate::study_goal::StudyPlan>,
 }
 
 impl StudySession {
@@ -235,6 +257,8 @@ impl StudySession {
             source_expanded: false,
             questions: vec![],
             doubt_target: None,
+            goal_mode: false,
+            goal_plan: None,
         }
     }
 
@@ -251,6 +275,9 @@ impl StudySession {
             "error":self.error,"next_topic":self.next_topic,
             "questions":self.questions,"can_ask":self.can_ask(),"question_limit":MAX_QUESTIONS,
             "doubt_target":self.doubt_target,
+            "goal_mode":self.goal_mode,"goal_plan":self.goal_public(),
+            "can_finish_goal":self.goal_mode && self.goal_finished(),
+            "can_reopen_goal":self.goal_mode && self.state == "completed" && !self.goal_finished() && self.goal_has_budget(),
             "source_card":self.source_card.as_ref().map(|c|json!({"card_id":c.card_id,"title":c.title})),
             "source_expanded":self.source_expanded,
             "review_target":self.review_target.as_ref().map(|r|json!({"concept_key":r.concept_key,"title":r.title})),
@@ -261,7 +288,7 @@ impl StudySession {
                 && self.control.charged_tokens < self.control.policy.max_token_charge
                 && self.control.charged_active_ms < self.control.policy.max_active_ms),
             "steps":self.steps.iter().enumerate().map(|(index,s)| json!({
-                "id":s.id,"kind":s.kind,"title":s.title,"text":s.text,"reason":self.step_reason(index),
+                "id":s.id,"kind":s.kind,"title":s.title,"text":s.text,"reason":self.goal_step_reason(s).unwrap_or_else(||self.step_reason(index).into()),
                 "card_id":s.card_id,"feedback":s.feedback,
                 "quiz":s.quiz.as_ref().map(|q| json!({"options":q.options,"selected":q.selected,
                     "correct_index":q.selected.map(|_|q.correct_index),

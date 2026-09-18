@@ -15,6 +15,8 @@ import type { KnowledgeCard, ProviderSpec, TopicPreference } from "../types";
 import "../study.css";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { StudyHighlights } from "./StudyHighlights";
+import { StudyGoalProgress } from "./StudyGoalProgress";
+import { StudyStartButton } from "./StudyStartButton";
 import { useStudyHighlights } from "../lib/useStudyHighlights";
 
 interface Props {
@@ -33,6 +35,7 @@ interface Props {
 }
 const feedbackLabels: Record<StudyFeedback, string> = {
   continue: "继续",
+  understood: "明白了",
   confused: "没看懂",
   easy: "太简单",
   example: "举个例子",
@@ -57,6 +60,8 @@ function QuestionThread({
   sourceAnchors = false,
   onFeedback,
   canFeedback,
+  onClarify,
+  canClarify,
 }: {
   questions: StudyQuestion[];
   focusId?: string;
@@ -67,6 +72,8 @@ function QuestionThread({
   sourceAnchors?: boolean;
   onFeedback?: (id: string, feedback: "understood" | "unresolved") => void;
   canFeedback?: (q: StudyQuestion) => boolean;
+  onClarify?: (id: string) => void;
+  canClarify?: (q: StudyQuestion) => boolean;
 }) {
   const labels = {
     explanation: "补充解释",
@@ -88,6 +95,12 @@ function QuestionThread({
             <strong>你问：</strong>
             {q.question}
           </p>
+          {q.clarification_replies?.length ? (
+            <p>
+              <strong>你补充：</strong>
+              {q.clarification_replies.at(-1)?.reply}
+            </p>
+          ) : null}
           {q.answer ? (
             <>
               <strong>{labels[q.answer.kind]}</strong>
@@ -106,26 +119,41 @@ function QuestionThread({
                 </button>
               ) : null}
               {onFeedback && canFeedback?.(q) ? (
-                <div className="study-actions" aria-label="这次回答讲明白了吗">
+                <div
+                  className="study-actions"
+                  role="group"
+                  aria-label="这次回答讲明白了吗"
+                >
                   <button
                     disabled={disabled || q.feedback === "understood"}
+                    aria-pressed={q.feedback === "understood"}
                     onClick={() => onFeedback(q.id, "understood")}
                   >
                     明白了
                   </button>
                   <button
                     disabled={disabled || q.feedback === "unresolved"}
+                    aria-pressed={q.feedback === "unresolved"}
                     onClick={() => onFeedback(q.id, "unresolved")}
                   >
                     还没懂
                   </button>
                 </div>
               ) : null}
+              {onClarify && canClarify?.(q) ? (
+                <button
+                  className="text-button"
+                  disabled={disabled}
+                  onClick={() => onClarify(q.id)}
+                >
+                  补充卡住的地方
+                </button>
+              ) : null}
               {q.feedback ? (
                 <p className="study-home-note">
                   {q.feedback === "understood"
                     ? "你反馈已明白，不计为掌握成绩。"
-                    : "已记录你反馈还没懂，可继续看后续解释，或结束后从首页接着解决。"}
+                    : "你反馈了“还没懂”，后续会结合这个问题和已讲过的内容继续解释。"}
                 </p>
               ) : null}
             </>
@@ -170,16 +198,21 @@ export function StudyPanel({
   const [error, setError] = useState<string | null>(null);
   const [sourceMissing, setSourceMissing] = useState(false);
   const [goal, setGoal] = useState("");
+  const [startHint, setStartHint] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [reviewDraft, setReviewDraft] = useState(!!reviewTarget);
   const [cardDraft, setCardDraft] = useState(!!cardTarget);
   const [doubtDraft, setDoubtDraft] = useState(!!doubtTarget);
   const [questionDraft, setQuestionDraft] = useState("");
+  const [replyToQuestionId, setReplyToQuestionId] = useState<string | null>(
+    null,
+  );
   const questionRequest = useRef<{
     stepId: string;
     question: string;
     id: string;
+    replyToQuestionId: string | null;
   } | null>(null);
   const questionThread = useRef<HTMLElement>(null);
   const [history, setHistory] = useState<StudySession[] | null>(null);
@@ -208,8 +241,10 @@ export function StudyPanel({
     if (current?.id === next.id && current.revision > next.revision) return;
     runRef.current = next;
     if (mounted.current) {
-      if (current?.steps.at(-1)?.id !== next.steps.at(-1)?.id)
+      if (current?.steps.at(-1)?.id !== next.steps.at(-1)?.id) {
         setQuestionDraft("");
+        setReplyToQuestionId(null);
+      }
       setRun(next);
       setDrafting(false);
       setReviewDraft(false);
@@ -304,14 +339,16 @@ export function StudyPanel({
     const next = await client.continue(id);
     accept(next);
   }
-  function start(topic: string) {
+  function start(topic: string, planned = false) {
     void operate(async () => {
-      const next = await client.start(
-        topic,
-        run?.state === "completed" && topic === run.next_topic
-          ? run.topic
-          : topic,
-      );
+      const next = planned
+        ? await client.startGoal(topic)
+        : await client.start(
+            topic,
+            run?.state === "completed" && topic === run.next_topic
+              ? run.topic
+              : topic,
+          );
       accept(next);
       if (!mounted.current) return;
       await advance(next.id);
@@ -339,22 +376,30 @@ export function StudyPanel({
     void operate(async () => {
       if (
         questionRequest.current?.stepId !== step.id ||
-        questionRequest.current.question !== question
+        questionRequest.current.question !== question ||
+        questionRequest.current.replyToQuestionId !== replyToQuestionId
       ) {
         questionRequest.current = {
           stepId: step.id,
           question,
           id: crypto.randomUUID(),
+          replyToQuestionId,
         };
       }
-      const next = await client.ask(
+      const args = [
         run.id,
         step.id,
         question,
         questionRequest.current.id,
-      );
+      ] as const;
+      const next = replyToQuestionId
+        ? await client.ask(...args, replyToQuestionId)
+        : await client.ask(...args);
       accept(next);
-      if (mounted.current) setQuestionDraft("");
+      if (mounted.current) {
+        setQuestionDraft("");
+        setReplyToQuestionId(null);
+      }
       questionRequest.current = null;
       if (next.questions.some((q) => !q.answer)) await advance(next.id);
     });
@@ -364,6 +409,8 @@ export function StudyPanel({
     void operate(async () => {
       const next = await client.questionFeedback(run.id, id, feedback);
       accept(next);
+      if (id === replyToQuestionId && mounted.current)
+        setReplyToQuestionId(null);
       if (next.state !== "completed" && next.questions.some((q) => !q.answer))
         await advance(next.id);
     });
@@ -418,7 +465,9 @@ export function StudyPanel({
         <span className="eyebrow">一点一点，学得明白</span>
         <h1 id="study-title">陪我学一会儿</h1>
         <p>
-          {active ? run.goal : "从一个好奇的问题开始，按你的反馈调整下一步。"}
+          {run && !drafting && (active || run.goal_mode)
+            ? run.goal
+            : "从一个好奇的问题开始，按你的反馈调整下一步。"}
         </p>
       </header>
       {run?.source_card && !cardDraft && !drafting && !doubtDraft ? (
@@ -454,8 +503,9 @@ export function StudyPanel({
       ) : null}
       {active && run.doubt_target ? (
         <p className="study-home-note">
-          接着解决：{run.doubt_target.question}
-          。你上次明确反馈还没懂，本次会结合此前回答重新解释。
+          {run.doubt_target.reason ||
+            `你上次对“${run.doubt_target.question}”反馈“还没懂”。`}
+          本次会结合此前回答和你补充的卡点重新解释。
         </p>
       ) : null}
       {active && doubtTarget && run.doubt_target?.id !== doubtTarget.id ? (
@@ -465,10 +515,15 @@ export function StudyPanel({
       ) : null}
       {!loading && doubtDraft && doubtTarget ? (
         <section className="study-start" aria-label="继续疑问预览">
-          <span className="eyebrow">上次这个问题还没讲明白</span>
+          <span className="eyebrow">上次这个问题还没讲明白，要继续吗？</span>
           <h2>{doubtTarget.question}</h2>
-          <p>
-            你明确反馈过“还没懂”。开始后会把这个问题、相关内容和此前最多三次回答发送给所选模型，换一种方式讲解。
+          <p className="study-reason">
+            {doubtTarget.reason ||
+              `你上次对“${doubtTarget.question}”反馈“还没懂”。`}
+          </p>
+          <p>开始后会结合此前解释，换个例子、补基础，或先确认你卡在哪里。</p>
+          <p className="study-privacy">
+            将把这个问题、相关内容、此前最多三次回答和三次澄清补充发送给所选模型。
           </p>
           <button
             className="primary-button"
@@ -622,21 +677,38 @@ export function StudyPanel({
               ))}
             </div>
             <div className="study-actions">
-              <button
+              <StudyStartButton
+                hint="把目标拆成最多三个小目标，先了解你卡在哪里，再按你的反馈逐步讲解。"
+                activeHint={startHint}
+                onHintChange={setStartHint}
                 className="primary-button"
+                type="button"
+                disabled={blocked || !hasModel || !goal.trim()}
+                onClick={() => start(goal.trim(), true)}
+              >
+                按目标学习
+              </StudyStartButton>
+              <StudyStartButton
+                hint="围绕你输入的问题直接开始讲解，可以随时追问、要求举例或补充基础。"
+                activeHint={startHint}
+                onHintChange={setStartHint}
+                className="secondary-button"
                 type="submit"
                 disabled={blocked || !hasModel || !goal.trim()}
               >
                 开始学习
-              </button>
-              <button
+              </StudyStartButton>
+              <StudyStartButton
+                hint="不用输入问题，从你的首选兴趣开始探索；未设置兴趣时，从生活中的科学开始。"
+                activeHint={startHint}
+                onHintChange={setStartHint}
                 type="button"
                 className="secondary-button"
                 onClick={explore}
                 disabled={blocked || !hasModel}
               >
                 随便探索
-              </button>
+              </StudyStartButton>
             </div>
           </form>
           {!hasModel ? (
@@ -646,11 +718,7 @@ export function StudyPanel({
                 配置学习模型 →
               </button>
             </p>
-          ) : (
-            <small className="study-privacy">
-              开始后，主题、相关卡片和启用个性化时的相关学习记录会发送给所选模型。进度保存在本机。
-            </small>
-          )}
+          ) : null}
         </section>
       ) : null}
       {!loading &&
@@ -660,6 +728,24 @@ export function StudyPanel({
       run &&
       !drafting ? (
         <>
+          {run.goal_plan ? (
+            <StudyGoalProgress
+              key={run.id}
+              plan={run.goal_plan}
+              disabled={blocked}
+              onCheckin={
+                run.state === "waiting"
+                  ? (reply) => {
+                      void operate(async () => {
+                        const next = await client.goalCheckin(run.id, reply);
+                        accept(next);
+                        await advance(next.id);
+                      });
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
           {run.state === "completed" ? (
             <section className="study-summary" aria-label="学习小结">
               <span className="eyebrow">今天先到这里</span>
@@ -694,6 +780,23 @@ export function StudyPanel({
                     : "本次没有提交新答案，原来的巩固安排保留。"}
                 </p>
               ) : null}
+              {run.can_reopen_goal ? (
+                <button
+                  className="primary-button"
+                  disabled={blocked}
+                  onClick={() =>
+                    void operate(async () =>
+                      accept(await client.reopenGoal(run.id)),
+                    )
+                  }
+                >
+                  继续这个目标
+                </button>
+              ) : run.goal_mode && !run.goal_plan?.finished ? (
+                <p>
+                  目标进度已保存，本轮执行预算已用完。可以带着仍需巩固的部分开始新目标。
+                </p>
+              ) : null}
               <button
                 className="primary-button"
                 disabled={!hasModel || blocked}
@@ -719,7 +822,9 @@ export function StudyPanel({
                 >
                   <div className="study-step-label">
                     <span>{kindLabels[step.kind]}</span>
-                    <span>第 {run.steps.length} 步 / 最多 6 步</span>
+                    <span>
+                      第 {run.steps.length} 步 / 最多 {run.goal_mode ? 5 : 6} 步
+                    </span>
                   </div>
                   <h2 ref={stepHeading} tabIndex={-1}>
                     {step.title}
@@ -793,6 +898,14 @@ export function StudyPanel({
                       >
                         继续
                       </button>
+                      {run.goal_mode ? (
+                        <button
+                          disabled={learningBlocked}
+                          onClick={() => feedback("understood")}
+                        >
+                          明白了
+                        </button>
+                      ) : null}
                       {(["confused", "easy", "example"] as const).map(
                         (kind) => (
                           <button
@@ -800,7 +913,9 @@ export function StudyPanel({
                             key={kind}
                             onClick={() => feedback(kind)}
                           >
-                            {feedbackLabels[kind]}
+                            {run.goal_mode && kind === "confused"
+                              ? "还没懂"
+                              : feedbackLabels[kind]}
                           </button>
                         ),
                       )}
@@ -838,6 +953,16 @@ export function StudyPanel({
                         sourceAnchors
                         onFeedback={questionFeedback}
                         canFeedback={canQuestionFeedback}
+                        onClarify={(id) => {
+                          setReplyToQuestionId(id);
+                          document.getElementById("study-question")?.focus();
+                        }}
+                        canClarify={(q) =>
+                          !!run.can_ask &&
+                          q.answer?.kind === "clarification" &&
+                          q.feedback !== "understood" &&
+                          canQuestionFeedback(q)
+                        }
                         onSave={(id) => void notes.save("question", id)}
                         isSaved={(id) => notes.saved("question", id)}
                         disabled={learningBlocked || notes.busy}
@@ -855,13 +980,19 @@ export function StudyPanel({
                           ask();
                         }}
                       >
-                        <label htmlFor="study-question">我想问……</label>
+                        <label htmlFor="study-question">
+                          {replyToQuestionId ? "补充你卡住的地方" : "我想问……"}
+                        </label>
                         <textarea
                           id="study-question"
                           value={questionDraft}
                           maxLength={300}
                           rows={2}
-                          placeholder="例如：这里的两个概念有什么区别？"
+                          placeholder={
+                            replyToQuestionId
+                              ? "例如：我不明白为什么名字不变，地址却可以变。"
+                              : "例如：这里的两个概念有什么区别？"
+                          }
                           disabled={blocked || !run.can_ask}
                           onChange={(event) =>
                             setQuestionDraft(event.target.value)
@@ -878,8 +1009,18 @@ export function StudyPanel({
                               !questionDraft.trim()
                             }
                           >
-                            发送问题
+                            {replyToQuestionId ? "发送补充" : "发送问题"}
                           </button>
+                          {replyToQuestionId ? (
+                            <button
+                              className="text-button"
+                              type="button"
+                              disabled={blocked}
+                              onClick={() => setReplyToQuestionId(null)}
+                            >
+                              改问新问题
+                            </button>
+                          ) : null}
                           <small>
                             {run.questions.length}/{run.question_limit} 个问题 ·
                             回答后仍停留在本段
@@ -887,7 +1028,7 @@ export function StudyPanel({
                         </div>
                         {run.questions.length >= run.question_limit ? (
                           <small>
-                            本次提问次数已用完，可以继续学习或结束后再学一会儿。
+                            本次提问次数已用完；未解决的疑问会保留，结束后可从首页继续。
                           </small>
                         ) : null}
                       </form>
@@ -909,23 +1050,27 @@ export function StudyPanel({
                   {run.error}
                 </p>
               ) : null}
-              {(run.can_resume || canCompleteReview) && !working ? (
+              {(run.can_resume || canCompleteReview || run.can_finish_goal) &&
+              !working ? (
                 <button
                   className="primary-button study-resume"
                   disabled={stopping}
                   onClick={() => void operate(() => advance(run.id))}
                 >
-                  {canCompleteReview
-                    ? "完成巩固并查看小结"
-                    : pendingQuestion
-                      ? "继续回答这个问题"
-                      : run.state === "failed"
-                        ? "重试当前步骤"
-                        : "继续上次学习"}
+                  {run.can_finish_goal
+                    ? "完成本轮并查看小结"
+                    : canCompleteReview
+                      ? "完成巩固并查看小结"
+                      : pendingQuestion
+                        ? "继续回答这个问题"
+                        : run.state === "failed"
+                          ? "重试当前步骤"
+                          : "继续上次学习"}
                 </button>
               ) : null}
               {!run.can_resume &&
               !canCompleteReview &&
+              !run.can_finish_goal &&
               ["failed", "paused", "ready"].includes(run.state) ? (
                 <p>本次学习已达到执行上限，可以结束并查看小结。</p>
               ) : null}
@@ -1037,6 +1182,22 @@ export function StudyPanel({
                   {item.goal} ·{" "}
                   {new Date(item.created_at).toLocaleDateString("zh-CN")}
                 </summary>
+                {item.goal_plan ? (
+                  <StudyGoalProgress plan={item.goal_plan} disabled />
+                ) : null}
+                {item.can_reopen_goal ? (
+                  <button
+                    disabled={blocked || !!active}
+                    title={active ? "先继续或结束当前学习" : undefined}
+                    onClick={() =>
+                      void operate(async () =>
+                        accept(await client.reopenGoal(item.id)),
+                      )
+                    }
+                  >
+                    继续这个目标
+                  </button>
+                ) : null}
                 <p>
                   {item.summary.answered
                     ? `提交 ${item.summary.answered} 道练习，${item.summary.correct} 道与参考答案一致。`

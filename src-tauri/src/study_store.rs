@@ -124,6 +124,17 @@ impl Database {
         question: &str,
         request_id: &str,
     ) -> Result<StudySession, DbError> {
+        self.study_ask_with_reply(id, step_id, question, request_id, None)
+    }
+
+    pub(crate) fn study_ask_with_reply(
+        &self,
+        id: &str,
+        step_id: &str,
+        question: &str,
+        request_id: &str,
+        reply_to_question_id: Option<&str>,
+    ) -> Result<StudySession, DbError> {
         let question = question.trim();
         if question.is_empty()
             || question.chars().count() > 300
@@ -144,7 +155,15 @@ impl Database {
             })?;
         let mut run: StudySession = serde_json::from_str(&record)?;
         if let Some(saved) = run.questions.iter().find(|q| q.id == request_id) {
-            if saved.step_id == step_id && saved.question == question {
+            let submitted = if saved.reply_to_question_id.is_some() {
+                saved.clarification_replies.last().map(|c| c.reply.as_str())
+            } else {
+                Some(saved.question.as_str())
+            };
+            if saved.step_id == step_id
+                && saved.reply_to_question_id.as_deref() == reply_to_question_id
+                && submitted == Some(question)
+            {
                 return Ok(run);
             }
             return Err(DbError::Validation(
@@ -157,7 +176,7 @@ impl Database {
             ));
         }
         let title = run.steps.last().unwrap().title.clone();
-        run.questions.push(crate::study::StudyQuestion {
+        let mut next_question = crate::study::StudyQuestion {
             id: request_id.into(),
             step_id: step_id.into(),
             question: question.into(),
@@ -166,8 +185,74 @@ impl Database {
             feedback: None,
             doubt_id: None,
             previous_answers: vec![],
-        });
-        run.messages.push(json!({"role":"user","content":json!({"kind":"study_question","request_id":request_id,"step_id":step_id,"step_title":title,"question":question}).to_string()}));
+            reply_to_question_id: reply_to_question_id.map(str::to_owned),
+            clarification_replies: vec![],
+        };
+        if let Some(parent_id) = reply_to_question_id {
+            let index = run
+                .questions
+                .iter()
+                .position(|q| q.id == parent_id)
+                .ok_or_else(|| DbError::Validation("找不到对应的澄清问题".into()))?;
+            let parent = &run.questions[index];
+            let answer = parent
+                .answer
+                .as_ref()
+                .filter(|answer| answer.kind == "clarification")
+                .ok_or_else(|| DbError::Validation("只能补充已完成的澄清问题".into()))?;
+            let doubt_id = parent
+                .doubt_id
+                .clone()
+                .unwrap_or_else(|| format!("{}:{}", run.id, parent.id));
+            if parent.step_id != step_id
+                || parent.feedback.as_deref() == Some("understood")
+                || run.questions[index + 1..]
+                    .iter()
+                    .any(|q| q.doubt_id.as_deref() == Some(&doubt_id))
+            {
+                return Err(DbError::Validation(
+                    "请在当前步骤的最新澄清问题处补充".into(),
+                ));
+            }
+            let current: Option<(String, String)> = tx
+                .query_row(
+                    "SELECT session_id,question_id FROM study_doubts WHERE id=?",
+                    [&doubt_id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?;
+            if current.is_some_and(|(session, q)| session != id || q != parent_id) {
+                return Err(DbError::Validation(
+                    "这个疑问已有后续回答，请返回最新回答补充".into(),
+                ));
+            }
+            next_question.question = parent.question.clone();
+            next_question.doubt_id = Some(doubt_id.clone());
+            next_question.previous_answers = parent.previous_answers.clone();
+            next_question.previous_answers.push(answer.clone());
+            if next_question.previous_answers.len() > 3 {
+                next_question.previous_answers.remove(0);
+            }
+            next_question.clarification_replies = parent.clarification_replies.clone();
+            next_question
+                .clarification_replies
+                .push(crate::study::StudyClarification {
+                    prompt: answer.text.clone(),
+                    reply: question.into(),
+                });
+            if next_question.clarification_replies.len() > 3 {
+                next_question.clarification_replies.remove(0);
+            }
+            run.questions[index].doubt_id = Some(doubt_id.clone());
+            // A clarification alone is not feedback. Move an existing doubt, but
+            // do not invent an unresolved one before the user says "还没懂".
+            tx.execute(
+                "UPDATE study_doubts SET session_id=?,question_id=?,updated_at=? WHERE id=?",
+                params![id, request_id, chrono::Utc::now().to_rfc3339(), doubt_id],
+            )?;
+        }
+        run.messages.push(json!({"role":"user","content":json!({"kind":if reply_to_question_id.is_some() { "clarification_reply" } else { "study_question" },"request_id":request_id,"step_id":step_id,"step_title":title,"question":next_question}).to_string()}));
+        run.questions.push(next_question);
         run.state = "ready".into();
         run.error = None;
         run.revision += 1;
@@ -196,7 +281,7 @@ impl Database {
                 let run: StudySession = serde_json::from_str(&record)?;
                 Ok(
                     json!({"id":run.id,"goal":run.goal,"topic":run.topic,"state":run.state,
-                "step_count":run.steps.len(),"last_title":run.steps.last().map(|s|&s.title),
+                "step_count":run.steps.len(),"last_title":if run.goal_mode {Some(&run.goal)} else {run.steps.last().map(|s|&s.title)},
                 "updated_at":updated}),
                 )
             })
@@ -214,7 +299,7 @@ impl Database {
             due = stmt.query_map([now], |r| Ok(json!({"concept_key":r.get::<_,String>(0)?,"topic":r.get::<_,String>(1)?,"title":r.get::<_,String>(2)?,"attempts":r.get::<_,i64>(3)?,"last_correct":r.get::<_,bool>(4)?,"due_at":r.get::<_,i64>(5)?})))?.collect::<Result<Vec<_>,_>>()?;
         }
         Ok(
-            json!({"active":active,"due":due,"due_count":due_count,"practice_count":practice_count,"next_due_at":next_due,"personalization_enabled":enabled,"doubts":if enabled { self.study_open_doubts()? } else { vec![] }}),
+            json!({"active":active,"goals":self.study_pending_goals()?,"due":due,"due_count":due_count,"practice_count":practice_count,"next_due_at":next_due,"personalization_enabled":enabled,"doubts":if enabled { self.study_open_doubts()? } else { vec![] }}),
         )
     }
 
@@ -440,7 +525,11 @@ impl Database {
             session.state = if finish { "completed" } else { "paused" }.into();
             session.error = None;
             if finish {
-                session.pending = None;
+                // Goal sessions may be reopened with their original budget and
+                // tool transcript. Preserve a checkpoint to keep tool replies paired.
+                if !session.goal_mode {
+                    session.pending = None;
+                }
                 if session.next_topic.is_none() {
                     session.next_topic = Some(session.goal.clone());
                 }
@@ -473,7 +562,17 @@ impl Database {
         feedback: &str,
         selected: Option<usize>,
     ) -> Result<StudySession, DbError> {
-        if !["continue", "confused", "easy", "example", "skip", "answer"].contains(&feedback) {
+        if ![
+            "continue",
+            "confused",
+            "easy",
+            "example",
+            "skip",
+            "answer",
+            "understood",
+        ]
+        .contains(&feedback)
+        {
             return Err(DbError::Validation("不支持的学习反馈".into()));
         }
         let mut conn = self.connect()?;
@@ -483,6 +582,10 @@ impl Database {
                 r.get(0)
             })?;
         let mut session: StudySession = serde_json::from_str(&record)?;
+        if feedback == "understood" && !session.goal_mode {
+            return Err(DbError::Validation("仅目标学习支持这个讲解反馈".into()));
+        }
+        let current_step = session.steps.last().map(|s| s.id.clone());
         let step = session
             .steps
             .iter_mut()
@@ -496,6 +599,14 @@ impl Database {
         }
         if session.state != "waiting" {
             return Err(DbError::Validation("请等待当前步骤完成".into()));
+        }
+        if session.goal_mode
+            && (current_step.as_deref() != Some(step_id)
+                || session.questions.last().is_some_and(|q| q.answer.is_none()))
+        {
+            return Err(DbError::Validation(
+                "请先完成当前问答，再对当前步骤反馈".into(),
+            ));
         }
         let mut result = json!({"step_id":step.id,"title":step.title,"feedback":feedback});
         if feedback == "answer" {

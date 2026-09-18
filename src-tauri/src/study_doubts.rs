@@ -27,7 +27,7 @@ impl Database {
                     .iter()
                     .find(|q| q.id == question_id)
                     .ok_or_else(|| DbError::Validation("疑问记录缺少原始问题".into()))?;
-                Ok(json!({"id":id,"question":q.question,"topic":run.topic,"session_id":run.id}))
+                Ok(json!({"id":id,"question":q.question,"topic":run.topic,"session_id":run.id,"reason":q.doubt_reason()}))
             })
             .collect()
     }
@@ -70,6 +70,14 @@ impl Database {
             .doubt_id
             .clone()
             .unwrap_or_else(|| format!("{}:{}", run.id, question.id));
+        if run.questions[index + 1..]
+            .iter()
+            .any(|q| q.doubt_id.as_deref() == Some(&doubt_id))
+        {
+            return Err(DbError::Validation(
+                "这个疑问已有后续回答，请在最新回答处反馈".into(),
+            ));
+        }
         let current: Option<(String, String)> = tx
             .query_row(
                 "SELECT session_id,question_id FROM study_doubts WHERE id=?",
@@ -98,6 +106,7 @@ impl Database {
             question.created_at = chrono::Utc::now().to_rfc3339();
             question.answer = None;
             question.feedback = None;
+            question.reply_to_question_id = None;
             question.doubt_id = Some(doubt_id.clone());
             last_question_id = question.id.clone();
             run.messages.push(json!({"role":"user","content":json!({"kind":"question_unresolved","question":question,"feedback":"用户明确反馈还没懂，请结合此前回答换一种方式解释。"}).to_string()}));
@@ -184,6 +193,8 @@ impl Database {
             feedback: None,
             doubt_id: Some(doubt_id.into()),
             previous_answers,
+            reply_to_question_id: None,
+            clarification_replies: old_question.clarification_replies.clone(),
         };
         run.topic = old.topic;
         run.goal = format!(
@@ -195,6 +206,7 @@ impl Database {
         run.doubt_target = Some(StudyDoubtTarget {
             id: doubt_id.into(),
             question: question.question.clone(),
+            reason: question.doubt_reason(),
         });
         run.messages.push(json!({"role":"user","content":json!({"kind":"resume_unresolved_question","context":context,"question":question}).to_string()}));
         run.steps.push(context);

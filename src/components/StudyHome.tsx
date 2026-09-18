@@ -56,6 +56,8 @@ export function StudyHome({
     };
   }, [client, refresh]);
   const saved = data?.active;
+  const savedTitle = saved?.last_title?.trim() || saved?.goal;
+  const blockedHint = saved ? "先继续或结束上次学习" : undefined;
   return (
     <section className="study-home" aria-label="我的短学习">
       <button
@@ -66,27 +68,35 @@ export function StudyHome({
         <span>
           <strong>{saved ? "继续上次" : "陪我学一会儿"}</strong>
           {saved ? (
-            <>
-              <span className="study-home-topic">{saved.goal}</span>
-              <small>
-                {saved.step_count
-                  ? `已留下 ${saved.step_count} 步 · ${saved.last_title ?? "学习中"}`
-                  : "主题已保存，还没展开内容"}
-              </small>
-              <small>
-                {saved.state === "failed"
-                  ? "上次未完成，打开后可查看或重试"
-                  : saved.state === "running"
-                    ? "学习正在进行，打开查看进度"
-                    : "从保存的位置接着看"}
-              </small>
-            </>
+            <span className="study-home-topic" title={savedTitle}>
+              {savedTitle}
+            </span>
           ) : (
             <small>约 3 分钟 · 按你的反馈调整</small>
           )}
         </span>
         <span aria-hidden="true">→</span>
       </button>
+      {data?.goals?.length ? (
+        <section className="study-review-home" aria-label="还没完成的目标">
+          <strong>还没完成的目标</strong>
+          {data.goals.map((item) => (
+            <button
+              className="study-review-entry"
+              disabled={busy || !!saved}
+              title={
+                blockedHint ? `${item.title} · ${blockedHint}` : item.title
+              }
+              aria-description={blockedHint}
+              key={item.id}
+              onClick={() => onOpen(item.id)}
+            >
+              <strong className="study-home-title">{item.title}</strong>
+              <span aria-hidden="true">→</span>
+            </button>
+          ))}
+        </section>
+      ) : null}
       {data?.personalization_enabled && data.doubts?.length && onDoubt ? (
         <section className="study-review-home" aria-label="接着解决疑问">
           <strong>上次这个问题还没讲明白</strong>
@@ -94,50 +104,42 @@ export function StudyHome({
             <button
               className="study-review-entry"
               disabled={busy || !!saved}
+              title={
+                blockedHint
+                  ? `${item.question} · ${blockedHint}`
+                  : item.question
+              }
+              aria-description={blockedHint}
               key={item.id}
               onClick={() => onDoubt(item)}
             >
-              <strong>{item.question}</strong>
-              <small>你上次反馈“还没懂”，可以换一种方式接着讲</small>
-              <span>看看这个问题 →</span>
+              <strong className="study-home-title">{item.question}</strong>
+              <span aria-hidden="true">→</span>
             </button>
           ))}
-          {saved ? (
-            <small>先继续或结束上次学习，再开始新的疑问跟进。</small>
-          ) : null}
         </section>
       ) : null}
       {data && onReview ? (
         <section className="study-review-home" aria-label="巩固一下">
-          <div className="study-step-label">
-            <strong>巩固一下</strong>
-            {data.due_count > 0 ? (
-              <span>{data.due_count} 个知识点可回顾</span>
-            ) : null}
-          </div>
+          <strong>巩固一下</strong>
           {!data.personalization_enabled ? (
             <p>个性化已关闭，暂不根据过往练习安排巩固。</p>
           ) : data.due_count > 0 ? (
-            <>
-              <p>一次只回顾一个知识点，先补讲，再试一道可跳过的小题。</p>
-              {data.due.map((item) => (
-                <button
-                  className="study-review-entry"
-                  key={item.concept_key}
-                  disabled={busy || !!saved}
-                  onClick={() => onReview(item)}
-                >
-                  <strong>{item.title}</strong>
-                  <small>
-                    {item.last_correct
-                      ? "到了约定的回顾时间，换个情境再试试"
-                      : "上次答案与参考答案不一致，换个例子再看看"}
-                  </small>
-                  <span>巩固这个知识点 →</span>
-                </button>
-              ))}
-              {saved ? <small>先继续或结束上次学习，再开始巩固。</small> : null}
-            </>
+            data.due.map((item) => (
+              <button
+                className="study-review-entry"
+                key={item.concept_key}
+                disabled={busy || !!saved}
+                title={
+                  blockedHint ? `${item.title} · ${blockedHint}` : item.title
+                }
+                aria-description={blockedHint}
+                onClick={() => onReview(item)}
+              >
+                <strong className="study-home-title">{item.title}</strong>
+                <span aria-hidden="true">→</span>
+              </button>
+            ))
           ) : (
             <p>
               {data.practice_count === 0

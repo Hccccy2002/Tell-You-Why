@@ -607,6 +607,262 @@ fn study_doubt_feedback_at_budget_limit_stays_local_and_abandoned_reply_can_resu
 }
 
 #[test]
+fn study_doubt_clarification_keeps_identity_context_and_resolution_after_restart() {
+    use crate::study_commands;
+    use serde_json::json;
+    let (dir, state, model, _) = crate::review_tests::setup(vec![]);
+    let mut run = prepare_question_session(&state, false);
+    run.questions.push(answered_question());
+    state.database.study_save(&mut run).unwrap();
+    let pending = state
+        .database
+        .study_question_feedback(&run.id, "q-original", "unresolved")
+        .unwrap();
+    let clarification_id = pending.pending_question().unwrap().id.clone();
+    let doubt_id = pending
+        .pending_question()
+        .unwrap()
+        .doubt_id
+        .clone()
+        .unwrap();
+    let prompt = "你卡在名称和地址的区别，还是地址改变后的查找过程？";
+    model.replies.lock().unwrap().push_back(action(
+        "clarify",
+        "answer_question",
+        json!({
+            "request_id":clarification_id,"kind":"clarification","text":prompt,"card_id":null
+        }),
+    ));
+    tauri::async_runtime::block_on(study_commands::continue_inner(run.id.clone(), &state)).unwrap();
+    let request_id = uuid::Uuid::new_v4().to_string();
+    let reply = "我不明白地址变了以后，怎么还能用原来的名字找到它。";
+    let clarified = state
+        .database
+        .study_ask_with_reply(
+            &run.id,
+            "step1",
+            reply,
+            &request_id,
+            Some(&clarification_id),
+        )
+        .unwrap();
+    let question = clarified.pending_question().unwrap();
+    assert_eq!(question.question, run.questions[0].question);
+    assert_eq!(question.doubt_id.as_deref(), Some(doubt_id.as_str()));
+    assert_eq!(question.previous_answers.len(), 2);
+    assert_eq!(question.clarification_replies[0].prompt, prompt);
+    assert_eq!(question.clarification_replies[0].reply, reply);
+    assert_eq!(
+        state
+            .database
+            .study_ask_with_reply(
+                &run.id,
+                "step1",
+                reply,
+                &request_id,
+                Some(&clarification_id)
+            )
+            .unwrap()
+            .revision,
+        clarified.revision
+    );
+    assert!(state
+        .database
+        .study_ask_with_reply(
+            &run.id,
+            "step1",
+            "覆盖补充",
+            &request_id,
+            Some(&clarification_id)
+        )
+        .is_err());
+    assert!(state
+        .database
+        .study_ask(&run.id, "step1", reply, &request_id)
+        .is_err());
+    model.replies.lock().unwrap().extend([
+        json!("NETWORK_ERROR"),
+        action("reply", "answer_question", json!({"request_id":request_id,"kind":"example","text":"像通讯录：朋友搬家后，你用同一个姓名查到更新后的住址；DNS 查询的也是更新后的地址记录。","card_id":null})),
+    ]);
+    let failed =
+        tauri::async_runtime::block_on(study_commands::continue_inner(run.id.clone(), &state))
+            .unwrap();
+    assert_eq!(failed["state"], "failed");
+    let reopened = Database::new(dir.path().join("test.db"));
+    reopened.initialize().unwrap();
+    assert_eq!(
+        reopened
+            .study_load(&run.id)
+            .unwrap()
+            .pending_question()
+            .unwrap()
+            .clarification_replies[0]
+            .reply,
+        reply
+    );
+    let explained =
+        tauri::async_runtime::block_on(study_commands::continue_inner(run.id.clone(), &state))
+            .unwrap();
+    assert_eq!(explained["steps"].as_array().unwrap().len(), 1);
+    assert_eq!(explained["questions"][2]["answer"]["kind"], "example");
+    assert!(state
+        .database
+        .study_question_feedback(&run.id, &clarification_id, "understood")
+        .is_err());
+    assert!(state
+        .database
+        .study_ask_with_reply(
+            &run.id,
+            "step1",
+            reply,
+            &uuid::Uuid::new_v4().to_string(),
+            Some(&clarification_id)
+        )
+        .is_err());
+    state.database.study_pause(&run.id, true).unwrap();
+    let home = reopened.study_home().unwrap();
+    assert_eq!(home["doubts"].as_array().unwrap().len(), 1);
+    assert_eq!(home["doubts"][0]["id"], doubt_id);
+    assert_eq!(home["doubts"][0]["question"], run.questions[0].question);
+    assert_eq!(
+        home["doubts"][0]["reason"],
+        "你上次对“域名和地址有什么区别？”反馈“还没懂”。"
+    );
+    let resumed = study_commands::start_doubt_inner(doubt_id.clone(), &state).unwrap();
+    assert_eq!(
+        resumed["questions"][0]["clarification_replies"][0]["reply"],
+        reply
+    );
+    assert_eq!(
+        resumed["questions"][0]["previous_answers"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(
+        resumed["doubt_target"]["reason"],
+        home["doubts"][0]["reason"]
+    );
+    let new_id = resumed["id"].as_str().unwrap();
+    let new_question_id = resumed["questions"][0]["id"].as_str().unwrap();
+    model.replies.lock().unwrap().push_back(action("next-session", "answer_question", json!({
+        "request_id":new_question_id,"kind":"explanation","text":"先区分名称与记录：名称保持不变，名称指向的记录可更新。再次查询会取得更新后的地址；缓存过期前可能仍得到旧记录。","card_id":null
+    })));
+    tauri::async_runtime::block_on(study_commands::continue_inner(new_id.into(), &state)).unwrap();
+    {
+        let requests = model.requests.lock().unwrap();
+        let current: serde_json::Value = serde_json::from_str(
+            requests.last().unwrap()["messages"]
+                .as_array()
+                .unwrap()
+                .last()
+                .unwrap()["content"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            current["pending_question"]["clarification_replies"][0]["reply"],
+            reply
+        );
+        assert_eq!(
+            current["pending_question"]["question"],
+            run.questions[0].question
+        );
+    }
+    assert_eq!(
+        reopened.study_home().unwrap()["doubts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let resolved = reopened
+        .study_question_feedback(new_id, new_question_id, "understood")
+        .unwrap();
+    assert_eq!(resolved.public()["summary"]["answered"], 0);
+    assert_eq!(reopened.study_home().unwrap()["doubts"], json!([]));
+    assert_eq!(reopened.study_home().unwrap()["practice_count"], 0);
+    assert!(reopened
+        .study_memories(&run.topic)
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn study_clarification_requires_current_context_and_never_infers_unresolved_feedback() {
+    use serde_json::json;
+    let (_dir, state, _, _) = crate::review_tests::setup(vec![]);
+    let mut run = prepare_question_session(&state, false);
+    let mut original = answered_question();
+    original.answer.as_mut().unwrap().kind = "clarification".into();
+    run.questions.push(original);
+    state.database.study_save(&mut run).unwrap();
+    let request_id = uuid::Uuid::new_v4().to_string();
+    for parent in ["missing", "from-another-session"] {
+        assert!(state
+            .database
+            .study_ask_with_reply(&run.id, "step1", "卡在地址变化", &request_id, Some(parent))
+            .is_err());
+    }
+    assert_eq!(
+        state.database.study_load(&run.id).unwrap().revision,
+        run.revision
+    );
+    let mut replied = state
+        .database
+        .study_ask_with_reply(
+            &run.id,
+            "step1",
+            "卡在地址变化",
+            &request_id,
+            Some("q-original"),
+        )
+        .unwrap();
+    assert_eq!(state.database.study_home().unwrap()["doubts"], json!([]));
+    replied.questions.last_mut().unwrap().answer = Some(crate::study::StudyAnswer {
+        kind: "explanation".into(),
+        text: "用原名查更新后的地址记录。".into(),
+        card_id: None,
+    });
+    replied.state = "waiting".into();
+    state.database.study_save(&mut replied).unwrap();
+    assert!(state
+        .database
+        .study_question_feedback(&run.id, "q-original", "unresolved")
+        .is_err());
+    assert!(state
+        .database
+        .study_ask_with_reply(
+            &run.id,
+            "step1",
+            "再补充",
+            &uuid::Uuid::new_v4().to_string(),
+            Some(&request_id)
+        )
+        .is_err());
+    let unrelated = state
+        .database
+        .study_ask(
+            &run.id,
+            "step1",
+            "HTTP 是什么？",
+            &uuid::Uuid::new_v4().to_string(),
+        )
+        .unwrap();
+    assert!(unrelated.pending_question().unwrap().doubt_id.is_none());
+    assert!(unrelated
+        .pending_question()
+        .unwrap()
+        .clarification_replies
+        .is_empty());
+    assert_eq!(state.database.study_home().unwrap()["doubts"], json!([]));
+}
+
+#[test]
 fn study_questions_survive_failure_retry_and_restart_without_advancing_or_grading() {
     use crate::study_commands;
     use serde_json::json;

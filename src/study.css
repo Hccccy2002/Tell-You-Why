@@ -8,11 +8,88 @@
   padding: 14px clamp(16px, 5vw, 30px) 28px;
   scrollbar-gutter: stable;
 }
-.study-home-topic {
-  display: block;
-  font-size: 14px;
+.study-start-button {
+  display: inline-flex;
+  border-radius: 10px;
+}
+.study-start-button > button:disabled {
+  pointer-events: none;
+}
+.study-start-tooltip {
+  position: fixed;
+  z-index: 1000;
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.65;
   overflow-wrap: anywhere;
-  margin: 6px 0;
+}
+.study-goal-progress {
+  margin-block: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-muted);
+  overflow-wrap: anywhere;
+}
+.study-goal-progress summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+.study-goal-progress ol {
+  padding-left: 22px;
+}
+.study-goal-progress li {
+  margin-block: 12px;
+}
+.study-goal-progress li > span,
+.study-goal-progress li > small {
+  display: block;
+  margin-top: 4px;
+}
+.study-goal-progress small,
+.study-goal-progress li > span {
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.study-goal-progress label {
+  display: block;
+  margin-block: 16px 8px;
+  font-weight: 600;
+}
+.study-goal-progress textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+}
+.study-home-topic,
+.study-home-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.study-home-topic {
+  margin-top: 4px;
 }
 .study-card-activity,
 .study-highlights {
@@ -36,6 +113,19 @@
 .study-home .study-entry > span:first-child {
   min-width: 0;
 }
+.study-home .study-entry {
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.study-home .study-entry strong,
+.study-review-home > strong {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.study-home .study-entry > span:last-child,
+.study-review-entry > span {
+  flex-shrink: 0;
+}
 .study-home-note {
   color: var(--text-soft);
   font-size: 12px;
@@ -43,36 +133,34 @@
 .study-review-home {
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 14px;
-  margin: 0 0 20px;
+  padding: 12px 14px;
+  margin: 0 0 12px;
   background: var(--surface);
 }
-.study-review-home p,
-.study-review-home > small {
+.study-review-home p {
   font-size: 12px;
   color: var(--text-soft);
   line-height: 1.6;
 }
 .study-review-entry {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
   text-align: left;
-  padding: 12px;
-  margin-top: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  margin-top: 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-muted);
   color: var(--text);
   overflow-wrap: anywhere;
 }
-.study-review-entry small {
-  color: var(--text-soft);
-  font-size: 12px;
-}
 .study-review-entry > span {
   color: var(--accent);
-  font-size: 12px;
+  font-size: 14px;
 }
 .study-review-entry:disabled {
   cursor: default;
