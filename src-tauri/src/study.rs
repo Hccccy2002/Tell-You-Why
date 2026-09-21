@@ -12,6 +12,8 @@ pub struct StudyAnswer {
     pub kind: String,
     pub text: String,
     pub card_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<crate::search::types::SearchAnswer>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -31,6 +33,8 @@ pub struct StudyQuestion {
     pub reply_to_question_id: Option<String>,
     #[serde(default)]
     pub clarification_replies: Vec<StudyClarification>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<crate::study_search::StudySearchRun>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -824,6 +824,7 @@ fn study_clarification_requires_current_context_and_never_infers_unresolved_feed
         .unwrap();
     assert_eq!(state.database.study_home().unwrap()["doubts"], json!([]));
     replied.questions.last_mut().unwrap().answer = Some(crate::study::StudyAnswer {
+        search: None,
         kind: "explanation".into(),
         text: "用原名查更新后的地址记录。".into(),
         card_id: None,

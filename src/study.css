@@ -440,6 +440,21 @@
   margin-top: 4px;
   font-weight: normal;
 }
+.study-search-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+.study-search-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 @media (max-width: 380px) {
   .study-start,
   .study-content,

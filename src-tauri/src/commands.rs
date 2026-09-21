@@ -383,7 +383,7 @@ fn require_provider_key_replacement_confirmation(
     Ok(())
 }
 
-fn cleanup_pending_credentials(state: &AppState) -> CommandResult<()> {
+pub(crate) fn cleanup_pending_credentials(state: &AppState) -> CommandResult<()> {
     let pending = state
         .database
         .pending_credential_deletions()
@@ -628,6 +628,7 @@ pub async fn ask_follow_up(
     question: String,
     display_question: Option<String>,
     history: Vec<FollowUpTurn>,
+    search_run_id: Option<String>,
     state: State<'_, AppState>,
 ) -> CommandResult<FollowUpResponse> {
     let _operation = state
@@ -642,14 +643,45 @@ pub async fn ask_follow_up(
         "显示问题",
         MAX_FOLLOW_UP_QUESTION_CHARS,
     )?;
-    let response = ask_follow_up_inner(&state, &card_id, stored_question.clone(), history).await?;
+    let run_id = crate::search::agent::resolve_run(&state, &card_id, search_run_id)?;
+    let result = async {
+        if let Some(id) = run_id.as_deref() {
+            crate::search::agent::answer(
+                &state,
+                id,
+                &card_id,
+                &stored_question,
+                &display_question,
+                history,
+            )
+            .await
+        } else {
+            if crate::search::routing::is_current(&display_question) {
+                return Err("此问题需要实时资料。请开启联网搜索，或勾选本次联网核查。".into());
+            }
+            ask_follow_up_inner(&state, &card_id, stored_question.clone(), history).await
+        }
+    }
+    .await;
+    let response = match result {
+        Ok(response) => response,
+        Err(error) => {
+            if let Some(id) = &run_id {
+                let _ = state
+                    .database
+                    .search_set_state(id, "failed", Some("follow_up_failed"));
+            }
+            return Err(error);
+        }
+    };
     state
         .database
-        .save_follow_up_exchange(
+        .save_follow_up_exchange_for_run(
             card_id.trim(),
             &display_question,
             &stored_question,
             &response,
+            run_id.as_deref(),
         )
         .map_err(|error| error.to_string())?;
     Ok(response)
@@ -681,7 +713,7 @@ pub fn list_card_follow_ups(
         .map_err(|error| error.to_string())
 }
 
-async fn ask_follow_up_inner(
+pub(crate) async fn ask_follow_up_inner(
     state: &AppState,
     card_id: &str,
     question: String,
@@ -719,6 +751,7 @@ async fn ask_follow_up_inner(
                     provider_id: profile.provider_id.clone(),
                     model: profile.model.clone(),
                     switched_from_provider_id,
+                    search: None,
                 });
             }
             Err(error) => errors.push(format!(
@@ -996,12 +1029,12 @@ fn remaining_generation_slots(state: &AppState) -> CommandResult<usize> {
     Ok((settings.daily_generation_limit - generated_today) as usize)
 }
 
-struct GenerationProfiles {
-    preferred_id: String,
-    profiles: Vec<ProviderProfileRecord>,
+pub(crate) struct GenerationProfiles {
+    pub preferred_id: String,
+    pub profiles: Vec<ProviderProfileRecord>,
 }
 
-fn generation_profiles(state: &AppState) -> CommandResult<GenerationProfiles> {
+pub(crate) fn generation_profiles(state: &AppState) -> CommandResult<GenerationProfiles> {
     let preferred_id = state
         .database
         .generation_provider_id()

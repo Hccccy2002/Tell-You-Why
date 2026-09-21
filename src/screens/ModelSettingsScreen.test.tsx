@@ -39,6 +39,29 @@ function withConfiguredDeepSeek(providers: ProviderSpec[]): ProviderSpec[] {
 }
 
 describe("ModelSettingsScreen", () => {
+  it("places Zhipu search alongside DeepSeek and Kimi without changing the generation provider", async () => {
+    const bootstrap = await bootstrapApp();
+    const changed = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ModelSettingsScreen
+        initialProviders={bootstrap.providers}
+        onProvidersChanged={changed}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "DeepSeek" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Kimi" })).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "智谱搜索" }));
+    const input = await screen.findByLabelText("智谱 API Key");
+    await waitFor(() => expect(input).toBeEnabled());
+    expect(screen.getByRole("tab", { name: "DeepSeek" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(changed).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "DeepSeek" }));
+    expect(screen.getByLabelText("API Key")).toBeVisible();
+  });
   beforeEach(() => {
     deleteProviderKeyMock.mockReset();
     deleteProviderKeyMock.mockResolvedValue(undefined);
@@ -47,16 +70,18 @@ describe("ModelSettingsScreen", () => {
 
   it("keeps generation user-triggered and does not expose auto replenishment", async () => {
     const bootstrap = await bootstrapApp();
-    render(
-      <ModelSettingsScreen
-        initialProviders={bootstrap.providers}
-        onProvidersChanged={vi.fn()}
-      />,
-    );
+    await act(async () => {
+      render(
+        <ModelSettingsScreen
+          initialProviders={bootstrap.providers}
+          onProvidersChanged={vi.fn()}
+        />,
+      );
+      await Promise.resolve();
+    });
 
     expect(screen.queryByText("自动补充内容")).not.toBeInTheDocument();
     expect(screen.queryByText("立即补充 5 张")).not.toBeInTheDocument();
-    expect(screen.getByText(/不会后台自动补充/)).toBeVisible();
   });
 
   it("deletes a configured API Key only after cancelling and confirming the reopened dialog", async () => {

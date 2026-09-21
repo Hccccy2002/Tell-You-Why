@@ -379,10 +379,17 @@ export async function askFollowUp(
   question: string,
   history: FollowUpTurn[],
   displayQuestion = question,
+  searchRunId?: string,
 ): Promise<FollowUpResult> {
   return desktopOr(
     "ask_follow_up",
-    { cardId, question, displayQuestion, history },
+    {
+      cardId,
+      question,
+      displayQuestion,
+      history,
+      ...(searchRunId ? { searchRunId } : {}),
+    },
     () => {
       throw new Error("请先配置模型哦~");
     },

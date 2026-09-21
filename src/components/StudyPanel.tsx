@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type Ref } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { friendlyError } from "../lib/api";
 import { useAutoHideGuard } from "../lib/autoHideGuard";
 import {
@@ -18,6 +25,7 @@ import { StudyHighlights } from "./StudyHighlights";
 import { StudyGoalProgress } from "./StudyGoalProgress";
 import { StudyStartButton } from "./StudyStartButton";
 import { useStudyHighlights } from "../lib/useStudyHighlights";
+import { SearchAnswerView } from "./SearchAnswerView";
 
 interface Props {
   modelBusy?: boolean;
@@ -105,12 +113,22 @@ function QuestionThread({
           ) : null}
           {q.answer ? (
             <>
-              <strong>{labels[q.answer.kind]}</strong>
-              <p>{q.answer.text}</p>
-              <small>
-                AI 辅助回答{q.answer.card_id ? " · 参考了已有知识卡" : ""}
-                ，内容可能有误。
-              </small>
+              <strong>
+                {q.answer.search?.sources.length === 0
+                  ? "搜索提示"
+                  : labels[q.answer.kind]}
+              </strong>
+              {q.answer.search ? (
+                <SearchAnswerView answer={q.answer.search} />
+              ) : (
+                <p>{q.answer.text}</p>
+              )}
+              {!q.answer.search ? (
+                <small>
+                  AI 辅助回答{q.answer.card_id ? " · 参考了已有知识卡" : ""}
+                  ，内容可能有误。
+                </small>
+              ) : null}
               {onSave ? (
                 <button
                   className="text-button"
@@ -209,6 +227,7 @@ export function StudyPanel({
   const [cardDraft, setCardDraft] = useState(!!cardTarget);
   const [doubtDraft, setDoubtDraft] = useState(!!doubtTarget);
   const [questionDraft, setQuestionDraft] = useState("");
+  const [forceSearch, setForceSearch] = useState(false);
   const [replyToQuestionId, setReplyToQuestionId] = useState<string | null>(
     null,
   );
@@ -217,6 +236,7 @@ export function StudyPanel({
     question: string;
     id: string;
     replyToQuestionId: string | null;
+    forceSearch: boolean;
   } | null>(null);
   const questionThread = useRef<HTMLElement>(null);
   const [history, setHistory] = useState<StudySession[] | null>(null);
@@ -247,6 +267,7 @@ export function StudyPanel({
     if (mounted.current) {
       if (current?.steps.at(-1)?.id !== next.steps.at(-1)?.id) {
         setQuestionDraft("");
+        setForceSearch(false);
         setReplyToQuestionId(null);
       }
       setRun(next);
@@ -308,15 +329,17 @@ export function StudyPanel({
     return () => window.removeEventListener("focus", refresh);
   }, [client, accept]);
 
+  const monitoredRunId = run?.id;
+  const monitoredRunState = run?.state;
   useEffect(() => {
-    if (run?.state !== "running" || busy) return;
+    if (!monitoredRunId || (monitoredRunState !== "running" && !busy)) return;
     // A request may still be finishing after navigation; never issue a second one.
     let active = true;
     const timer = window.setInterval(() => {
       void client
-        .read(run.id)
+        .read(monitoredRunId)
         .then((latest) => {
-          if (active) accept(latest);
+          if (active && runRef.current?.id === latest.id) accept(latest);
         })
         .catch((e: unknown) => {
           if (active) setError(friendlyError(e));
@@ -326,22 +349,22 @@ export function StudyPanel({
       active = false;
       window.clearInterval(timer);
     };
-  }, [client, run?.id, run?.state, busy, accept]);
+  }, [client, monitoredRunId, monitoredRunState, busy, accept]);
 
-  useEffect(() => {
-    stepHeading.current?.focus();
-  }, [step?.id]);
+  useLayoutEffect(() => {
+    if (!loading) stepHeading.current?.focus();
+  }, [step?.id, loading]);
 
   const answeredQuestionId = run?.questions.filter((q) => q.answer).at(-1)?.id;
-  useEffect(() => {
-    if (answeredQuestionId) questionThread.current?.focus();
-  }, [answeredQuestionId]);
+  useLayoutEffect(() => {
+    if (!loading && answeredQuestionId) questionThread.current?.focus();
+  }, [answeredQuestionId, loading]);
 
   const loadedRunId = run?.id;
-  useEffect(() => {
+  useLayoutEffect(() => {
     // An explicitly opened source takes priority over the latest-answer focus.
-    if (loadedRunId && focusSourceId) focusSource(focusSourceId);
-  }, [loadedRunId, focusSourceId]);
+    if (!loading && loadedRunId && focusSourceId) focusSource(focusSourceId);
+  }, [loadedRunId, focusSourceId, loading]);
 
   async function operate(operation: () => Promise<void>) {
     if (busyRef.current || stoppingRef.current) return;
@@ -403,6 +426,7 @@ export function StudyPanel({
       if (
         questionRequest.current?.stepId !== step.id ||
         questionRequest.current.question !== question ||
+        questionRequest.current.forceSearch !== forceSearch ||
         questionRequest.current.replyToQuestionId !== replyToQuestionId
       ) {
         questionRequest.current = {
@@ -410,6 +434,7 @@ export function StudyPanel({
           question,
           id: crypto.randomUUID(),
           replyToQuestionId,
+          forceSearch,
         };
       }
       const args = [
@@ -418,12 +443,15 @@ export function StudyPanel({
         question,
         questionRequest.current.id,
       ] as const;
-      const next = replyToQuestionId
-        ? await client.ask(...args, replyToQuestionId)
-        : await client.ask(...args);
+      const next = forceSearch
+        ? await client.ask(...args, replyToQuestionId ?? undefined, true)
+        : replyToQuestionId
+          ? await client.ask(...args, replyToQuestionId)
+          : await client.ask(...args);
       accept(next);
       if (mounted.current) {
         setQuestionDraft("");
+        setForceSearch(false);
         setReplyToQuestionId(null);
       }
       questionRequest.current = null;
@@ -1040,6 +1068,17 @@ export function StudyPanel({
                           >
                             {replyToQuestionId ? "发送补充" : "发送问题"}
                           </button>
+                          <label className="study-search-toggle">
+                            <input
+                              type="checkbox"
+                              checked={forceSearch}
+                              disabled={blocked || !run.can_ask}
+                              onChange={(event) =>
+                                setForceSearch(event.target.checked)
+                              }
+                            />
+                            本次联网核查
+                          </label>
                           {replyToQuestionId ? (
                             <button
                               className="text-button"
@@ -1069,7 +1108,13 @@ export function StudyPanel({
                 <div className="study-progress" role="status">
                   <span className="study-pulse" />
                   {pendingQuestion
-                    ? "正在结合当前内容回答你的问题…"
+                    ? ({
+                        planning: "正在规划联网查询…",
+                        searching: "正在通过智谱搜索资料…",
+                        answering: "正在整理联网资料…",
+                        validating: "正在核对引用…",
+                      }[pendingQuestion.search?.stage ?? ""] ??
+                      "正在结合当前内容回答你的问题…")
                     : "正在准备适合你的下一步…"}
                   <small>可以稍后继续，已完成的内容会保留。</small>
                 </div>

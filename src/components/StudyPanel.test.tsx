@@ -1,10 +1,205 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { StudyPanel } from "./StudyPanel";
 import type { StudyClient, StudySession, StudyHighlight } from "../lib/study";
-import type { ProviderSpec } from "../types";
+import type { ProviderSpec, SearchAnswer } from "../types";
 import { fallbackCards } from "../data/fallbackCards";
+
+const webAnswer: SearchAnswer = {
+  runId: "question-search",
+  status: "answered",
+  asOf: "2026-09-21",
+  retrievedAt: "2026-09-21T03:00:00Z",
+  cacheHit: false,
+  blocks: [{ text: "联网资料支持的解释。", evidenceIds: ["W1"] }],
+  limitation: null,
+  sources: [
+    {
+      id: "W1",
+      title: "科技参考资料",
+      url: "https://example.org/reference",
+      snippet: "不应显示的摘要正文",
+      publisher: null,
+      publishedAt: null,
+      retrievedAt: "2026-09-21T03:00:00Z",
+    },
+  ],
+};
+
+it("forces one study search, polls its progress and keeps the original lesson", async () => {
+  const user = userEvent.setup();
+  const api = client(session());
+  const question = {
+    ...pendingQuestion,
+    question: "今天的科技新闻",
+    search: { stage: "planning" },
+  };
+  vi.mocked(api.ask).mockResolvedValue(
+    session({
+      state: "ready",
+      revision: 3,
+      can_ask: false,
+      questions: [question],
+    }),
+  );
+  vi.mocked(api.read).mockResolvedValue(
+    session({
+      state: "running",
+      revision: 4,
+      can_ask: false,
+      questions: [{ ...question, search: { stage: "searching" } }],
+    }),
+  );
+  let finish!: (run: StudySession) => void;
+  vi.mocked(api.continue).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  show(api);
+  await user.type(await screen.findByLabelText("我想问……"), question.question);
+  await user.click(screen.getByRole("checkbox", { name: "本次联网核查" }));
+  await user.click(screen.getByRole("button", { name: "发送问题" }));
+  expect(api.ask).toHaveBeenCalledWith(
+    "study",
+    "one",
+    question.question,
+    expect.any(String),
+    undefined,
+    true,
+  );
+  expect(
+    await screen.findByText("正在通过智谱搜索资料…", {}, { timeout: 2500 }),
+  ).toBeVisible();
+  await act(async () => {
+    finish(
+      session({
+        revision: 5,
+        questions: [
+          {
+            ...question,
+            answer: {
+              kind: "explanation",
+              text: "联网资料支持的解释。",
+              card_id: null,
+              search: webAnswer,
+            },
+          },
+        ],
+      }),
+    );
+    await Promise.resolve();
+  });
+  expect(screen.getByText("联网资料支持的解释。")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "DNS 是什么" })).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "查看来源 W1" }));
+  expect(screen.getByRole("link", { name: "科技参考资料" })).toHaveAttribute(
+    "href",
+    "https://example.org/reference",
+  );
+  expect(screen.queryByText("不应显示的摘要正文")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("checkbox", { name: "本次联网核查" }),
+  ).not.toBeChecked();
+  expect(api.feedback).not.toHaveBeenCalled();
+});
+
+it("ignores a late search answer after the study was paused", async () => {
+  const user = userEvent.setup();
+  const question = { ...pendingQuestion, search: { stage: "searching" } };
+  const api = client(
+    session({
+      state: "ready",
+      can_resume: true,
+      can_ask: false,
+      questions: [question],
+    }),
+  );
+  let finish!: (run: StudySession) => void;
+  vi.mocked(api.continue).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  vi.mocked(api.pause).mockResolvedValue(
+    session({
+      state: "paused",
+      revision: 10,
+      can_resume: true,
+      can_ask: false,
+      questions: [{ ...question, search: { stage: "paused" } }],
+    }),
+  );
+  show(api);
+  await user.click(
+    await screen.findByRole("button", { name: "继续回答这个问题" }),
+  );
+  await user.click(screen.getByRole("button", { name: "稍后继续" }));
+  await act(async () => {
+    finish(
+      session({
+        revision: 9,
+        questions: [
+          {
+            ...question,
+            answer: {
+              kind: "explanation",
+              text: "联网资料支持的解释。",
+              card_id: null,
+              search: webAnswer,
+            },
+          },
+        ],
+      }),
+    );
+    await Promise.resolve();
+  });
+  expect(screen.queryByText("联网资料支持的解释。")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /参考资料/ }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "继续回答这个问题" }),
+  ).toBeVisible();
+});
+
+it("restores source titles in both study history and saved learning highlights", async () => {
+  const question = {
+    ...pendingQuestion,
+    answer: {
+      kind: "explanation" as const,
+      text: "联网资料支持的解释。",
+      card_id: null,
+      search: webAnswer,
+    },
+  };
+  const api = client(session({ questions: [question] }));
+  vi.mocked(api.highlights).mockResolvedValue([
+    {
+      id: "note",
+      session_id: "study",
+      source_kind: "question",
+      source_id: question.id,
+      title: question.question,
+      text: question.answer.text,
+      created_at: "2026-09-21",
+      search: webAnswer,
+    },
+  ]);
+  show(api);
+  const notes = await screen.findByRole("region", { name: "学习收获" });
+  await userEvent.click(
+    within(notes).getByRole("button", { name: "查看来源 W1" }),
+  );
+  expect(
+    within(notes).getByRole("link", { name: "科技参考资料" }),
+  ).toBeVisible();
+  expect(
+    within(notes).queryByText("不应显示的摘要正文"),
+  ).not.toBeInTheDocument();
+  expect(api.continue).not.toHaveBeenCalled();
+});
 
 it("returns a restored session to its real source card and keeps its expanded view", async () => {
   const user = userEvent.setup();
@@ -853,9 +1048,11 @@ it("answers a specific question once and stays on the current lesson without gra
     }),
   );
   expect(await screen.findByText("名字可以不变，地址可以更新。")).toBeVisible();
-  expect(
-    screen.getByText("名字可以不变，地址可以更新。").closest("section"),
-  ).toHaveFocus();
+  await waitFor(() =>
+    expect(
+      screen.getByText("名字可以不变，地址可以更新。").closest("section"),
+    ).toHaveFocus(),
+  );
   expect(screen.getByRole("heading", { name: "DNS 是什么" })).toBeVisible();
   expect(screen.getByRole("button", { name: "继续" })).toBeEnabled();
   expect(api.continue).toHaveBeenCalledTimes(1);

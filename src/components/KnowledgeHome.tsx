@@ -83,7 +83,6 @@ export function KnowledgeHome({
       <div className="feed-empty-card">
         <span className="eyebrow">知识小窗</span>
         <h1 id="feed-empty-title">想探索哪个领域？</h1>
-        <p>选择一个领域，生成新的知识卡。</p>
         <div className="generation-provider-field">
           <div className="generation-provider-heading">
             <label htmlFor="generation-provider">生成模型</label>
@@ -127,7 +126,6 @@ export function KnowledgeHome({
               );
             })}
           </select>
-          <small>首选模型不可用时，将自动尝试另一已就绪模型。</small>
         </div>
         {pendingGeneration ? (
           <section className="pending-generation" aria-label="未完成的生成任务">

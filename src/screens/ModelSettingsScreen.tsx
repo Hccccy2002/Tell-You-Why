@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CREDENTIAL_REPLACEMENT_REQUIRED,
   deleteProviderKey,
@@ -8,6 +8,8 @@ import {
 } from "../lib/api";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import { PdfModelOverview } from "../components/PdfModelOverview";
+import { SearchSettingsPanel } from "../components/SearchSettingsPanel";
+import { getSearchSettings, type SearchSettings } from "../lib/search";
 import type { ProviderSpec } from "../types";
 
 interface ProviderKeyDeleteConfirmation {
@@ -41,21 +43,40 @@ export function ModelSettingsScreen({
   const [providers, setProviders] = useState(() =>
     structuredClone(initialProviders),
   );
-  const [activeId, setActiveId] = useState<ProviderSpec["id"]>(
+  const [activeId, setActiveId] = useState<ProviderSpec["id"] | "zhipu-search">(
     initialProviders[0]?.id ?? "deepseek",
   );
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchSettings, setSearchSettings] = useState<SearchSettings | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<ProviderKeyDeleteConfirmation | null>(null);
   const [replaceConfirmation, setReplaceConfirmation] =
     useState<ProviderKeyReplaceConfirmation | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    void getSearchSettings()
+      .then((settings) => {
+        if (active) setSearchSettings((current) => current ?? settings);
+      })
+      .catch(() => {
+        // The search panel displays configuration errors when opened.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const active =
     providers.find((provider) => provider.id === activeId) ?? providers[0];
   const controlsLocked =
-    busy != null || deleteConfirmation != null || replaceConfirmation != null;
+    busy != null ||
+    searchBusy ||
+    deleteConfirmation != null ||
+    replaceConfirmation != null;
 
   function updateActive(patch: Partial<ProviderSpec>) {
     setProviders((items) =>
@@ -201,9 +222,9 @@ export function ModelSettingsScreen({
   return (
     <main className="page-view model-settings">
       <div className="page-heading">
-        <span className="eyebrow">在线生成 · 本地识别与检索</span>
+        <span className="eyebrow">在线生成与搜索 · 本地识别与检索</span>
         <h1>模型设置</h1>
-        <p>配置生成与追问使用的在线模型，查看 PDF 知识库使用的本地模型。</p>
+        <p>配置在线生成模型和智谱搜索，查看 PDF 知识库使用的本地模型。</p>
       </div>
       <div
         className="segmented-control model-section-switcher"
@@ -247,8 +268,8 @@ export function ModelSettingsScreen({
                   key={provider.id}
                   role="tab"
                   disabled={controlsLocked}
-                  aria-selected={provider.id === active.id}
-                  className={provider.id === active.id ? "active" : ""}
+                  aria-selected={provider.id === activeId}
+                  className={provider.id === activeId ? "active" : ""}
                   onClick={() => {
                     setActiveId(provider.id);
                     setApiKey("");
@@ -261,130 +282,151 @@ export function ModelSettingsScreen({
                   ) : null}
                 </button>
               ))}
-            </div>
-            <section className="settings-card">
-              <label className="field-label">
-                服务通道
-                <select
-                  disabled={controlsLocked}
-                  value={active.selectedRegion}
-                  onChange={(event) =>
-                    updateActive({
-                      selectedRegion: event.target.value,
-                      connectionVerified: false,
-                    })
-                  }
-                >
-                  {active.regions.map((region) => (
-                    <option key={region.id} value={region.id}>
-                      {region.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field-label">
-                模型
-                <select
-                  disabled={controlsLocked}
-                  value={active.selectedModel}
-                  onChange={(event) =>
-                    updateActive({
-                      selectedModel: event.target.value,
-                      connectionVerified: false,
-                    })
-                  }
-                >
-                  {active.models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.label}
-                      {model.recommended ? "（推荐）" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field-label">
-                API Key
-                <input
-                  type="password"
-                  disabled={controlsLocked}
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={apiKey}
-                  placeholder={
-                    active.keyConfigured
-                      ? `已配置 · •••• ${active.keyLast4 ?? ""}`
-                      : "输入完整 Key"
-                  }
-                  onChange={(event) => setApiKey(event.target.value)}
-                />
-              </label>
-              <p className="security-note">
-                <span aria-hidden="true">▣</span>
-                Key 由 Rust 保存到 Windows Credential Manager；SQLite
-                和前端都不保存原文。
-              </p>
               <button
-                className="secondary-button wide"
+                role="tab"
                 disabled={controlsLocked}
-                onClick={requestSaveProfile}
-              >
-                {busy === "save" ? "正在安全保存…" : "保存配置"}
-              </button>
-              {active.keyConfigured ? (
-                <div className="connection-row">
-                  <span
-                    className={
-                      active.connectionVerified ? "status success" : "status"
-                    }
-                  >
-                    {active.connectionVerified ? "连接已验证" : "尚未验证连接"}
-                  </span>
-                  <button
-                    className="text-button"
-                    disabled={controlsLocked}
-                    onClick={() => void testConnection()}
-                  >
-                    {busy === "test" ? "正在测试…" : "测试连接"}
-                  </button>
-                </div>
-              ) : null}
-            </section>
-            <p className="model-call-note">
-              在线模型用于知识卡生成、追问，以及 PDF
-              中的生成、解释和复习。仅在你主动使用这些功能时调用，不会后台自动补充。
-            </p>
-            {message && !deleteConfirmation && !replaceConfirmation ? (
-              <p className="form-message" role="status">
-                {message}
-              </p>
-            ) : null}
-            {active.keyConfigured ? (
-              <button
-                className="danger-text-button"
-                disabled={controlsLocked}
+                aria-selected={activeId === "zhipu-search"}
+                className={activeId === "zhipu-search" ? "active" : ""}
                 onClick={() => {
+                  setActiveId("zhipu-search");
+                  setApiKey("");
                   setMessage(null);
-                  setDeleteConfirmation({
-                    providerId: active.id,
-                    region: active.selectedRegion,
-                    regionLabel:
-                      active.regions.find(
-                        (region) => region.id === active.selectedRegion,
-                      )?.label ?? active.selectedRegion,
-                    label: active.label,
-                    keyLast4: active.keyLast4,
-                  });
                 }}
               >
-                {busy === "delete"
-                  ? "正在删除…"
-                  : `删除 ${active.label} API Key`}
+                智谱搜索
+                {searchSettings?.keyConfigured &&
+                searchSettings.connectionVerified ? (
+                  <span className="configured-dot" aria-label="连接已验证" />
+                ) : null}
               </button>
-            ) : null}
-            <p className="ai-disclosure">
-              模型生成的卡片统一标记为“AI
-              生成，未经外部核验”，模型自行给出的链接不会显示为已核验来源。
-            </p>
+            </div>
+            {activeId === "zhipu-search" ? (
+              <SearchSettingsPanel
+                onBusyChange={setSearchBusy}
+                onSettingsChange={setSearchSettings}
+              />
+            ) : (
+              <>
+                <section className="settings-card">
+                  <label className="field-label">
+                    服务通道
+                    <select
+                      disabled={controlsLocked}
+                      value={active.selectedRegion}
+                      onChange={(event) =>
+                        updateActive({
+                          selectedRegion: event.target.value,
+                          connectionVerified: false,
+                        })
+                      }
+                    >
+                      {active.regions.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    模型
+                    <select
+                      disabled={controlsLocked}
+                      value={active.selectedModel}
+                      onChange={(event) =>
+                        updateActive({
+                          selectedModel: event.target.value,
+                          connectionVerified: false,
+                        })
+                      }
+                    >
+                      {active.models.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.label}
+                          {model.recommended ? "（推荐）" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    API Key
+                    <input
+                      type="password"
+                      disabled={controlsLocked}
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={apiKey}
+                      placeholder={
+                        active.keyConfigured
+                          ? `已配置 · •••• ${active.keyLast4 ?? ""}`
+                          : "输入完整 Key"
+                      }
+                      onChange={(event) => setApiKey(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="secondary-button wide"
+                    disabled={controlsLocked}
+                    onClick={requestSaveProfile}
+                  >
+                    {busy === "save" ? "正在安全保存…" : "保存配置"}
+                  </button>
+                  {active.keyConfigured ? (
+                    <div className="connection-row">
+                      <span
+                        className={
+                          active.connectionVerified
+                            ? "status success"
+                            : "status"
+                        }
+                      >
+                        {active.connectionVerified
+                          ? "连接已验证"
+                          : "尚未验证连接"}
+                      </span>
+                      <button
+                        className="text-button"
+                        disabled={controlsLocked}
+                        onClick={() => void testConnection()}
+                      >
+                        {busy === "test" ? "正在测试…" : "测试连接"}
+                      </button>
+                    </div>
+                  ) : null}
+                </section>
+                {message && !deleteConfirmation && !replaceConfirmation ? (
+                  <p className="form-message" role="status">
+                    {message}
+                  </p>
+                ) : null}
+                {active.keyConfigured ? (
+                  <button
+                    className="danger-text-button"
+                    disabled={controlsLocked}
+                    onClick={() => {
+                      setMessage(null);
+                      setDeleteConfirmation({
+                        providerId: active.id,
+                        region: active.selectedRegion,
+                        regionLabel:
+                          active.regions.find(
+                            (region) => region.id === active.selectedRegion,
+                          )?.label ?? active.selectedRegion,
+                        label: active.label,
+                        keyLast4: active.keyLast4,
+                      });
+                    }}
+                  >
+                    {busy === "delete"
+                      ? "正在删除…"
+                      : `删除 ${active.label} API Key`}
+                  </button>
+                ) : null}
+                <p className="ai-disclosure">
+                  模型生成的卡片统一标记为“AI
+                  生成，未经外部核验”，模型自行给出的链接不会显示为已核验来源。
+                </p>
+              </>
+            )}
           </>
         ) : (
           <p className="form-message" role="status">
