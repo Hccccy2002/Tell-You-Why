@@ -1,4 +1,5 @@
 import type { useStudyHighlights } from "../lib/useStudyHighlights";
+import { SearchAnswerView } from "./SearchAnswerView";
 
 export function StudyHighlights({
   notes,
@@ -25,7 +26,11 @@ export function StudyHighlights({
       {notes.items.map((note) => (
         <article key={note.id}>
           <h4>{note.title}</h4>
-          <p>{note.text}</p>
+          {note.search ? (
+            <SearchAnswerView answer={note.search} />
+          ) : (
+            <p>{note.text}</p>
+          )}
           <div className="study-actions">
             {onOpen ? (
               <button

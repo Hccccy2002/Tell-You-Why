@@ -105,6 +105,14 @@ impl Database {
             question.id = uuid::Uuid::new_v4().to_string();
             question.created_at = chrono::Utc::now().to_rfc3339();
             question.answer = None;
+            question.search = Some(crate::study_search::StudySearchRun::new(
+                question
+                    .search
+                    .as_ref()
+                    .map(|s| s.options.clone())
+                    .unwrap_or(self.search_options()?),
+                false,
+            ));
             question.feedback = None;
             question.reply_to_question_id = None;
             question.doubt_id = Some(doubt_id.clone());
@@ -195,6 +203,10 @@ impl Database {
             previous_answers,
             reply_to_question_id: None,
             clarification_replies: old_question.clarification_replies.clone(),
+            search: Some(crate::study_search::StudySearchRun::new(
+                self.search_options()?,
+                false,
+            )),
         };
         run.topic = old.topic;
         run.goal = format!(

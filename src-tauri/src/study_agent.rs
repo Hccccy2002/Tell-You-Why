@@ -303,6 +303,7 @@ pub(crate) fn execute(
                 kind: args.kind,
                 text: args.text,
                 card_id: args.card_id,
+                search: None,
             });
             Ok(
                 json!({"answered":args.request_id,"awaiting":"user_action","learning_step_unchanged":true}),
@@ -524,7 +525,7 @@ pub(crate) fn execute(
     }
 }
 
-async fn request(
+pub(crate) async fn request(
     db: &Database,
     run: &mut StudySession,
     transport: &dyn ProviderTransport,
@@ -535,9 +536,26 @@ async fn request(
     run.control
         .check(run.model_calls, run.tool_calls, true)
         .map_err(|s| s.message)?;
+    let search_budget = run
+        .pending_question()
+        .and_then(|q| q.search.as_ref())
+        .filter(|s| s.is_active());
+    let remaining = search_budget.map_or(60_000, |s| 90_000u64.saturating_sub(s.active_ms));
+    if search_budget.is_some_and(|s| s.model_calls >= 3) || remaining == 0 {
+        return Err("本次联网回答已达到调用次数或时间上限".into());
+    }
     let charge = request_charge(body, 2200);
     run.control.reserve_tokens(charge).map_err(|s| s.message)?;
-    let reserved = run.control.reserve_time(60_000);
+    let reserved = run.control.reserve_time(60_000.min(remaining));
+    if let Some(search) = run
+        .questions
+        .last_mut()
+        .and_then(|q| q.search.as_mut())
+        .filter(|s| s.is_active())
+    {
+        search.model_calls += 1;
+        search.active_ms += reserved;
+    }
     run.model_calls += 1;
     db.study_save(run).map_err(|e| e.to_string())?;
     let start = Instant::now();
@@ -564,6 +582,17 @@ async fn request(
         }
     };
     run.control.settle_time(reserved, start.elapsed());
+    if let Some(search) = run
+        .questions
+        .last_mut()
+        .and_then(|q| q.search.as_mut())
+        .filter(|s| s.is_active())
+    {
+        search.active_ms = search
+            .active_ms
+            .saturating_sub(reserved)
+            .saturating_add(start.elapsed().as_millis() as u64);
+    }
     // Persist the request charge even when parsing/network fails; no free repeated retries.
     db.study_save(run).map_err(|e| e.to_string())?;
     let response = response.map_err(|e| e.to_string())?;
@@ -607,38 +636,7 @@ pub(crate) async fn drive(
         db.study_save(run).map_err(|e| e.to_string())?;
         return Ok(());
     }
-    if run.pending_question().is_some() {
-        // The question and its source are already chosen by the user. Required
-        // local reads are deterministic; never ask a model to guess them again.
-        let mut reads = Vec::new();
-        if !run.context_read {
-            reads.push(("get_learning_context", json!({})));
-        }
-        if let Some(card) = &run.source_card {
-            if !run
-                .discovered_cards
-                .contains(&format!("read:{}", card.card_id))
-            {
-                reads.push(("read_card", json!({"card_id":card.card_id})));
-            }
-        }
-        for (name, arguments) in reads {
-            run.control
-                .check(run.model_calls, run.tool_calls, false)
-                .map_err(|s| s.message)?;
-            let mut candidate = run.clone();
-            let call = StudyCall {
-                id: uuid::Uuid::new_v4().to_string(),
-                name: name.into(),
-                arguments: arguments.to_string(),
-            };
-            let data = execute(db, &mut candidate, &call)?;
-            candidate.tool_calls += 1;
-            candidate.messages.push(json!({"role":"user","content":json!({"kind":"required_question_context","tool":name,"data":data}).to_string()}));
-            db.study_save(&mut candidate).map_err(|e| e.to_string())?;
-            *run = candidate;
-        }
-    }
+    prepare_question_context(db, run)?;
     for turn in 0..=8 {
         if let Some(call) = run.pending.clone() {
             run.control
@@ -749,4 +747,43 @@ pub(crate) fn failure(control: &mut RunControl, message: &str) {
     let resumable = control.charged_active_ms < control.policy.max_active_ms
         && control.charged_tokens < control.policy.max_token_charge;
     control.stop = Some(StopReason::new("study_step_failed", message, resumable));
+}
+
+pub(crate) fn prepare_question_context(
+    db: &Database,
+    run: &mut StudySession,
+) -> Result<(), String> {
+    if run.pending_question().is_some() {
+        // The question and its source are already chosen by the user. Required
+        // local reads are deterministic; never ask a model to guess them again.
+        let mut reads = Vec::new();
+        if !run.context_read {
+            reads.push(("get_learning_context", json!({})));
+        }
+        if let Some(card) = &run.source_card {
+            if !run
+                .discovered_cards
+                .contains(&format!("read:{}", card.card_id))
+            {
+                reads.push(("read_card", json!({"card_id":card.card_id})));
+            }
+        }
+        for (name, arguments) in reads {
+            run.control
+                .check(run.model_calls, run.tool_calls, false)
+                .map_err(|s| s.message)?;
+            let mut candidate = run.clone();
+            let call = StudyCall {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: name.into(),
+                arguments: arguments.to_string(),
+            };
+            let data = execute(db, &mut candidate, &call)?;
+            candidate.tool_calls += 1;
+            candidate.messages.push(json!({"role":"user","content":json!({"kind":"required_question_context","tool":name,"data":data}).to_string()}));
+            db.study_save(&mut candidate).map_err(|e| e.to_string())?;
+            *run = candidate;
+        }
+    }
+    Ok(())
 }

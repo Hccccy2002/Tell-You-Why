@@ -1,0 +1,69 @@
+{
+  "provenance": "Synthetic contract fixtures derived from the official OpenAPI schema, not live account responses. Verified 2026-09-21.",
+  "source": "https://docs.bigmodel.cn/api-reference/工具-api/网络搜索.md",
+  "cases": [
+    {
+      "httpStatus": 200,
+      "body": {
+        "request_id": "fixture-public-1",
+        "search_intent": [{ "intent": "SEARCH_ALWAYS" }],
+        "search_result": [
+          {
+            "title": "公开发布记录",
+            "content": "示例资料摘要。",
+            "link": "https://nodejs.org/en/blog/",
+            "media": "Node.js",
+            "refer": "ref_1",
+            "publish_date": "2026-09-01"
+          }
+        ]
+      },
+      "expected": "success"
+    },
+    { "httpStatus": 200, "body": { "search_result": [] }, "expected": "empty" },
+    {
+      "httpStatus": 401,
+      "body": { "error": { "code": "1000", "message": "身份验证失败" } },
+      "expected": "invalid_key"
+    },
+    {
+      "httpStatus": 429,
+      "body": { "error": { "code": "1113" } },
+      "expected": "insufficient_balance"
+    },
+    {
+      "httpStatus": 429,
+      "body": { "error": { "code": "1302" } },
+      "expected": "rate_limited"
+    },
+    {
+      "httpStatus": 200,
+      "body": { "error": { "code": "1701" } },
+      "expected": "rate_limited"
+    },
+    {
+      "httpStatus": 200,
+      "body": { "error": { "code": "1702" } },
+      "expected": "unavailable"
+    },
+    {
+      "httpStatus": 200,
+      "body": { "error": { "code": "1703" } },
+      "expected": "empty"
+    },
+    {
+      "httpStatus": 403,
+      "body": { "error": { "code": "1311" } },
+      "expected": "permission_denied"
+    },
+    { "httpStatus": 503, "body": {}, "expected": "unavailable" },
+    {
+      "httpStatus": 200,
+      "body": {
+        "search_intent": [{ "intent": "SEARCH_NONE" }],
+        "search_result": []
+      },
+      "expected": "search_skipped"
+    }
+  ]
+}

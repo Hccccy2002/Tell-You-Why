@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { withAutoHideGuard } from "./autoHideGuard";
-import type { KnowledgeCard } from "../types";
+import type { KnowledgeCard, SearchAnswer } from "../types";
 
 export type StudyFeedback =
   | "continue"
@@ -72,6 +72,7 @@ export interface StudySession {
   summary: { topics: string[]; answered: number; correct: number };
 }
 export interface StudyQuestion {
+  search?: { stage: string } | null;
   id: string;
   step_id: string;
   question: string;
@@ -81,6 +82,7 @@ export interface StudyQuestion {
   reply_to_question_id?: string | null;
   clarification_replies?: { prompt: string; reply: string }[];
   answer: {
+    search?: SearchAnswer | null;
     kind: "explanation" | "comparison" | "example" | "clarification";
     text: string;
     card_id: string | null;
@@ -121,6 +123,7 @@ export interface StudyClient {
     question: string,
     requestId: string,
     replyToQuestionId?: string,
+    forceSearch?: boolean,
   ) => Promise<StudySession>;
   read: (id: string) => Promise<StudySession>;
   continue: (id: string) => Promise<StudySession>;
@@ -173,6 +176,7 @@ export interface StudyCardSession {
   step_count: number;
 }
 export interface StudyHighlight {
+  search?: SearchAnswer | null;
   id: string;
   session_id: string;
   source_kind: "step" | "question";
@@ -224,13 +228,14 @@ export const studyClient: StudyClient = {
   startReview: (conceptKey) => invoke("study_start_review", { conceptKey }),
   startCard: (cardId, expanded = false) =>
     invoke("study_start_card_view", { cardId, expanded }),
-  ask: (id, stepId, question, requestId, replyToQuestionId) =>
+  ask: (id, stepId, question, requestId, replyToQuestionId, forceSearch) =>
     invoke("study_ask", {
       id,
       stepId,
       question,
       requestId,
       replyToQuestionId: replyToQuestionId ?? null,
+      forceSearch: forceSearch ?? false,
     }),
   read: (id) => invoke("study_read", { id }),
   continue: (id) =>

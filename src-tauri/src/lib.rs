@@ -36,6 +36,7 @@ mod review_store;
 mod review_tests;
 mod review_tools;
 mod review_trace;
+mod search;
 mod secret_store;
 mod study;
 mod study_agent;
@@ -44,6 +45,9 @@ mod study_doubts;
 mod study_goal;
 #[cfg(test)]
 mod study_goal_tests;
+mod study_search;
+#[cfg(test)]
+mod study_search_tests;
 mod study_store;
 #[cfg(test)]
 mod study_tests;
@@ -106,6 +110,9 @@ pub fn run() {
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             let http = RestrictedHttpClient::new()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            database
+                .search_recover()
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
             app.manage(AppState {
                 database,
                 secrets: Arc::new(WindowsCredentialStore),
@@ -152,6 +159,14 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            search::search_settings,
+            search::save_search_key,
+            search::delete_search_key,
+            search::test_search_connection,
+            search::save_search_options,
+            search::agent::prepare_search_follow_up,
+            search::agent::search_follow_up_status,
+            search::agent::cancel_search_follow_up,
             navigation::take_window_navigation,
             navigation::acknowledge_window_navigation,
             study_commands::study_start,

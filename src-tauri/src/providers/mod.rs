@@ -232,9 +232,14 @@ impl RestrictedHttpClient {
             .map_err(|_| ProviderError::Unavailable)?;
         Ok(Self {
             client,
-            allowed_hosts: ["api.deepseek.com", "api.moonshot.cn", "api.moonshot.ai"]
-                .into_iter()
-                .collect(),
+            allowed_hosts: [
+                "api.deepseek.com",
+                "api.moonshot.cn",
+                "api.moonshot.ai",
+                "open.bigmodel.cn",
+            ]
+            .into_iter()
+            .collect(),
         })
     }
 
@@ -246,6 +251,10 @@ impl RestrictedHttpClient {
             || !endpoint.username().is_empty()
             || endpoint.password().is_some()
             || !self.allowed_hosts.contains(host)
+            || (host == "open.bigmodel.cn"
+                && (endpoint.path() != "/api/paas/v4/web_search"
+                    || endpoint.query().is_some()
+                    || endpoint.fragment().is_some()))
         {
             return Err(ProviderError::UnsafeTarget);
         }
@@ -263,7 +272,7 @@ impl ProviderTransport for RestrictedHttpClient {
         timeout: Duration,
     ) -> Result<TransportResponse, ProviderError> {
         self.validate_url(endpoint)?;
-        let response = self
+        let mut response = self
             .client
             .post(endpoint.clone())
             .bearer_auth(api_key.expose())
@@ -274,7 +283,18 @@ impl ProviderTransport for RestrictedHttpClient {
             .await
             .map_err(classify_transport_error)?;
         let status = response.status().as_u16();
-        let body = response.text().await.map_err(classify_transport_error)?;
+        let body = if endpoint.host_str() == Some("open.bigmodel.cn") {
+            let mut bytes = Vec::new();
+            while let Some(chunk) = response.chunk().await.map_err(classify_transport_error)? {
+                if bytes.len() + chunk.len() > 1_000_000 {
+                    return Err(ProviderError::MalformedResponse);
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            String::from_utf8(bytes).map_err(|_| ProviderError::MalformedResponse)?
+        } else {
+            response.text().await.map_err(classify_transport_error)?
+        };
         Ok(TransportResponse { status, body })
     }
 }
@@ -563,7 +583,7 @@ async fn answer_follow_up_openai_compatible(
     unreachable!("bounded follow-up retry loop must return")
 }
 
-async fn answer_follow_up_once(
+pub(crate) async fn answer_follow_up_once(
     context: &ProviderContext,
     api_key: &SecretValue,
     body: &Value,

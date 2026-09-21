@@ -294,6 +294,21 @@ impl Database {
             transaction.execute_batch(include_str!("study_doubts_schema.sql"))?;
             transaction.commit()?;
         }
+        if version < 14 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(include_str!("search/schema.sql"))?;
+            transaction.commit()?;
+        }
+        if version < 15 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(include_str!("search/runtime_schema.sql"))?;
+            transaction.commit()?;
+        }
+        if version < 16 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(include_str!("search/answer_schema.sql"))?;
+            transaction.commit()?;
+        }
         connection.execute(
             "UPDATE card_user_state
              SET hidden = 1
@@ -824,6 +839,7 @@ impl Database {
             "DELETE FROM follow_up_exchanges WHERE card_id = ?1",
             [card_id],
         )?;
+        transaction.execute("DELETE FROM search_runs WHERE card_id=?1", [card_id])?;
         if built_in == 0 {
             transaction.execute("DELETE FROM cards WHERE id = ?1", [card_id])?;
         } else {
@@ -845,6 +861,7 @@ impl Database {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn save_follow_up_exchange(
         &self,
         card_id: &str,
@@ -852,7 +869,34 @@ impl Database {
         request_question: &str,
         response: &FollowUpResponse,
     ) -> Result<(), DbError> {
-        let connection = self.connect()?;
+        self.save_follow_up_exchange_for_run(
+            card_id,
+            display_question,
+            request_question,
+            response,
+            None,
+        )
+    }
+
+    pub(crate) fn save_follow_up_exchange_for_run(
+        &self,
+        card_id: &str,
+        display_question: &str,
+        request_question: &str,
+        response: &FollowUpResponse,
+        run_id: Option<&str>,
+    ) -> Result<(), DbError> {
+        let mut conn = self.connect()?;
+        let connection =
+            conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        if let Some(id) = run_id {
+            let changed = connection.execute("UPDATE search_runs SET state='completed' WHERE id=?1 AND card_id=?2 AND state IN ('planning','searching','answering','validating')", params![id,card_id])?;
+            if changed != 1 {
+                return Err(DbError::Validation(
+                    "本次请求已取消或结束，回答未保存".into(),
+                ));
+            }
+        }
         let inserted = connection.execute(
             "INSERT INTO follow_up_exchanges(
                 card_id, display_question, request_question, answer,
@@ -876,6 +920,19 @@ impl Database {
         if inserted == 0 {
             return Err(DbError::NoCards);
         }
+        if let Some(search) = &response.search {
+            if Some(search.run_id.as_str()) != run_id {
+                return Err(DbError::Validation("搜索记录不匹配".into()));
+            }
+            connection.execute(
+                "INSERT INTO follow_up_search VALUES(?1,?2)",
+                params![
+                    connection.last_insert_rowid(),
+                    serde_json::to_string(search)?
+                ],
+            )?;
+        }
+        connection.commit()?;
         Ok(())
     }
 
@@ -883,10 +940,10 @@ impl Database {
         let connection = self.connect()?;
         let mut statement = connection.prepare(
             "SELECT display_question, request_question, answer, provider_id,
-                    model, switched_from_provider_id
-             FROM follow_up_exchanges
+                    model, switched_from_provider_id, fs.record
+             FROM follow_up_exchanges LEFT JOIN follow_up_search fs ON fs.exchange_id=follow_up_exchanges.id
              WHERE card_id = ?1
-             ORDER BY id ASC",
+             ORDER BY follow_up_exchanges.id ASC",
         )?;
         let rows = statement
             .query_map([card_id], |row| {
@@ -897,6 +954,7 @@ impl Database {
                     row.get::<_, String>(3)?,
                     row.get::<_, String>(4)?,
                     row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -908,6 +966,7 @@ impl Database {
             provider_id,
             model,
             switched_from_provider_id,
+            search_json,
         ) in rows
         {
             let request_content =
@@ -927,6 +986,7 @@ impl Database {
                     provider_id,
                     model,
                     switched_from_provider_id,
+                    search: search_json.map(|v| serde_json::from_str(&v)).transpose()?,
                 }),
             });
         }
@@ -1188,6 +1248,10 @@ impl Database {
                SELECT 1 FROM provider_profiles profile
                WHERE profile.credential_ref = pending.credential_ref
              )
+             AND NOT EXISTS (
+               SELECT 1 FROM search_profiles search
+               WHERE search.credential_ref = pending.credential_ref
+             )
              ORDER BY pending.created_at, pending.credential_ref",
         )?;
         let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
@@ -1319,6 +1383,16 @@ impl Database {
                 )?;
             }
             "all" => {
+                transaction.execute(
+                    "INSERT OR IGNORE INTO pending_credential_deletions(credential_ref, created_at)
+                     SELECT credential_ref, ?1 FROM search_profiles",
+                    [chrono::Utc::now().to_rfc3339()],
+                )?;
+                transaction.execute("DELETE FROM search_profiles", [])?;
+                transaction.execute("DELETE FROM search_runs", [])?;
+                transaction.execute("DELETE FROM search_options", [])?;
+                transaction.execute("DELETE FROM search_cache", [])?;
+                transaction.execute("DELETE FROM search_attempts", [])?;
                 transaction.execute(
                     "INSERT OR IGNORE INTO pending_credential_deletions(
                         credential_ref, created_at
@@ -1729,6 +1803,7 @@ mod tests {
             provider_id: "deepseek".into(),
             model: "deepseek-v4-flash".into(),
             switched_from_provider_id: None,
+            search: None,
         };
         let display_question = "解释「晶体结构」";
         let request_question = "请解释选中的晶体结构";

@@ -6,26 +6,32 @@ import remarkGfm from "remark-gfm";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { useAutoHideGuard } from "../lib/autoHideGuard";
 import { friendlyError, openSourceUrl } from "../lib/api";
+import {
+  getSearchSettings,
+  prepareSearchFollowUp,
+  searchFollowUpStatus,
+  cancelSearchFollowUp,
+} from "../lib/search";
+import { SearchAnswerView } from "./SearchAnswerView";
 import type {
   FollowUpMessage,
   FollowUpResult,
   FollowUpTurn,
   InteractionKind,
   KnowledgeCard,
-  TrustStatus,
 } from "../types";
-
-const trustLabels: Record<TrustStatus, string> = {
-  verified: "已核验",
-  source_grounded: "基于来源生成",
-  ai_unverified: "AI 生成 · 未经外部核验",
-  demo_unreviewed: "演示内容 · 未经人工复核",
-};
 
 const providerLabels = {
   deepseek: "DeepSeek",
   kimi: "Kimi",
 } satisfies Record<FollowUpResult["providerId"], string>;
+
+function isEmptySearchResult(result?: FollowUpResult) {
+  return (
+    result?.search?.status === "insufficient" &&
+    result.search.sources.length === 0
+  );
+}
 
 interface SelectionAnchor {
   bottom: number;
@@ -251,6 +257,7 @@ interface Props {
     question: string,
     history: FollowUpTurn[],
     displayQuestion: string,
+    searchRunId?: string,
   ) => Promise<FollowUpResult>;
   onLoadFollowUps: (cardId: string) => Promise<FollowUpMessage[]>;
   onFollowUpBusyChange: (busy: boolean) => void;
@@ -298,6 +305,44 @@ export function KnowledgeCardView({
   const followUpHistoryLoading = loadedFollowUpCardId !== card.id;
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [searchMode, setSearchMode] = useState("off");
+  const [forceSearch, setForceSearch] = useState(false);
+  const [searchRunId, setSearchRunId] = useState<string | null>(null);
+  const [searchStage, setSearchStage] = useState("planning");
+  const [cancellingSearch, setCancellingSearch] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void getSearchSettings()
+      .then((settings) => {
+        if (active) setSearchMode(settings.options?.mode ?? "off");
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [card.id]);
+  useEffect(() => {
+    if (!searchRunId) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const stage = await searchFollowUpStatus(card.id, searchRunId);
+        if (active && stage) setSearchStage(stage);
+      } catch {
+        /* The request itself reports errors; a missed progress read is harmless. */
+      }
+      if (active)
+        timer = setTimeout(() => {
+          void poll();
+        }, 500);
+    };
+    void poll();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [card.id, searchRunId]);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [failedSelectionQuery, setFailedSelectionQuery] =
     useState<FailedSelectionQuery | null>(null);
@@ -520,7 +565,15 @@ export function KnowledgeCardView({
           role,
           content: requestContent ?? content,
         }));
-      const result = await onAskFollowUp(question, history, visibleQuestion);
+      let runId: string | undefined;
+      if (forceSearch || searchMode !== "off") {
+        runId = await prepareSearchFollowUp(card.id, forceSearch);
+        setSearchRunId(runId);
+        setSearchStage("planning");
+      }
+      const result = runId
+        ? await onAskFollowUp(question, history, visibleQuestion, runId)
+        : await onAskFollowUp(question, history, visibleQuestion);
       if (followUpRequestRef.current !== requestId) return;
       const answer = result.answer.trim();
       if (!answer) throw new Error("模型暂未返回内容，请稍后再试");
@@ -538,6 +591,7 @@ export function KnowledgeCardView({
         },
       ]);
       if (source === "draft") setFollowUpDraft("");
+      setForceSearch(false);
     } catch (error) {
       if (followUpRequestRef.current === requestId) {
         setFollowUpError(friendlyError(error));
@@ -553,6 +607,8 @@ export function KnowledgeCardView({
         followUpInFlightRef.current = false;
         setPendingQuestion(null);
         setFollowUpLoading(false);
+        setSearchRunId(null);
+        setCancellingSearch(false);
         onFollowUpBusyChange(false);
         if (source === "draft") {
           requestAnimationFrame(() => followUpInputRef.current?.focus());
@@ -688,7 +744,6 @@ export function KnowledgeCardView({
               ref={answerRef}
               tabIndex={-1}
               aria-live="polite"
-              aria-describedby="selection-query-hint"
               onPointerUp={(event) =>
                 captureSelectionQuery("pointer", event.target)
               }
@@ -700,9 +755,6 @@ export function KnowledgeCardView({
               <p className="short-answer" data-queryable-text>
                 {card.shortAnswer}
               </p>
-              <small id="selection-query-hint" className="selection-query-hint">
-                选中答案或解释中的文字，可以让 AI 结合当前卡片解释。
-              </small>
               <button
                 className="text-button expand-button"
                 aria-expanded={expanded}
@@ -721,15 +773,6 @@ export function KnowledgeCardView({
                     </aside>
                   ) : null}
                 </section>
-              ) : null}
-              <div className={`trust-badge trust-${card.trustStatus}`}>
-                <span aria-hidden="true">●</span>
-                {trustLabels[card.trustStatus]}
-              </div>
-              {card.trustStatus === "ai_unverified" ? (
-                <p className="trust-warning">
-                  AI 生成，未经外部核验，可能存在错误。
-                </p>
               ) : null}
               {card.sourceRefs.length > 0 ? (
                 <section className="sources" aria-label="内容来源">
@@ -776,7 +819,6 @@ export function KnowledgeCardView({
                   <span id="follow-up-heading" className="section-label">
                     继续追问
                   </span>
-                  <small>会参考当前卡片，也可以问其他知识</small>
                 </div>
                 {(!followUpHistoryLoading && followUpThread.length > 0) ||
                 pendingQuestion ? (
@@ -798,17 +840,30 @@ export function KnowledgeCardView({
                         {message.role === "assistant" ? (
                           <>
                             <strong className="follow-up-author">
-                              AI 回答
+                              {isEmptySearchResult(message.result)
+                                ? "搜索提示"
+                                : "AI 回答"}
                             </strong>
-                            <MarkdownAnswer>{message.content}</MarkdownAnswer>
+                            {message.result?.search ? (
+                              <SearchAnswerView
+                                answer={message.result.search}
+                              />
+                            ) : (
+                              <MarkdownAnswer>{message.content}</MarkdownAnswer>
+                            )}
                           </>
                         ) : (
                           <p>{message.content}</p>
                         )}
-                        {message.role === "assistant" && message.result ? (
+                        {message.role === "assistant" &&
+                        message.result &&
+                        !isEmptySearchResult(message.result) ? (
                           <small className="follow-up-provider">
                             {providerLabels[message.result.providerId]} ·{" "}
-                            {message.result.model} · AI 未核验
+                            {message.result.model} ·{" "}
+                            {message.result.search
+                              ? "模型整理 · 引用未经人工复核"
+                              : "AI 未核验"}
                             {message.result.switchedFromProviderId
                               ? ` · 已从 ${
                                   providerLabels[
@@ -830,7 +885,34 @@ export function KnowledgeCardView({
                     ) : null}
                     {followUpLoading ? (
                       <div className="follow-up-loading" role="status">
-                        AI 正在回答…
+                        {searchRunId
+                          ? ({
+                              planning: "正在分析查询…",
+                              searching: "正在查找资料…",
+                              answering: "正在整理回答…",
+                              validating: "正在校验引用…",
+                              cancelled: "正在取消…",
+                            }[searchStage] ?? "正在处理…")
+                          : "AI 正在回答…"}
+                        {searchRunId ? (
+                          <button
+                            type="button"
+                            disabled={cancellingSearch}
+                            onClick={() => {
+                              setCancellingSearch(true);
+                              void cancelSearchFollowUp(card.id, searchRunId)
+                                .then((cancelled) => {
+                                  if (cancelled) setSearchStage("cancelled");
+                                })
+                                .catch((error) => {
+                                  setFollowUpError(friendlyError(error));
+                                  setCancellingSearch(false);
+                                });
+                            }}
+                          >
+                            {cancellingSearch ? "正在取消…" : "取消本次查询"}
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -857,6 +939,15 @@ export function KnowledgeCardView({
                   </div>
                 ) : null}
                 <>
+                  <label className="follow-up-search-toggle">
+                    <input
+                      type="checkbox"
+                      checked={forceSearch}
+                      disabled={cardBusy}
+                      onChange={(event) => setForceSearch(event.target.checked)}
+                    />
+                    本次联网核查
+                  </label>
                   <form
                     className="follow-up-form"
                     aria-busy={followUpLoading}
@@ -876,7 +967,6 @@ export function KnowledgeCardView({
                       value={followUpDraft}
                       disabled={cardBusy}
                       placeholder="输入任何想了解的问题…"
-                      aria-describedby="follow-up-keyboard-hint"
                       onChange={(event) => {
                         setFollowUpDraft(event.target.value);
                         if (followUpError) {
@@ -909,12 +999,6 @@ export function KnowledgeCardView({
                           : "发送"}
                     </button>
                   </form>
-                  <small
-                    id="follow-up-keyboard-hint"
-                    className="follow-up-keyboard-hint"
-                  >
-                    Enter 发送 · Shift + Enter 换行
-                  </small>
                 </>
               </section>
             </div>

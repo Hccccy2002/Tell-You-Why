@@ -256,20 +256,26 @@ pub(crate) async fn continue_inner(id: String, state: &AppState) -> Result<Value
         .get(&profile.credential_ref)
         .map_err(|e| e.to_string())?;
     let mut run = state.database.study_claim(&id).map_err(|e| e.to_string())?;
-    if let Err(error) = study_agent::drive(
-        &state.database,
-        state.http.as_ref(),
-        &context,
-        &key,
-        &mut run,
-    )
-    .await
-    {
+    if let Err(error) = crate::study_search::drive(state, &context, &key, &mut run).await {
         let latest = state.database.study_load(&id).map_err(|e| e.to_string())?;
         if latest.state == "running" && latest.revision == run.revision {
             run.state = "failed".into();
             run.error = Some(error.clone());
             study_agent::failure(&mut run.control, &error);
+            if let Some(search) = run.questions.last_mut().and_then(|q| q.search.as_mut()) {
+                if search.is_active() {
+                    search.stage = "failed".into();
+                    if search.model_calls >= 3
+                        || search.active_ms >= 90_000
+                        || error == crate::search::types::SearchError::Budget.to_string()
+                        || error == "已达到本次学习的搜索次数上限"
+                    {
+                        if let Some(stop) = run.control.stop.as_mut() {
+                            stop.resumable = false;
+                        }
+                    }
+                }
+            }
             state
                 .database
                 .study_save(&mut run)
@@ -371,18 +377,20 @@ pub fn study_ask(
     question: String,
     request_id: String,
     reply_to_question_id: Option<String>,
+    force_search: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     let _permit = state.persistence_gate.try_operation()?;
-    let result = if let Some(reply_to) = reply_to_question_id {
-        state
-            .database
-            .study_ask_with_reply(&id, &step_id, &question, &request_id, Some(&reply_to))
-    } else {
-        state
-            .database
-            .study_ask(&id, &step_id, &question, &request_id)
-    };
+    let result = state.database.study_ask_with_options(
+        &id,
+        &step_id,
+        &question,
+        &request_id,
+        crate::study_store::QuestionOptions {
+            reply_to: reply_to_question_id.as_deref(),
+            force_search: force_search.unwrap_or(false),
+        },
+    );
     result.map(|r| r.public()).map_err(|e| e.to_string())
 }
 #[tauri::command]

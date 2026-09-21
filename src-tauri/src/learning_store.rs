@@ -328,7 +328,7 @@ pub(crate) mod tests {
     fn learning_migration_initializes_legacy_cards_without_inventing_history() {
         let (dir, db, _) = setup();
         let conn = db.connect().unwrap();
-        conn.execute_batch("DROP TRIGGER rag_card_learning_state; DROP TABLE rag_learning_events; DROP TABLE rag_learning_sessions; DROP TABLE rag_learning_state; DROP TABLE rag_card_units; DROP TABLE rag_learning_units; DROP TABLE review_memory_events; DROP TABLE review_memory; DROP TABLE review_runs; DROP TABLE study_doubts; DROP TABLE study_highlights; DROP TABLE study_memory; DROP TABLE study_sessions; DELETE FROM schema_migrations WHERE version>=8;").unwrap();
+        conn.execute_batch("DROP TRIGGER rag_card_learning_state; DROP TABLE rag_learning_events; DROP TABLE rag_learning_sessions; DROP TABLE rag_learning_state; DROP TABLE rag_card_units; DROP TABLE rag_learning_units; DROP TABLE review_memory_events; DROP TABLE review_memory; DROP TABLE review_runs; DROP TABLE study_doubts; DROP TABLE study_highlights; DROP TABLE study_memory; DROP TABLE study_sessions; DROP TABLE follow_up_search; DROP TABLE search_runs; DROP TABLE search_cache; DROP TABLE search_attempts; DROP TABLE search_options; DROP TABLE search_profiles; DELETE FROM schema_migrations WHERE version>=8;").unwrap();
         drop(conn);
         let reopened = Database::new(dir.path().join("learn.db"));
         reopened.initialize().unwrap();

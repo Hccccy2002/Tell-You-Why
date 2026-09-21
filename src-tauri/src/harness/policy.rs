@@ -13,6 +13,7 @@ use std::{
 pub struct RunPolicy {
     pub max_model_calls: usize,
     pub max_tool_calls: usize,
+    pub max_search_attempts: usize,
     pub max_token_charge: u64,
     pub max_active_ms: u64,
     pub model_timeout_ms: u64,
@@ -28,6 +29,7 @@ impl Default for RunPolicy {
         Self {
             max_model_calls: crate::review_agent::MAX_MODEL_CALLS,
             max_tool_calls: crate::review_agent::MAX_TOOL_CALLS,
+            max_search_attempts: 8,
             max_token_charge: 400_000,
             max_active_ms: 300_000,
             model_timeout_ms: 90_000,

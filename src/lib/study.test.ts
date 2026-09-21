@@ -26,6 +26,7 @@ it("sends a clarification reply with its exact parent question to the desktop", 
     question: "卡在地址变化",
     requestId: "request",
     replyToQuestionId: "parent",
+    forceSearch: false,
   });
 });
 
@@ -37,5 +38,25 @@ it("keeps ordinary questions separate from clarification replies", async () => {
     question: "另一个问题",
     requestId: "request",
     replyToQuestionId: null,
+    forceSearch: false,
+  });
+});
+
+it("passes explicit search consent without changing the question binding", async () => {
+  await studyClient.ask(
+    "session",
+    "step",
+    "核查公开资料",
+    "request",
+    undefined,
+    true,
+  );
+  expect(invoke).toHaveBeenLastCalledWith("study_ask", {
+    id: "session",
+    stepId: "step",
+    question: "核查公开资料",
+    requestId: "request",
+    replyToQuestionId: null,
+    forceSearch: true,
   });
 });

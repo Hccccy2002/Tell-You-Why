@@ -379,9 +379,16 @@ export default function App() {
     question: string,
     history: FollowUpTurn[],
     displayQuestion: string,
+    searchRunId?: string,
   ): Promise<FollowUpResult> {
     if (!data?.card) throw new Error("当前知识卡不可用，请切换后再试");
-    return askFollowUp(data.card.id, question, history, displayQuestion);
+    return askFollowUp(
+      data.card.id,
+      question,
+      history,
+      displayQuestion,
+      searchRunId,
+    );
   }
 
   async function advance() {

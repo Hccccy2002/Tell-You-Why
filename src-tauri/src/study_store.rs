@@ -5,6 +5,11 @@ use crate::{
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde_json::{json, Value};
 
+pub(crate) struct QuestionOptions<'a> {
+    pub reply_to: Option<&'a str>,
+    pub force_search: bool,
+}
+
 impl Database {
     pub(crate) fn study_save_highlight(
         &self,
@@ -80,7 +85,27 @@ impl Database {
         }
         let conn = self.connect()?;
         let mut stmt = conn.prepare("SELECT id,session_id,source_kind,source_id,title,text,created_at FROM study_highlights WHERE (?1 IS NOT NULL AND session_id=?1) OR (?2 IS NOT NULL AND card_id=?2) ORDER BY created_at DESC,rowid DESC")?;
-        let rows = stmt.query_map(params![session_id,card_id], |r| Ok(json!({"id":r.get::<_,String>(0)?,"session_id":r.get::<_,String>(1)?,"source_kind":r.get::<_,String>(2)?,"source_id":r.get::<_,String>(3)?,"title":r.get::<_,String>(4)?,"text":r.get::<_,String>(5)?,"created_at":r.get::<_,String>(6)?})))?.collect::<Result<Vec<_>, _>>()?;
+        let mut rows = stmt.query_map(params![session_id,card_id], |r| Ok(json!({"id":r.get::<_,String>(0)?,"session_id":r.get::<_,String>(1)?,"source_kind":r.get::<_,String>(2)?,"source_id":r.get::<_,String>(3)?,"title":r.get::<_,String>(4)?,"text":r.get::<_,String>(5)?,"created_at":r.get::<_,String>(6)?})))?.collect::<Result<Vec<_>, _>>()?;
+        // Answers are immutable; retain their canonical evidence association even
+        // after re-explanation, cache expiry, deleted source cards or restart.
+        let mut sessions = std::collections::HashMap::new();
+        for row in &mut rows {
+            if row["source_kind"] != "question" {
+                continue;
+            }
+            let id = row["session_id"].as_str().unwrap();
+            if !sessions.contains_key(id) {
+                sessions.insert(id.to_owned(), self.study_load(id)?);
+            }
+            let source = row["source_id"].as_str().unwrap();
+            let search = sessions[id]
+                .questions
+                .iter()
+                .find(|q| q.id == source)
+                .and_then(|q| q.answer.as_ref())
+                .and_then(|a| a.search.as_ref());
+            row["search"] = serde_json::to_value(search)?;
+        }
         Ok(rows)
     }
 
@@ -117,6 +142,7 @@ impl Database {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn study_ask(
         &self,
         id: &str,
@@ -127,6 +153,7 @@ impl Database {
         self.study_ask_with_reply(id, step_id, question, request_id, None)
     }
 
+    #[cfg(test)]
     pub(crate) fn study_ask_with_reply(
         &self,
         id: &str,
@@ -135,6 +162,27 @@ impl Database {
         request_id: &str,
         reply_to_question_id: Option<&str>,
     ) -> Result<StudySession, DbError> {
+        self.study_ask_with_options(
+            id,
+            step_id,
+            question,
+            request_id,
+            QuestionOptions {
+                reply_to: reply_to_question_id,
+                force_search: false,
+            },
+        )
+    }
+
+    pub(crate) fn study_ask_with_options(
+        &self,
+        id: &str,
+        step_id: &str,
+        question: &str,
+        request_id: &str,
+        options: QuestionOptions<'_>,
+    ) -> Result<StudySession, DbError> {
+        let reply_to_question_id = options.reply_to;
         let question = question.trim();
         if question.is_empty()
             || question.chars().count() > 300
@@ -163,6 +211,7 @@ impl Database {
             if saved.step_id == step_id
                 && saved.reply_to_question_id.as_deref() == reply_to_question_id
                 && submitted == Some(question)
+                && saved.search.as_ref().is_some_and(|s| s.force_refresh) == options.force_search
             {
                 return Ok(run);
             }
@@ -187,6 +236,10 @@ impl Database {
             previous_answers: vec![],
             reply_to_question_id: reply_to_question_id.map(str::to_owned),
             clarification_replies: vec![],
+            search: Some(crate::study_search::StudySearchRun::new(
+                self.search_options()?,
+                options.force_search,
+            )),
         };
         if let Some(parent_id) = reply_to_question_id {
             let index = run
@@ -523,6 +576,16 @@ impl Database {
                 return Ok(session);
             }
             session.state = if finish { "completed" } else { "paused" }.into();
+            if let Some(search) = session
+                .questions
+                .last_mut()
+                .filter(|q| q.answer.is_none())
+                .and_then(|q| q.search.as_mut())
+            {
+                if search.is_active() {
+                    search.stage = if finish { "cancelled" } else { "paused" }.into();
+                }
+            }
             session.error = None;
             if finish {
                 // Goal sessions may be reopened with their original budget and

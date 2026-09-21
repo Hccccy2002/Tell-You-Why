@@ -1,0 +1,54 @@
+{
+  "version": "search-development-v1",
+  "purpose": "P0 exploration and later routing development; not a holdout or a scored accuracy benchmark.",
+  "cases": [
+    { "question": "什么是二分查找？", "search": false },
+    { "question": "为什么天空是蓝色的？", "search": false },
+    { "question": "解释 CPU 缓存原理", "search": false },
+    { "question": "2020 年发布的 Python 版本有哪些？", "search": true },
+    { "question": "Node.js 最新 LTS 版本是什么？", "search": true },
+    { "question": "Rust 最近发布了哪些变化？", "search": true },
+    { "question": "React 现在推荐怎样创建项目？", "search": true },
+    { "question": "这个库还维护吗？", "search": true, "context": "Vue 2" },
+    {
+      "question": "它还支持 Windows 10 吗？",
+      "search": true,
+      "context": "最新 Python"
+    },
+    {
+      "question": "目前官方推荐哪个版本？",
+      "search": true,
+      "context": "Node.js"
+    },
+    { "question": "今天发布了什么技术新闻？", "search": true },
+    { "question": "今年 Tauri 有哪些新特性？", "search": true },
+    {
+      "question": "帮我查证一下这个说法",
+      "search": true,
+      "context": "某开源软件停止维护"
+    },
+    { "question": "请联网核查牛顿第二定律的定义", "search": true },
+    { "question": "解释向量数据库，并介绍近期版本变化", "search": true },
+    {
+      "question": "现在这个服务多少钱？",
+      "search": true,
+      "context": "智谱 Search-Pro"
+    },
+    { "question": "Node.js 发布计划", "search": true },
+    { "question": "HTTP 和 HTTPS 有什么区别？", "search": false },
+    { "question": "举一个递归的例子", "search": false },
+    {
+      "question": "再解释一下刚才的比喻",
+      "search": false,
+      "context": "内存和硬盘"
+    },
+    { "question": "Python 这个功能已废弃了吗？", "search": true },
+    {
+      "question": "现在能在官网下到这个版本吗？",
+      "search": true,
+      "context": "某软件版本"
+    },
+    { "question": "今年发布的公告和去年的说法为什么冲突？", "search": true },
+    { "question": "刚才的资料太旧了，请重新查", "search": true }
+  ]
+}

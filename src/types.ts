@@ -85,6 +85,26 @@ export interface FollowUpResult {
   providerId: "deepseek" | "kimi";
   model: string;
   switchedFromProviderId: "deepseek" | "kimi" | null;
+  search?: SearchAnswer;
+}
+
+export interface SearchAnswer {
+  runId: string;
+  status: "answered" | "partial" | "insufficient";
+  asOf: string;
+  retrievedAt: string;
+  sources: {
+    id: string;
+    title: string;
+    url: string | null;
+    snippet: string;
+    publisher: string | null;
+    publishedAt: string | null;
+    retrievedAt: string;
+  }[];
+  blocks: { text: string; evidenceIds: string[] }[];
+  limitation: string | null;
+  cacheHit: boolean;
 }
 
 export interface FollowUpMessage extends FollowUpTurn {

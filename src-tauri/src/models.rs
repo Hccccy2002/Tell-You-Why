@@ -257,6 +257,8 @@ pub struct FollowUpResponse {
     pub provider_id: String,
     pub model: String,
     pub switched_from_provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<crate::search::types::SearchAnswer>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
