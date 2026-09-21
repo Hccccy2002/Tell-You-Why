@@ -21,7 +21,8 @@ pub fn setup(app: &mut App) -> tauri::Result<()> {
             |settings| settings.global_shortcut,
         );
     if app.global_shortcut().register(shortcut.as_str()).is_err() {
-        let _ = app.emit(
+        let _ = app.emit_to(
+            "main",
             "desktop-notice",
             "默认快捷键已被其他应用占用，请在通用设置中更换。",
         );
@@ -50,26 +51,33 @@ fn create_tray(app: &App) -> tauri::Result<()> {
         None::<&str>,
     )?;
     let next = MenuItem::with_id(app, "next", "下一条知识", true, None::<&str>)?;
+    let study = MenuItem::with_id(app, "study", "打开学习中心", true, None::<&str>)?;
     let pause = MenuItem::with_id(app, "pause", "暂停 30 分钟", true, None::<&str>)?;
     let today = MenuItem::with_id(app, "today", "今天不再提醒", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
     let exit = MenuItem::with_id(app, "exit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&toggle, &next, &pause, &today, &settings, &exit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&toggle, &study, &next, &pause, &today, &settings, &exit],
+    )?;
     let mut tray = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("Tell You Why")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "toggle" => toggle_window(app),
+            "study" => {
+                let _ = crate::navigation::open_study_center(app);
+            }
             "next" => {
                 show_window(app);
-                let _ = app.emit("request-next-card", ());
+                let _ = app.emit_to("main", "request-next-card", ());
             }
             "pause" => pause_from_tray(app, false),
             "today" => pause_from_tray(app, true),
             "settings" => {
                 show_window(app);
-                let _ = app.emit("open-settings", ());
+                let _ = app.emit_to("main", "open-settings", ());
             }
             "exit" => {
                 let state = app.state::<AppState>();
@@ -77,6 +85,10 @@ fn create_tray(app: &App) -> tauri::Result<()> {
                     return;
                 };
                 state.exiting.store(true, Ordering::SeqCst);
+                let _ = crate::study_commands::pause_active(&state.database);
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = save_window_state_under_permit(&window);
+                }
                 app.exit(0);
             }
             _ => {}
@@ -110,7 +122,7 @@ pub fn toggle_window(app: &AppHandle) {
     }
 }
 
-fn show_window(app: &AppHandle) {
+pub(crate) fn show_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         ensure_window_visible(&window);
         let _ = window.show();
@@ -149,6 +161,9 @@ pub fn handle_close_requested(window: &WebviewWindow, api: &tauri::CloseRequestA
     }
     api.prevent_close();
     if let Ok(_permit) = state.persistence_gate.try_operation() {
+        if crate::study_commands::pause_active(&state.database).is_err() {
+            return;
+        }
         let _ = save_window_state_under_permit(window);
         if !state.database.close_tip_shown().unwrap_or(true) {
             let shortcut = state
@@ -277,7 +292,7 @@ fn restore_window_state(window: &WebviewWindow) {
     }
 }
 
-fn ensure_window_visible(window: &WebviewWindow) {
+pub(crate) fn ensure_window_visible(window: &WebviewWindow) {
     let visible = window.outer_position().ok().is_some_and(|position| {
         window.available_monitors().ok().is_some_and(|monitors| {
             monitors.iter().any(|monitor| {

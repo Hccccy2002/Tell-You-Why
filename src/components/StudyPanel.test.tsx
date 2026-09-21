@@ -75,6 +75,30 @@ const provider: ProviderSpec = {
   keyLast4: "test",
   connectionVerified: true,
 };
+it("disables model actions while another window is busy and keeps the exit available", async () => {
+  const api = client();
+  render(
+    <StudyPanel
+      modelBusy
+      topics={[]}
+      providers={[provider]}
+      client={api}
+      onExit={vi.fn()}
+      onModelSettings={vi.fn()}
+    />,
+  );
+  await screen.findByRole("button", { name: "随便探索" });
+  await userEvent.type(
+    screen.getByRole("textbox", { name: "今天想了解什么？" }),
+    "DNS",
+  );
+  expect(screen.getByRole("button", { name: "按目标学习" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "开始学习" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "随便探索" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "← 返回小窗" })).toBeEnabled();
+  expect(api.start).not.toHaveBeenCalled();
+  expect(api.continue).not.toHaveBeenCalled();
+});
 function session(overrides: Partial<StudySession> = {}): StudySession {
   return {
     id: "study",

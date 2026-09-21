@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { friendlyError } from "./api";
 import { studyClient, type StudyClient, type StudyHighlight } from "./study";
+import { listenSharedData, notifySharedData } from "./windowSync";
 
 type Client = Pick<
   StudyClient,
@@ -23,6 +24,14 @@ export function useStudyHighlights(
   const busyRef = useRef(false);
   const epoch = useRef(0);
   const reload = useCallback(() => setRevision((n) => n + 1), []);
+  useEffect(() => {
+    const stop = listenSharedData(reload);
+    window.addEventListener("focus", reload);
+    return () => {
+      stop();
+      window.removeEventListener("focus", reload);
+    };
+  }, [reload]);
   useEffect(() => {
     if (!sessionId && !cardId) return;
     let active = true;
@@ -49,6 +58,7 @@ export function useStudyHighlights(
     setBusy(true);
     try {
       await action();
+      notifySharedData("study");
       const next = await client.highlights({ sessionId, cardId });
       if (epoch.current === request)
         setResult({ scope, items: next, error: null });

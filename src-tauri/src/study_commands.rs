@@ -5,7 +5,7 @@ use crate::{
     study_agent, AppState,
 };
 use serde_json::Value;
-use tauri::State;
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[tauri::command]
 pub fn study_home(state: State<'_, AppState>) -> Result<Value, String> {
@@ -53,9 +53,13 @@ pub fn study_history(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
     state.database.study_history().map_err(|e| e.to_string())
 }
 #[tauri::command]
-pub fn study_reset(state: State<'_, AppState>) -> Result<(), String> {
+pub fn study_reset(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let _permit = state.persistence_gate.try_reset()?;
-    state.database.study_reset().map_err(|e| e.to_string())
+    state.database.study_reset().map_err(|e| e.to_string())?;
+    app.state::<crate::navigation::NavigationState>().clear();
+    drop(_permit);
+    let _ = app.emit("shared-data-changed", "study-reset");
+    Ok(())
 }
 
 pub(crate) fn start_inner(goal: String, topic: String, state: &AppState) -> Result<Value, String> {
@@ -66,6 +70,13 @@ pub(crate) fn start_inner(goal: String, topic: String, state: &AppState) -> Resu
         .study_insert(&run)
         .map_err(|e| e.to_string())?;
     Ok(run.public())
+}
+
+pub(crate) fn pause_active(db: &crate::db::Database) -> Result<(), String> {
+    if let Some(run) = db.study_latest().map_err(|e| e.to_string())? {
+        db.study_pause(&run.id, false).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 pub(crate) fn start_goal_inner(goal: String, state: &AppState) -> Result<Value, String> {

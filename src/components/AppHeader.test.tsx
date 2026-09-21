@@ -4,6 +4,22 @@ import { vi } from "vitest";
 import { AppHeader } from "./AppHeader";
 
 describe("AppHeader", () => {
+  it("locks the study page entry while an operation is running", async () => {
+    const onOpenStudy = vi.fn();
+    render(
+      <AppHeader
+        view="home"
+        menuOpen={false}
+        navigationLocked
+        onMenuToggle={vi.fn()}
+        onNavigate={vi.fn()}
+        onOpenStudy={onOpenStudy}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "打开学习中心" }));
+    expect(screen.getByRole("button", { name: "打开学习中心" })).toBeDisabled();
+    expect(onOpenStudy).not.toHaveBeenCalled();
+  });
   it("keeps the menu dismissible while locking navigation for an AI reply", async () => {
     const user = userEvent.setup();
     const onMenuToggle = vi.fn();
@@ -28,6 +44,7 @@ describe("AppHeader", () => {
     expect(developerTools).toHaveAttribute("open");
     const navigationButtons = [
       "知识小窗",
+      "学习中心",
       "兴趣设置",
       "模型设置",
       "收藏与历史",
@@ -36,7 +53,7 @@ describe("AppHeader", () => {
     ].map((name) =>
       screen.getByRole("button", { name: new RegExp(`^${name}$`) }),
     );
-    expect(navigationButtons).toHaveLength(6);
+    expect(navigationButtons).toHaveLength(7);
     for (const button of navigationButtons) {
       expect(button).toBeDisabled();
     }

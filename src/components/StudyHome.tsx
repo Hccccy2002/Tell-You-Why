@@ -8,6 +8,7 @@ import {
 } from "../lib/study";
 
 interface Props {
+  refreshToken?: number;
   busy: boolean;
   onOpen: (sessionId?: string) => void;
   onReview?: (item: StudyDueItem) => void;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function StudyHome({
+  refreshToken,
   busy,
   onOpen,
   onReview,
@@ -54,7 +56,7 @@ export function StudyHome({
     return () => {
       active = false;
     };
-  }, [client, refresh]);
+  }, [client, refresh, refreshToken]);
   const saved = data?.active;
   const savedTitle = saved?.last_title?.trim() || saved?.goal;
   const blockedHint = saved ? "先继续或结束上次学习" : undefined;

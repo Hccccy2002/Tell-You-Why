@@ -20,6 +20,8 @@ import { StudyStartButton } from "./StudyStartButton";
 import { useStudyHighlights } from "../lib/useStudyHighlights";
 
 interface Props {
+  modelBusy?: boolean;
+  exitLabel?: string;
   topics: TopicPreference[];
   providers: ProviderSpec[];
   onExit: () => void;
@@ -167,6 +169,8 @@ function QuestionThread({
 }
 
 export function StudyPanel({
+  modelBusy = false,
+  exitLabel,
   topics,
   providers,
   onExit,
@@ -281,6 +285,28 @@ export function StudyPanel({
         void client.pause(current.id, false).catch(() => undefined);
     };
   }, [client, sessionId]);
+
+  useEffect(() => {
+    const refresh = () => {
+      const current = runRef.current;
+      if (!current || busyRef.current || stoppingRef.current) return;
+      void client
+        .read(current.id)
+        .then((latest) => {
+          if (
+            mounted.current &&
+            runRef.current?.id === latest.id &&
+            latest.revision > runRef.current.revision
+          )
+            accept(latest);
+        })
+        .catch((e: unknown) => {
+          if (mounted.current) setError(friendlyError(e));
+        });
+    };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [client, accept]);
 
   useEffect(() => {
     if (run?.state !== "running" || busy) return;
@@ -446,7 +472,7 @@ export function StudyPanel({
   }
   const active = run && run.state !== "completed";
   const working = busy || run?.state === "running";
-  const blocked = working || stopping;
+  const blocked = working || stopping || modelBusy;
   const learningBlocked = blocked || !!pendingQuestion;
 
   return (
@@ -457,7 +483,7 @@ export function StudyPanel({
           onClick={() => (run && active ? void stop(false) : onExit())}
           disabled={stopping}
         >
-          ← 返回小窗
+          ← {exitLabel ?? "返回小窗"}
         </button>
         <span>约 3 分钟 · 随时可停</span>
       </div>
@@ -470,6 +496,9 @@ export function StudyPanel({
             : "从一个好奇的问题开始，按你的反馈调整下一步。"}
         </p>
       </header>
+      {modelBusy && !working ? (
+        <p role="status">模型正在处理请求，请稍候。</p>
+      ) : null}
       {run?.source_card && !cardDraft && !drafting && !doubtDraft ? (
         <div className="study-origin">
           <p>本次围绕：{run.source_card.title}</p>
@@ -544,7 +573,7 @@ export function StudyPanel({
             </button>
           ) : null}
           <button className="text-button" disabled={blocked} onClick={onExit}>
-            先返回小窗
+            {exitLabel ?? "先返回小窗"}
           </button>
         </section>
       ) : null}
@@ -808,7 +837,7 @@ export function StudyPanel({
                 再学一会儿
               </button>
               <button className="text-button" onClick={onExit}>
-                回到自由浏览
+                {exitLabel ?? "回到自由浏览"}
               </button>
             </section>
           ) : (

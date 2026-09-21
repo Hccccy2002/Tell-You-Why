@@ -15,7 +15,7 @@ use chrono::{Duration, Local, TimeZone, Utc};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_autostart::ManagerExt as AutostartExt;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tauri_plugin_opener::OpenerExt;
@@ -295,8 +295,15 @@ pub fn save_settings(
 }
 
 #[tauri::command]
-pub fn set_auto_hide_suspended(suspended: bool, state: State<'_, AppState>) {
-    state.auto_hide.set_suspended(suspended);
+pub fn set_auto_hide_suspended(window: WebviewWindow, suspended: bool, state: State<'_, AppState>) {
+    if window.label() == "main" {
+        state.auto_hide.set_suspended(suspended);
+    }
+}
+
+#[tauri::command]
+pub fn model_operation_busy(state: State<'_, AppState>) -> bool {
+    state.generation_in_progress.load(Ordering::SeqCst)
 }
 
 #[tauri::command]
@@ -1149,13 +1156,21 @@ pub fn clear_data(
         state.auto_hide.set_enabled(false);
         let system_result = restore_default_system_integrations(&app);
         let credential_result = cleanup_pending_credentials(&state);
-        return Ok(match (system_result, credential_result) {
+        let warning = match (system_result, credential_result) {
             (Ok(()), Ok(())) => None,
             (Err(system), Ok(())) => Some(system),
             (Ok(()), Err(credentials)) => Some(format!("本地数据已清除，但{credentials}")),
             (Err(system), Err(credentials)) => Some(format!("{system}；同时{credentials}")),
-        });
+        };
+        app.state::<crate::navigation::NavigationState>().clear();
+        drop(_lock);
+        drop(_reset);
+        let _ = app.emit("shared-data-changed", "all");
+        return Ok(warning);
     }
+    drop(_lock);
+    drop(_reset);
+    let _ = app.emit("shared-data-changed", &scope);
     Ok(None)
 }
 
@@ -1218,6 +1233,10 @@ pub fn exit_application(app: AppHandle, state: State<'_, AppState>) {
     state
         .exiting
         .store(true, std::sync::atomic::Ordering::SeqCst);
+    let _ = crate::study_commands::pause_active(&state.database);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = crate::desktop::save_window_state(&window);
+    }
     app.exit(0);
 }
 

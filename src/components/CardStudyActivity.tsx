@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { friendlyError } from "../lib/api";
 import { StudyHighlights } from "./StudyHighlights";
 import { useStudyHighlights } from "../lib/useStudyHighlights";
+import { listenSharedData } from "../lib/windowSync";
 import {
   studyClient,
   type StudyCardSession,
@@ -28,6 +29,15 @@ export function CardStudyActivity({
   const sessions = result?.cardId === cardId ? result.sessions : [];
   const error = result?.cardId === cardId ? result.error : null;
   const [reload, setReload] = useState(0);
+  useEffect(() => {
+    const refresh = () => setReload((n) => n + 1);
+    const stop = listenSharedData(refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      stop();
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   useEffect(() => {
     let active = true;
     void client

@@ -75,6 +75,7 @@ describe("follow-up navigation lock", () => {
     await waitFor(() => expect(askFollowUpMock).toHaveBeenCalledOnce());
 
     expect(screen.getByRole("button", { name: "返回知识小窗" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "打开学习中心" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "打开菜单" }));
     expect(screen.getByRole("button", { name: "模型设置" })).toBeDisabled();
 

@@ -1697,3 +1697,22 @@ fn study_live_provider_smoke() {
         serde_json::json!({"model":done.model,"model_calls":done.model_calls,"tool_calls":done.tool_calls,"first_title":steps[0]["title"],"feedback_kind":steps[1]["kind"],"feedback_title":steps[1]["title"],"state":done.state})
     );
 }
+#[test]
+fn closing_main_window_pauses_study_without_resetting_budget() {
+    let (_dir, state, _, _) = crate::review_tests::setup(vec![]);
+    let created = crate::study_commands::start_goal_inner("理解网络".into(), &state).unwrap();
+    let id = created["id"].as_str().unwrap();
+    let mut in_flight = state.database.study_claim(id).unwrap();
+    in_flight.model_calls = 3;
+    state.database.study_save(&mut in_flight).unwrap();
+    crate::study_commands::pause_active(&state.database).unwrap();
+    let paused = state.database.study_load(id).unwrap();
+    assert_eq!(paused.state, "paused");
+    assert_eq!(paused.model_calls, 3);
+    assert!(state.database.study_save(&mut in_flight).is_err());
+    crate::study_commands::pause_active(&state.database).unwrap();
+    assert_eq!(
+        state.database.study_load(id).unwrap().revision,
+        paused.revision
+    );
+}

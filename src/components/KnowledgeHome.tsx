@@ -1,8 +1,5 @@
 import { useMemo, useState } from "react";
 import type { ProviderSpec, TopicPreference } from "../types";
-import "../study.css";
-import { StudyHome } from "./StudyHome";
-import type { StudyDueItem, StudyDoubtItem } from "../lib/study";
 
 const CUSTOM_TOPIC = "__custom__";
 
@@ -28,9 +25,6 @@ interface Props {
   onGenerateRandom: (count: number) => Promise<void>;
   onContinueGeneration: () => Promise<void>;
   onOpenModelSettings: () => void;
-  onStartStudy?: (sessionId?: string) => void;
-  onReviewStudy?: (item: StudyDueItem) => void;
-  onDoubtStudy?: (item: StudyDoubtItem) => void;
   onGenerationProviderChange: (
     providerId: "deepseek" | "kimi",
   ) => Promise<void>;
@@ -49,9 +43,6 @@ export function KnowledgeHome({
   onGenerateRandom,
   onContinueGeneration,
   onOpenModelSettings,
-  onStartStudy,
-  onReviewStudy,
-  onDoubtStudy,
   onGenerationProviderChange,
 }: Props) {
   const enabledTopics = useMemo(
@@ -92,15 +83,7 @@ export function KnowledgeHome({
       <div className="feed-empty-card">
         <span className="eyebrow">知识小窗</span>
         <h1 id="feed-empty-title">想探索哪个领域？</h1>
-        <p>浏览本地知识，或选择一个领域生成新的知识点。</p>
-        {onStartStudy ? (
-          <StudyHome
-            busy={busy}
-            onOpen={onStartStudy}
-            onReview={onReviewStudy}
-            onDoubt={onDoubtStudy}
-          />
-        ) : null}
+        <p>选择一个领域，生成新的知识卡。</p>
         <div className="generation-provider-field">
           <div className="generation-provider-heading">
             <label htmlFor="generation-provider">生成模型</label>
@@ -184,7 +167,7 @@ export function KnowledgeHome({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (topicLabel && generationCount > 0) {
+            if (!busy && topicLabel && generationCount > 0) {
               void onGenerate(
                 selectedTopic?.id ?? null,
                 topicLabel,

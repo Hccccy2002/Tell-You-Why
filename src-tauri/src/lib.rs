@@ -16,6 +16,7 @@ mod learning_generation;
 mod learning_live_tests;
 mod learning_store;
 mod models;
+mod navigation;
 mod pdf_runtime;
 mod persistence_gate;
 mod providers;
@@ -114,6 +115,7 @@ pub fn run() {
                 auto_hide: auto_hide::AutoHideController::default(),
                 persistence_gate: PersistenceResetGate::default(),
             });
+            app.manage(navigation::NavigationState::default());
             desktop::setup(app)?;
             app.manage(knowledge_base::KnowledgeBaseState::default());
             app.manage(evaluation::EvaluationState(
@@ -150,6 +152,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            navigation::take_window_navigation,
+            navigation::acknowledge_window_navigation,
             study_commands::study_start,
             study_commands::study_start_goal,
             study_commands::study_goal_checkin,
@@ -217,6 +221,7 @@ pub fn run() {
             commands::delete_library_card,
             commands::save_settings,
             commands::set_auto_hide_suspended,
+            commands::model_operation_busy,
             commands::save_generation_provider,
             commands::generation_usage,
             commands::pause_reminders,

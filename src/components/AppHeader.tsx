@@ -12,6 +12,7 @@ export type AppView =
   | "evaluation";
 
 interface Props {
+  onOpenStudy?: () => void;
   view: AppView;
   menuOpen: boolean;
   navigationLocked: boolean;
@@ -21,6 +22,7 @@ interface Props {
 
 const menuItems: Array<[AppView, string, string]> = [
   ["home", "知识小窗", "⌂"],
+  ["study", "学习中心", "◈"],
   ["interests", "兴趣设置", "◇"],
   ["models", "模型设置", "◎"],
   ["library", "收藏与历史", "☆"],
@@ -29,6 +31,7 @@ const menuItems: Array<[AppView, string, string]> = [
 ];
 
 export function AppHeader({
+  onOpenStudy,
   view,
   menuOpen,
   navigationLocked,
@@ -58,6 +61,17 @@ export function AppHeader({
         <span>Tell You Why</span>
       </button>
       <div className="header-actions">
+        {onOpenStudy ? (
+          <button
+            className="kb-header-button"
+            onClick={onOpenStudy}
+            disabled={navigationLocked}
+            aria-label="打开学习中心"
+            aria-current={view === "study" ? "page" : undefined}
+          >
+            学习
+          </button>
+        ) : null}
         <button
           className="kb-header-button"
           onClick={() => onNavigate("knowledge-base")}
@@ -96,7 +110,11 @@ export function AppHeader({
               <button
                 key={target}
                 className={target === view ? "menu-item active" : "menu-item"}
-                onClick={() => onNavigate(target)}
+                onClick={() =>
+                  target === "study" && onOpenStudy
+                    ? onOpenStudy()
+                    : onNavigate(target)
+                }
                 aria-current={target === view ? "page" : undefined}
                 disabled={navigationLocked}
                 title={navigationLocked ? "请等待当前操作完成" : undefined}

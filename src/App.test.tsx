@@ -37,6 +37,10 @@ describe("critical local user flow", () => {
     expect(
       screen.getByRole("heading", { name: "想探索哪个领域？" }),
     ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "我的短学习" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开学习中心" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: /去配置/ }));
     expect(
       await screen.findByRole("heading", { name: "模型设置" }),
