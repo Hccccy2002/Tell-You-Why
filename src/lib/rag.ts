@@ -63,6 +63,7 @@ export interface RelatedSourcesRequest {
   version: string;
   chapter: string | null;
   query: string;
+  source_sha256?: string;
 }
 export const ragRelatedSources = (request: RelatedSourcesRequest) =>
   invoke<EvidencePacket>("rag_related_sources", { request });

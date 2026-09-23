@@ -469,11 +469,17 @@ impl Database {
                END,
                CASE WHEN ?4 IS NOT NULL AND c.topic_id = ?4 THEN 1 ELSE 0 END,
                COALESCE(s.known, 0),
+               CASE WHEN c.id IN (
+                 SELECT recent.card_id
+                 FROM interactions recent
+                 WHERE recent.kind = 'shown'
+                 ORDER BY recent.id DESC
+                 LIMIT 5
+               ) THEN 1 ELSE 0 END,
                last_shown IS NOT NULL,
-               last_shown ASC,
                CASE WHEN ?3 = 1 THEN COALESCE(tp.weight, 0) ELSE 0 END ASC,
                CASE WHEN ?3 = 0 THEN COALESCE(tp.weight, 0) ELSE 0 END DESC,
-               c.created_at ASC
+               random()
              LIMIT 1"
         );
         let card = connection
@@ -1059,7 +1065,22 @@ impl Database {
                 ))
             })?
             .collect::<Result<Vec<(String, String, bool, bool)>, _>>()?;
-        let weighted = generation_topic_weights(candidates);
+        let mut weighted = generation_topic_weights(candidates);
+        if weighted.len() > 1 {
+            let mut recent_statement = connection.prepare(
+                "SELECT topic_id
+                 FROM cards
+                 WHERE generated_by_json IS NOT NULL
+                 ORDER BY created_at DESC, rowid DESC
+                 LIMIT 2",
+            )?;
+            let recent_topics = recent_statement
+                .query_map([], |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            if recent_topics.len() == 2 && recent_topics[0] == recent_topics[1] {
+                weighted.retain(|(id, _, _)| id != &recent_topics[0]);
+            }
+        }
         let total_weight = weighted.iter().map(|item| item.2).sum::<u32>();
         if total_weight == 0 {
             return Err(DbError::Validation("请先选择兴趣领域".into()));
@@ -1077,6 +1098,28 @@ impl Database {
             cursor -= weight;
         }
         Err(DbError::Validation("没有可用于生成的兴趣领域".into()))
+    }
+
+    pub fn recent_questions(
+        &self,
+        topic_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, DbError> {
+        let connection = self.connect()?;
+        let limit = limit.clamp(1, 30) as i64;
+        let mut statement = connection.prepare(
+            "SELECT question
+             FROM cards
+             WHERE (?1 IS NULL OR topic_id = ?1)
+               AND (built_in = 1 OR generated_by_json IS NOT NULL)
+             ORDER BY created_at DESC, rowid DESC
+             LIMIT ?2",
+        )?;
+        let questions = statement
+            .query_map(params![topic_id, limit], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(DbError::from)?;
+        Ok(questions)
     }
 
     pub fn provider_profile(
@@ -1795,6 +1838,27 @@ mod tests {
     }
 
     #[test]
+    fn browsing_avoids_the_five_most_recent_cards() {
+        let (_directory, database) = test_database();
+        let mut shown = Vec::new();
+        let mut current_id = None::<String>;
+        for _ in 0..8 {
+            let card = database
+                .next_card(current_id.as_deref())
+                .expect("next unseen card");
+            assert!(!shown.contains(&card.id));
+            current_id = Some(card.id.clone());
+            shown.push(card.id);
+        }
+
+        let recent = &shown[shown.len() - 5..];
+        let next = database
+            .next_card(current_id.as_deref())
+            .expect("next card outside recent window");
+        assert!(!recent.contains(&next.id));
+    }
+
+    #[test]
     fn follow_ups_survive_history_clear_and_are_removed_with_the_card() {
         let (_directory, database) = test_database();
         let card = database.next_card(None).expect("shown card");
@@ -2180,6 +2244,49 @@ mod tests {
         for _ in 0..20 {
             let (topic_id, _) = database.random_generation_topic().expect("weighted topic");
             assert!(selected.contains(&topic_id.as_str()));
+        }
+    }
+
+    #[test]
+    fn random_generation_topic_rotates_after_two_generated_cards() {
+        let (_directory, database) = test_database();
+        database
+            .save_onboarding(&OnboardingInput {
+                selected_topic_ids: vec![
+                    "natural_science".into(),
+                    "space_earth".into(),
+                    "computing_internet".into(),
+                ],
+                custom_interests: Vec::new(),
+                reminder_preset: crate::models::ReminderPreset::Manual,
+            })
+            .expect("save onboarding");
+        let connection = database.connect().expect("connection");
+        connection
+            .execute(
+                "UPDATE cards
+                 SET topic_id = 'natural_science', generated_by_json = '{}',
+                     created_at = '2099-01-01T00:00:00Z'
+                 WHERE id = 'demo-science-ice'",
+                [],
+            )
+            .expect("first generated marker");
+        connection
+            .execute(
+                "UPDATE cards
+                 SET topic_id = 'natural_science', generated_by_json = '{}',
+                     created_at = '2099-01-02T00:00:00Z'
+                 WHERE id = 'demo-space-sky'",
+                [],
+            )
+            .expect("second generated marker");
+        drop(connection);
+
+        for _ in 0..10 {
+            assert_ne!(
+                database.random_generation_topic().expect("rotated topic").0,
+                "natural_science"
+            );
         }
     }
 

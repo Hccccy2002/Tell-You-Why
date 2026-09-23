@@ -15,8 +15,8 @@ export function RelatedSources({
   active: boolean;
   onPage: (page: number, version: string) => void;
 }) {
-  const { kb, version, chapter, query } = request;
-  const key = JSON.stringify([kb, version, chapter, query]);
+  const { kb, version, chapter, query, source_sha256 } = request;
+  const key = JSON.stringify([kb, version, chapter, query, source_sha256]);
   const pending = useRef<{
     key: string;
     promise: Promise<EvidencePacket>;
@@ -34,7 +34,13 @@ export function RelatedSources({
     if (pending.current?.key !== key) {
       pending.current = {
         key,
-        promise: ragRelatedSources({ kb, version, chapter, query }),
+        promise: ragRelatedSources({
+          kb,
+          version,
+          chapter,
+          query,
+          ...(source_sha256 ? { source_sha256 } : {}),
+        }),
       };
     }
     const current = pending.current;
@@ -50,7 +56,7 @@ export function RelatedSources({
     return () => {
       live = false;
     };
-  }, [active, key, kb, version, chapter, query, attempt]);
+  }, [active, key, kb, version, chapter, query, source_sha256, attempt]);
 
   if (!active) return null;
   const current = response?.key === key ? response : null;

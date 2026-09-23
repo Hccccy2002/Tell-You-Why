@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
 import { LearningPanel } from "../components/LearningPanel";
 import { ReviewAgentPanel } from "../components/ReviewAgentPanel";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import "../knowledge-base.css";
 import { friendlyError } from "../lib/api";
 import { useAutoHideGuard } from "../lib/autoHideGuard";
 import {
   choosePdf,
+  deletePdf,
   importPdf,
   kbRead,
   pausePdf,
   resumePdf,
   type Catalog,
   type Chapter,
+  type OcrMode,
   type PagePreview,
   type Passage,
   type PdfKnowledgeBase,
@@ -41,7 +44,11 @@ export function KnowledgeBaseScreen() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [selection, setSelection] = useState<PdfSelection | null>(null);
   const [firstPage, setFirstPage] = useState(1);
+  const [ocrMode, setOcrMode] = useState<OcrMode>("always");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PdfKnowledgeBase | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
@@ -94,7 +101,7 @@ export function KnowledgeBaseScreen() {
     setError(null);
     setNotice(null);
     try {
-      const result = await importPdf(selection.path, firstPage);
+      const result = await importPdf(selection.path, firstPage, ocrMode);
       setSelection(null);
       setSelectedId(result.kb);
       setRefresh((v) => v + 1);
@@ -128,6 +135,32 @@ export function KnowledgeBaseScreen() {
     } catch (reason) {
       setError(friendlyError(reason));
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await deletePdf(target.id);
+      setCatalog((value) =>
+        value
+          ? {
+              ...value,
+              items: value.items.filter((item) => item.id !== target.id),
+            }
+          : value,
+      );
+      if (selectedId === target.id) setSelectedId(null);
+      setNotice(`已删除“${target.filename}”及其本地处理数据。`);
+    } catch (reason) {
+      setError(friendlyError(reason));
+    } finally {
+      setPendingDelete(null);
       setBusy(false);
     }
   }
@@ -248,6 +281,13 @@ export function KnowledgeBaseScreen() {
                   : ""}
               </p>
             ) : null}
+            <button
+              className="kb-delete-button kb-detail-delete"
+              disabled={busy}
+              onClick={() => setPendingDelete(selected)}
+            >
+              删除这份 PDF
+            </button>
           </section>
           {selected.version ? (
             <BookContent key={selected.id + selected.version} book={selected} />
@@ -292,6 +332,67 @@ export function KnowledgeBaseScreen() {
                   使用 PDF
                   的实际页序号。此前页面仍会保留原文，但不纳入知识片段。
                 </p>
+                <fieldset className="kb-ocr-field" disabled={busy}>
+                  <legend>文字识别模式</legend>
+                  <div className="kb-ocr-options">
+                    <label
+                      className={
+                        ocrMode === "always"
+                          ? "kb-ocr-option selected"
+                          : "kb-ocr-option"
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="ocr-mode"
+                        value="always"
+                        checked={ocrMode === "always"}
+                        aria-describedby="kb-ocr-always-tip"
+                        onChange={() => setOcrMode("always")}
+                      />
+                      <span>
+                        <strong>始终 OCR</strong>
+                        <small>always · 扫描件优先</small>
+                      </span>
+                      <span
+                        id="kb-ocr-always-tip"
+                        role="tooltip"
+                        className="kb-ocr-tooltip"
+                      >
+                        每页都渲染并进行 OCR。适合扫描版或文字层不可靠的
+                        PDF；速度较慢，电子版文字也会重新识别。
+                      </span>
+                    </label>
+                    <label
+                      className={
+                        ocrMode === "auto"
+                          ? "kb-ocr-option selected"
+                          : "kb-ocr-option"
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="ocr-mode"
+                        value="auto"
+                        checked={ocrMode === "auto"}
+                        aria-describedby="kb-ocr-auto-tip"
+                        onChange={() => setOcrMode("auto")}
+                      />
+                      <span>
+                        <strong>智能选择</strong>
+                        <small>auto · 电子版更快</small>
+                      </span>
+                      <span
+                        id="kb-ocr-auto-tip"
+                        role="tooltip"
+                        className="kb-ocr-tooltip"
+                      >
+                        优先使用 PDF 自带的可用文字层，无法使用的页面再执行
+                        OCR。适合电子版或混合 PDF，通常更快。
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
                 <div className="kb-actions">
                   <button
                     className="primary-button"
@@ -354,34 +455,64 @@ export function KnowledgeBaseScreen() {
             </div>
           ) : null}
           {catalog?.items.map((book) => (
-            <button
-              className="kb-book"
-              key={book.id}
-              onClick={() => {
-                setSelectedId(book.id);
-                setNotice(null);
-              }}
-            >
-              <span className="kb-book-icon" aria-hidden="true">
-                ▤
-              </span>
-              <span className="kb-book-copy">
-                <strong className="kb-filename">{book.filename}</strong>
-                <span>
-                  {book.pages} 页 · {book.chunks.toLocaleString()} 个片段
+            <div className="kb-book-row" key={book.id}>
+              <button
+                className="kb-book"
+                onClick={() => {
+                  setSelectedId(book.id);
+                  setNotice(null);
+                }}
+              >
+                <span className="kb-book-icon" aria-hidden="true">
+                  ▤
                 </span>
-                <span className="kb-book-status">
-                  {statusText(book)}
-                  {book.job && book.job.status !== "completed"
-                    ? ` · ${book.job.completed}/${book.job.total} 页`
-                    : ""}
+                <span className="kb-book-copy">
+                  <strong className="kb-filename" id={`kb-book-${book.id}`}>
+                    {book.filename}
+                  </strong>
+                  <span>
+                    {book.pages} 页 · {book.chunks.toLocaleString()} 个片段
+                  </span>
+                  <span className="kb-book-status">
+                    {statusText(book)}
+                    {book.job && book.job.status !== "completed"
+                      ? ` · ${book.job.completed}/${book.job.total} 页`
+                      : ""}
+                  </span>
                 </span>
-              </span>
-              <span aria-hidden="true">›</span>
-            </button>
+                <span aria-hidden="true">›</span>
+              </button>
+              <button
+                className="kb-delete-button kb-book-delete"
+                aria-label="删除 PDF"
+                aria-describedby={`kb-book-${book.id}`}
+                title={`删除 ${book.filename}`}
+                disabled={busy}
+                onClick={() => setPendingDelete(book)}
+              >
+                删除
+              </button>
+            </div>
           ))}
         </>
       )}
+      {pendingDelete ? (
+        <ConfirmationDialog
+          id="delete-pdf"
+          title={`删除“${pendingDelete.filename}”？`}
+          confirmLabel="删除 PDF"
+          busyLabel="正在停止并删除…"
+          busy={busy}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => void remove()}
+        >
+          <p>原 PDF 副本、识别结果和检索索引将从本机永久删除。</p>
+          {pendingDelete.job?.status === "running" ||
+          pendingDelete.job?.status === "cancelling" ? (
+            <p>当前导入任务会先安全停止；正在处理的页面保存完毕后再删除。</p>
+          ) : null}
+        </ConfirmationDialog>
+      ) : null}
     </main>
   );
 }

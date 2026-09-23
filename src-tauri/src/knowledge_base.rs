@@ -130,6 +130,7 @@ impl Runtime {
             .join("work")
             .join(job)
             .join("desktop-worker.log");
+        let kb_root = self.data.join("knowledge-bases").join(kb);
         let log = std::fs::File::create(&log_path).map_err(|e| e.to_string())?;
         // Disk-backed output lets the worker finish even after a full app exit.
         let mut worker_runtime = self.clone();
@@ -157,8 +158,10 @@ impl Runtime {
                 parse_reply(&bytes)
             });
             if let Err(error) = outcome {
-                if let Ok(mut value) = errors.lock() {
-                    *value = Some(error);
+                if kb_root.exists() {
+                    if let Ok(mut value) = errors.lock() {
+                        *value = Some(error);
+                    }
                 }
             }
         });
@@ -193,9 +196,18 @@ fn validate_id(id: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_ocr_mode(mode: &str) -> Result<(), String> {
+    if matches!(mode, "always" | "auto") {
+        Ok(())
+    } else {
+        Err("无效的 OCR 模式".into())
+    }
+}
+
 #[derive(Default)]
 pub struct KnowledgeBaseState {
     busy: Arc<AtomicBool>,
+    deleting: Arc<AtomicBool>,
     errors: Arc<Mutex<Option<String>>>,
 }
 
@@ -205,15 +217,36 @@ impl Drop for ImportPermit {
         self.0.store(false, Ordering::SeqCst);
     }
 }
+
+struct DeletePermit(Arc<AtomicBool>);
+impl Drop for DeletePermit {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
 impl KnowledgeBaseState {
     fn acquire(&self) -> Result<ImportPermit, String> {
+        if self.deleting.load(Ordering::SeqCst) {
+            return Err("正在删除 PDF，请稍候".into());
+        }
         self.busy
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .map_err(|_| "已有导入任务正在启动或处理，请稍候")?;
+        if self.deleting.load(Ordering::SeqCst) {
+            self.busy.store(false, Ordering::SeqCst);
+            return Err("正在删除 PDF，请稍候".into());
+        }
         if let Ok(mut error) = self.errors.lock() {
             *error = None;
         }
         Ok(ImportPermit(self.busy.clone()))
+    }
+
+    fn acquire_delete(&self) -> Result<DeletePermit, String> {
+        self.deleting
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| "已有 PDF 正在删除，请稍候")?;
+        Ok(DeletePermit(self.deleting.clone()))
     }
 }
 
@@ -251,14 +284,18 @@ pub async fn kb_read(
     request: ReadRequest,
 ) -> Result<Value, String> {
     let busy = state.busy.clone();
+    let deleting = state.deleting.clone();
     let errors = state.errors.clone();
     let catalog = matches!(request, ReadRequest::Catalog {});
     tauri::async_runtime::spawn_blocking(move || {
         let mut result =
             Runtime::discover()?.call(serde_json::to_value(request).map_err(|e| e.to_string())?)?;
         if catalog {
-            result["import_running"] =
-                json!(result["import_running"] == true || busy.load(Ordering::SeqCst));
+            result["import_running"] = json!(
+                result["import_running"] == true
+                    || busy.load(Ordering::SeqCst)
+                    || deleting.load(Ordering::SeqCst)
+            );
             result["launch_error"] = json!(errors.lock().map_err(|e| e.to_string())?.clone());
         }
         Ok(result)
@@ -272,12 +309,16 @@ pub async fn kb_import(
     state: tauri::State<'_, KnowledgeBaseState>,
     pdf: String,
     first_page: u32,
+    ocr_mode: String,
 ) -> Result<Value, String> {
+    validate_ocr_mode(&ocr_mode)?;
     let permit = state.acquire()?;
     let errors = state.errors.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let runtime = Runtime::discover()?;
-        let result = runtime.call(json!({"op":"prepare", "pdf":pdf, "first_page":first_page}))?;
+        let result = runtime.call(
+            json!({"op":"prepare", "pdf":pdf, "first_page":first_page, "ocr_mode":ocr_mode}),
+        )?;
         if result["reused"] != true {
             runtime.spawn_import(
                 result["kb"].as_str().ok_or("缺少知识库标识")?,
@@ -313,6 +354,20 @@ pub async fn kb_pause(kb: String, job: String) -> Result<Value, String> {
     validate_id(&job)?;
     tauri::async_runtime::spawn_blocking(move || {
         Runtime::discover()?.call(json!({"op":"cancel", "kb":kb, "job":job}))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn kb_delete(
+    state: tauri::State<'_, KnowledgeBaseState>,
+    kb: String,
+) -> Result<Value, String> {
+    validate_id(&kb)?;
+    let _permit = state.acquire_delete()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        Runtime::discover()?.call(json!({"op":"delete", "kb":kb}))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -391,11 +446,24 @@ mod tests {
     }
 
     #[test]
+    fn deletion_blocks_new_imports_and_releases_after_completion() {
+        let state = KnowledgeBaseState::default();
+        let deletion = state.acquire_delete().unwrap();
+        assert!(state.acquire().is_err());
+        assert!(state.acquire_delete().is_err());
+        drop(deletion);
+        assert!(state.acquire().is_ok());
+    }
+
+    #[test]
     fn paths_and_read_commands_are_restricted() {
         for id in ["../source", "C:\\tmp", "a/b", "", "."] {
             assert!(validate_id(id).is_err());
         }
         assert!(validate_id("computer-organization").is_ok());
+        assert!(validate_ocr_mode("always").is_ok());
+        assert!(validate_ocr_mode("auto").is_ok());
+        assert!(validate_ocr_mode("native").is_err());
         assert!(
             serde_json::from_value::<ReadRequest>(json!({"op":"run","kb":"x","job":"y"})).is_err()
         );

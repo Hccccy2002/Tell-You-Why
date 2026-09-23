@@ -49,6 +49,7 @@ pub struct RelatedSourcesRequest {
     version: String,
     chapter: Option<String>,
     query: String,
+    source_sha256: Option<String>,
 }
 
 #[tauri::command]
@@ -62,12 +63,18 @@ pub async fn rag_related_sources(
     if let Some(chapter) = &request.chapter {
         identifier(chapter)?;
     }
+    if request.source_sha256.as_ref().is_some_and(|sha256| {
+        sha256.len() != 64 || !sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+    }) {
+        return Err("无效的 PDF 哈希".into());
+    }
     if request.query.trim().is_empty() || request.query.chars().count() > 1000 {
         return Err("请输入 1–1000 字的问题".into());
     }
     // Only one CPU reranker runs at a time, including requests from multiple windows.
     let wire = json!({"op":"related_sources","kb":request.kb,"version":request.version,
-        "chapter":request.chapter,"query":request.query.trim()});
+        "chapter":request.chapter,"query":request.query.trim(),
+        "source_sha256":request.source_sha256});
     tauri::async_runtime::spawn_blocking(move || {
         static RERANKER: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _slot = RERANKER.lock().map_err(|e| e.to_string())?;

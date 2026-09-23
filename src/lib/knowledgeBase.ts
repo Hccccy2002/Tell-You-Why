@@ -39,6 +39,8 @@ export interface PdfSelection {
   bytes: number;
 }
 
+export type OcrMode = "always" | "auto";
+
 export interface Chapter {
   id: string;
   title: string;
@@ -83,12 +85,15 @@ export async function choosePdf(): Promise<PdfSelection | null> {
   return { ...info, path: selected };
 }
 
-export const importPdf = (pdf: string, firstPage: number) =>
+export const importPdf = (pdf: string, firstPage: number, ocrMode: OcrMode) =>
   invoke<{ kb: string; job: string; reused: boolean }>("kb_import", {
     pdf,
     firstPage,
+    ocrMode,
   });
 export const resumePdf = (kb: string, job: string) =>
   invoke<void>("kb_resume", { kb, job });
 export const pausePdf = (kb: string, job: string) =>
   invoke<void>("kb_pause", { kb, job });
+export const deletePdf = (kb: string) =>
+  invoke<{ deleted: boolean }>("kb_delete", { kb });

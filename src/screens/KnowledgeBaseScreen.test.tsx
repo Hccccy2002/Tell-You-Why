@@ -9,6 +9,7 @@ import * as learning from "../lib/learning";
 vi.mock("../lib/knowledgeBase", () => ({
   kbRead: vi.fn(),
   choosePdf: vi.fn(),
+  deletePdf: vi.fn(),
   importPdf: vi.fn(),
   pausePdf: vi.fn(),
   resumePdf: vi.fn(),
@@ -45,6 +46,7 @@ beforeEach(() => {
     models_ready: true,
     import_running: false,
   };
+  vi.mocked(kb.deletePdf).mockResolvedValue({ deleted: true });
   vi.mocked(kb.kbRead).mockImplementation((request) => {
     if (request.op === "catalog") return Promise.resolve(catalog);
     if (request.op === "chapters")
@@ -66,6 +68,25 @@ beforeEach(() => {
       });
     return Promise.reject(new Error("Unexpected request"));
   });
+});
+
+it("confirms and deletes a PDF knowledge base", async () => {
+  const user = userEvent.setup();
+  render(<KnowledgeBaseScreen />);
+  await user.click(await screen.findByTitle(`删除 ${book.filename}`));
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    "原 PDF 副本、识别结果和检索索引将从本机永久删除",
+  );
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: "删除 PDF",
+    }),
+  );
+  await waitFor(() => expect(kb.deletePdf).toHaveBeenCalledWith(book.id));
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    `已删除“${book.filename}”`,
+  );
+  expect(screen.queryByTitle(`删除 ${book.filename}`)).not.toBeInTheDocument();
 });
 
 it("opens in search with only the retained tabs and follows a chapter-filtered citation", async () => {
@@ -196,9 +217,21 @@ it("selects a PDF then explicitly starts import; repeat clicks cannot duplicate 
   expect(kb.importPdf).not.toHaveBeenCalled();
   await user.clear(screen.getByLabelText("正文起始页"));
   await user.type(screen.getByLabelText("正文起始页"), "3");
+  expect(screen.getByRole("radio", { name: /始终 OCR/ })).toBeChecked();
+  expect(
+    screen.getByRole("tooltip", { name: /每页都渲染/ }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("tooltip", { name: /优先使用 PDF 自带/ }),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("radio", { name: /智能选择/ }));
   await user.click(screen.getByRole("button", { name: "开始导入" }));
   expect(screen.getByRole("button", { name: "正在准备…" })).toBeDisabled();
-  expect(kb.importPdf).toHaveBeenCalledExactlyOnceWith("D:\\新 教材.pdf", 3);
+  expect(kb.importPdf).toHaveBeenCalledExactlyOnceWith(
+    "D:\\新 教材.pdf",
+    3,
+    "auto",
+  );
   await act(async () => {
     complete({ kb: book.id, job: "job1", reused: true });
     await Promise.resolve();

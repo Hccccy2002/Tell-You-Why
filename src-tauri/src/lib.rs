@@ -204,6 +204,7 @@ pub fn run() {
             knowledge_base::kb_import,
             knowledge_base::kb_resume,
             knowledge_base::kb_pause,
+            knowledge_base::kb_delete,
             rag_commands::rag_providers,
             rag_commands::rag_prepare,
             learning_generation::rag_prepare_random,

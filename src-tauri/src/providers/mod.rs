@@ -336,6 +336,8 @@ impl ProviderContext {
 pub struct GenerationRequest {
     pub topics: Vec<String>,
     pub count: usize,
+    pub avoid_questions: Vec<String>,
+    pub diversity_hint: String,
 }
 
 #[derive(Debug, Clone)]
@@ -620,21 +622,30 @@ async fn generate_openai_compatible(
         .join("、");
     let output_example = json!({
         "cards": [{
-            "topicId": "natural_science",
-            "topicLabel": "自然科学",
-            "tags": ["气体", "溶解度"],
-            "question": "为什么刚打开的汽水会迅速冒出许多气泡？",
-            "shortAnswer": "密封时的高压让更多二氧化碳溶在液体中；开盖后压力突然下降，气体溶解度随之降低，便从微小成核点析出并形成大量气泡。",
-            "explanation": "汽水在灌装时会被加压注入二氧化碳。较高压力使更多气体能够稳定地溶解在液体中，密封瓶内因此暂时看不到大量气泡。开盖后，液面上方的压力迅速降到接近大气压，原先溶解的二氧化碳不再能全部留在水中。气体会优先在瓶壁划痕、灰尘颗粒或晃动形成的微小空隙处聚集，这些位置称为成核点。小气泡形成后继续吸收周围的二氧化碳，体积增大并上浮，所以会看到连续冒泡。温度越高，二氧化碳通常越不容易溶解；摇晃又会增加成核机会，因此温热或刚被摇过的汽水开盖时更容易喷涌。这个解释适用于普通碳酸饮料，实际程度还会受到配方、温度、瓶内压力和容器表面状态影响。",
-            "whyItMatters": "它解释了为什么汽水应冷藏并在开盖前保持静置。",
+            "topicId": "topic_id",
+            "topicLabel": "领域名称",
+            "tags": ["标签一", "标签二"],
+            "question": "这里填写十二至四十五个中文字符的问题",
+            "shortAnswer": "这里填写四十至九十个中文字符的简短答案，直接说明关键机制、原因或结论，并保持信息完整清楚。",
+            "explanation": "这里填写详细解释，长度必须达到一百八十至二百八十个中文字符。先解释现象背后的核心机制，再补充必要条件、具体过程、容易忽略的限制以及一个有助于理解的应用场景。内容需要准确、连贯、通俗，不能重复简短答案来凑字数，也不要加入来源链接、实时数据或未经支持的结论。最后说明该规律适用的边界，让读者知道它并非在所有条件下都完全相同。为了满足长度要求，还应补充相关因素之间如何相互影响，以及观察结果可能随环境、尺度或时间发生怎样的变化。",
+            "whyItMatters": "这里说明这条知识在理解现实或解决问题时的价值。",
             "difficulty": "general",
             "estimatedReadSeconds": 45
         }]
     })
     .to_string();
+    let avoid_questions = request
+        .avoid_questions
+        .iter()
+        .take(20)
+        .map(|question| question.chars().take(45).collect::<String>())
+        .collect::<Vec<_>>();
+    let avoid_questions =
+        serde_json::to_string(&avoid_questions).map_err(|_| ProviderError::ContentRejected)?;
+    let diversity_hint = request.diversity_hint.chars().take(120).collect::<String>();
     let prompt = format!(
-        "请围绕这些低风险知识领域生成 {} 张简体中文知识卡：{}。返回紧凑的 JSON 对象，顶层必须包含 cards 数组；每张卡必须包含 topicId、topicLabel、tags、question、shortAnswer、explanation、whyItMatters、difficulty 和 estimatedReadSeconds。字段名及大小写必须与这个 JSON 结构示例完全一致：{}。question 为 12 至 45 个中文字符，shortAnswer 控制在 40 至 90 个中文字符，explanation 控制在 180 至 280 个中文字符，estimatedReadSeconds 为 30 至 90。difficulty 只能是 beginner、general 或 advanced。必须恰好返回要求的卡片数量。禁止医疗诊断、法律意见、投资建议、实时政治和需要实时数据的问题。不要提供或编造来源链接，不要声称内容已核验。只输出这个 JSON 对象，不要输出 Markdown、解释或其他文字。",
-        request.count, topics, output_example
+        "请围绕这些低风险知识领域生成 {} 张简体中文知识卡：{}。本次内容方向：{}。近期已有问题如下：{}。新问题必须避开这些问题的对象、核心结论和常见改写，不得只替换措辞；同一批卡片之间也必须选择不同子主题和不同切入角度。返回紧凑的 JSON 对象，顶层必须包含 cards 数组；每张卡必须包含 topicId、topicLabel、tags、question、shortAnswer、explanation、whyItMatters、difficulty 和 estimatedReadSeconds。字段名及大小写必须与这个仅用于说明格式的 JSON 骨架完全一致，但严禁复制骨架中的占位内容：{}。question 为 12 至 45 个中文字符，shortAnswer 控制在 40 至 90 个中文字符，explanation 控制在 180 至 280 个中文字符，estimatedReadSeconds 为 30 至 90。difficulty 只能是 beginner、general 或 advanced。优先选择具体、反直觉但可可靠解释的知识，不要反复生成该领域最常见的入门问题。必须恰好返回要求的卡片数量。禁止医疗诊断、法律意见、投资建议、实时政治和需要实时数据的问题。不要提供或编造来源链接，不要声称内容已核验。只输出这个 JSON 对象，不要输出 Markdown、解释或其他文字。",
+        request.count, topics, diversity_hint, avoid_questions, output_example
     );
     let output_token_budget = (request.count * 2_000).min(6_000);
     let mut body = json!({
@@ -653,7 +664,7 @@ async fn generate_openai_compatible(
         "response_format": { "type": "json_object" }
     });
     if provider_id == "deepseek" {
-        body["temperature"] = json!(0.4);
+        body["temperature"] = json!(0.7);
         body["max_tokens"] = json!(output_token_budget);
         body["thinking"] = json!({ "type": "disabled" });
     } else if provider_id == "kimi" {
@@ -672,7 +683,7 @@ async fn generate_openai_compatible(
             Ok(cards) => return Ok(cards),
             Err(error) if attempt == 0 && error.retryable_generation_output() => {
                 if provider_id == "deepseek" {
-                    body["temperature"] = json!(0.2);
+                    body["temperature"] = json!(0.3);
                 }
                 if matches!(error, ProviderError::TruncatedResponse) {
                     let expanded_budget = (output_token_budget + 2_000).min(6_000);
@@ -982,6 +993,8 @@ mod tests {
             &GenerationRequest {
                 topics: vec!["自然科学".into()],
                 count: 1,
+                avoid_questions: vec!["为什么天空通常是蓝色？".into()],
+                diversity_hint: "从边界条件切入".into(),
             },
             transport,
         ))
@@ -1036,6 +1049,8 @@ mod tests {
             &GenerationRequest {
                 topics: vec!["自然科学".into()],
                 count: 1,
+                avoid_questions: vec!["为什么天空通常是蓝色？".into()],
+                diversity_hint: "从边界条件切入".into(),
             },
             &transport,
         ))
@@ -1062,7 +1077,7 @@ mod tests {
         let captured_body = &bodies[0];
         if provider_id == "deepseek" {
             assert_eq!(captured_body["thinking"]["type"], "disabled");
-            assert_eq!(captured_body["temperature"], 0.4);
+            assert_eq!(captured_body["temperature"], 0.7);
             assert_eq!(captured_body["max_tokens"], 2_000);
             assert!(captured_body.get("max_completion_tokens").is_none());
             assert_eq!(captured_body["response_format"]["type"], "json_object");
@@ -1091,6 +1106,8 @@ mod tests {
         let prompt = captured_body["messages"][1]["content"]
             .as_str()
             .expect("generation prompt");
+        assert!(prompt.contains("为什么天空通常是蓝色"));
+        assert!(prompt.contains("从边界条件切入"));
         let example_start = prompt.find('{').expect("JSON example start");
         let example_end = prompt.rfind('}').expect("JSON example end");
         let example_cards = parse_generated_content(&prompt[example_start..=example_end])
@@ -1231,8 +1248,8 @@ mod tests {
             assert_eq!(cards.len(), 1);
             let bodies = transport.bodies.lock().expect("body lock");
             assert_eq!(bodies.len(), 2);
-            assert_eq!(bodies[0]["temperature"], 0.4);
-            assert_eq!(bodies[1]["temperature"], 0.2);
+            assert_eq!(bodies[0]["temperature"], 0.7);
+            assert_eq!(bodies[1]["temperature"], 0.3);
             assert_eq!(bodies[0]["max_tokens"], 2_000);
             assert_eq!(bodies[1]["max_tokens"], 2_000);
         }
@@ -1249,8 +1266,8 @@ mod tests {
         assert_eq!(cards.len(), 1);
         let bodies = transport.bodies.lock().expect("body lock");
         assert_eq!(bodies.len(), 2);
-        assert_eq!(bodies[0]["temperature"], 0.4);
-        assert_eq!(bodies[1]["temperature"], 0.2);
+        assert_eq!(bodies[0]["temperature"], 0.7);
+        assert_eq!(bodies[1]["temperature"], 0.3);
         assert_eq!(bodies[0]["max_tokens"], 2_000);
         assert_eq!(bodies[1]["max_tokens"], 4_000);
     }

@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import shutil
 import sqlite3
 import sys
 import time
@@ -18,6 +19,7 @@ from .util import atomic_json, file_hash, read_json, safe_name
 
 REPLY_PREFIX = "TELLWHY_DESKTOP:"
 ACTIVE_STATES = {"running", "cancelling"}
+DELETE_WAIT_SECONDS = 30 * 60
 
 
 def inside(root: Path, relative: str) -> Path:
@@ -57,6 +59,9 @@ class DesktopLibrary:
         if not (folder / "job.json").is_file():
             raise ValueError("导入任务不存在")
         return folder
+
+    def kb_lock(self, kb: str) -> Path:
+        return inside(self.root, ".locks/" + safe_name(kb) + ".lock")
 
     def published(self, kb: str, verify_data: bool = False):
         root = self.kb_root(kb)
@@ -158,7 +163,7 @@ class DesktopLibrary:
         probe = inspect_pdf(Path(pdf))
         return {key: probe[key] for key in ("filename", "pages", "bytes", "sha256")}
 
-    def prepare(self, pdf: str, first_page: int = 1):
+    def prepare(self, pdf: str, first_page: int = 1, ocr_mode: str = "always"):
         from .ingest.probe import inspect_pdf
         from .jobs import initialize_job
         from .models import verify_models
@@ -169,27 +174,34 @@ class DesktopLibrary:
         probe = inspect_pdf(Path(pdf))
         if type(first_page) is not int or not 1 <= first_page <= probe["pages"]:
             raise ValueError("正文起始页必须在 PDF 页数范围内")
+        config = IngestConfig(
+            exclude_before_page=first_page,
+            ocr_mode=ocr_mode,
+            native_text_trusted=ocr_mode == "auto",
+        )
+        requested_config = config.model_dump()
         # Re-selecting a known PDF opens its existing knowledge base without replacing
         # accepted chapter overrides or re-running a full textbook's OCR.
         for root in sorted(self.root.glob("*")):
             if (root / "sources" / (probe["sha256"] + ".pdf")).is_file():
                 if (root / "active.json").exists():
                     _, manifest = self.published(root.name, verify_data=True)
-                    if manifest["source"]["sha256"] == probe["sha256"]:
+                    if (
+                        manifest["source"]["sha256"] == probe["sha256"]
+                        and manifest.get("config") == requested_config
+                    ):
                         return {"kb": root.name, "job": manifest["job_id"], "reused": True}
                 jobs = sorted(root.glob("work/*/job.json"), key=lambda p: p.stat().st_mtime, reverse=True)
                 for path in jobs:
                     meta = read_json(path)
                     if (
                         meta["source_sha256"] == probe["sha256"]
-                        and meta["config"]["exclude_before_page"] == first_page
+                        and meta.get("config") == requested_config
                     ):
                         return {"kb": root.name, "job": meta["id"], "reused": False}
         models = verify_models(self.models)
         kb = "pdf-" + probe["sha256"][:20]
-        folder, meta = initialize_job(
-            self.data, kb, probe, IngestConfig(exclude_before_page=first_page), models
-        )
+        folder, meta = initialize_job(self.data, kb, probe, config, models)
         atomic_json(folder / "desktop-state.json", {"status": "paused", "stage": "extracting"})
         return {"kb": kb, "job": meta["id"], "reused": False}
 
@@ -197,9 +209,18 @@ class DesktopLibrary:
         from .jobs import exclusive_lock, runtime_versions
         from .models import verify_models
 
+        root = self.kb_root(kb)
+        if (root / "delete.request").exists():
+            raise ValueError("这份 PDF 正在删除")
         folder = self.job_folder(kb, job)
         meta = read_json(folder / "job.json")
-        with exclusive_lock(self.data / "desktop-import.lock"), exclusive_lock(folder / "desktop.lock"):
+        with (
+            exclusive_lock(self.data / "desktop-import.lock"),
+            exclusive_lock(self.kb_lock(kb)),
+            exclusive_lock(folder / "desktop.lock"),
+        ):
+            if (root / "delete.request").exists():
+                raise ValueError("这份 PDF 正在删除")
             state = {"status": "running", "stage": "verifying", "updated_at": time.time()}
 
             def update(**values):
@@ -232,6 +253,8 @@ class DesktopLibrary:
 
     def launch_ready(self, kb: str, job: str):
         folder = self.job_folder(kb, job)
+        if (self.kb_root(kb) / "delete.request").exists():
+            raise ValueError("这份 PDF 正在删除")
         if self.catalog()["import_running"]:
             raise ValueError("已有 PDF 正在处理，请等待完成或暂停当前任务")
         (folder / "cancel.request").unlink(missing_ok=True)
@@ -241,6 +264,50 @@ class DesktopLibrary:
         folder = self.job_folder(kb, job)
         (folder / "cancel.request").write_text("pause requested", encoding="utf-8")
         return {"status": "cancelling"}
+
+    def delete(self, kb: str):
+        from .jobs import exclusive_lock
+
+        root = self.kb_root(kb)
+        if not root.is_dir():
+            return {"deleted": False}
+        marker = root / "delete.request"
+        marker.write_text("delete requested", encoding="utf-8")
+        deadline = time.monotonic() + DELETE_WAIT_SECONDS
+        try:
+            while root.exists():
+                locked = False
+                for job_file in root.glob("work/*/job.json"):
+                    folder = job_file.parent
+                    if is_locked(folder / "desktop.lock") or is_locked(folder / "writer.lock"):
+                        locked = True
+                        (folder / "cancel.request").write_text("delete requested", encoding="utf-8")
+                if locked:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("等待 PDF 处理任务停止超时，请稍后重试删除")
+                    time.sleep(0.2)
+                    continue
+                try:
+                    with exclusive_lock(self.kb_lock(kb)):
+                        while root.exists():
+                            try:
+                                shutil.rmtree(root)
+                            except OSError:
+                                if time.monotonic() >= deadline:
+                                    raise TimeoutError("等待 PDF 文件释放超时，请稍后重试删除")
+                                if root.exists():
+                                    marker.write_text("delete requested", encoding="utf-8")
+                                time.sleep(0.2)
+                        return {"deleted": True}
+                except RuntimeError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("等待 PDF 处理任务停止超时，请稍后重试删除")
+                    marker.write_text("delete requested", encoding="utf-8")
+                    time.sleep(0.2)
+            return {"deleted": True}
+        except Exception:
+            marker.unlink(missing_ok=True)
+            raise
 
     def chapters(self, kb: str):
         directory, _ = self.published(kb, verify_data=True)
@@ -325,14 +392,51 @@ class DesktopLibrary:
             raise ValueError("资料版本已更新，请重新预览")
         return {"version": version}
 
-    def related_sources(self, kb: str, version: str, query: str, chapter: str | None = None):
+    def _related_source_version(
+        self, kb: str, version: str, chapter: str | None, source_sha256: str | None
+    ):
+        root = self.kb_root(kb)
+        directory = inside(root, "versions/" + safe_name(version))
+        replaced = not directory.is_dir()
+        if replaced:
+            try:
+                directory, manifest = self.published(kb, verify_data=True)
+            except (OSError, ValueError, KeyError, sqlite3.Error) as exc:
+                raise ValueError("原资料版本已删除，且当前没有可用的同一 PDF") from exc
+        else:
+            manifest = read_json(directory / "manifest.json")
+            if manifest["version"] != version:
+                raise ValueError("原文版本不一致")
+        actual_sha256 = manifest["source"]["sha256"]
+        if source_sha256 and actual_sha256 != source_sha256:
+            raise ValueError("当前知识库已不是生成这张学习卡时使用的 PDF")
+        if replaced and not source_sha256:
+            generated_id = "pdf-" + actual_sha256[:20]
+            if kb != generated_id:
+                raise ValueError("原资料版本已删除，无法确认当前 PDF 与原资料一致")
+        if replaced and chapter:
+            with readonly(directory / "knowledge.sqlite") as db:
+                exists = db.execute(
+                    "SELECT 1 FROM chapters WHERE id=? OR title=?", (chapter, chapter)
+                ).fetchone()
+            if not exists:
+                chapter = None
+        return directory, manifest, chapter
+
+    def related_sources(
+        self,
+        kb: str,
+        version: str,
+        query: str,
+        chapter: str | None = None,
+        source_sha256: str | None = None,
+    ):
         """Top 5 for the finished question; never replace its original citation snapshot."""
         if not isinstance(query, str) or not query.strip() or len(query) > 1000:
             raise ValueError("请输入 1–1000 字的问题")
-        directory = inside(self.kb_root(kb), "versions/" + safe_name(version))
-        manifest = read_json(directory / "manifest.json")
-        if manifest["version"] != version:
-            raise ValueError("原文版本不一致")
+        directory, manifest, chapter = self._related_source_version(
+            kb, version, chapter, source_sha256
+        )
         for relative in ("knowledge.sqlite", "embeddings.npy"):
             if file_hash(directory / relative) != manifest["files"][relative]:
                 raise ValueError("知识库索引校验失败，请重新导入")
@@ -426,6 +530,7 @@ class DesktopLibrary:
             "run": self.run_import,
             "launch_ready": self.launch_ready,
             "cancel": self.cancel,
+            "delete": self.delete,
             "chapters": self.chapters,
             "browse": self.browse,
             "search": self.search,

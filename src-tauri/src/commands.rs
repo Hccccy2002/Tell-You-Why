@@ -1100,6 +1100,12 @@ async fn generate_and_store(
         return Err("单批生成数量超过供应商适配器限制".into());
     }
     let job_id = Uuid::new_v4().to_string();
+    let recent_topic_id = topic_override.as_ref().map(|(id, _)| id.as_str());
+    let avoid_questions = state
+        .database
+        .recent_questions(recent_topic_id, 20)
+        .map_err(|error| error.to_string())?;
+    let diversity_hint = generation_diversity_hint(&job_id);
     state
         .database
         .start_generation_job(&job_id, &profile.provider_id, count)
@@ -1108,7 +1114,12 @@ async fn generate_and_store(
         .generate_knowledge_cards(
             &context,
             &secret,
-            &GenerationRequest { topics, count },
+            &GenerationRequest {
+                topics,
+                count,
+                avoid_questions,
+                diversity_hint,
+            },
             state.http.as_ref(),
         )
         .await;
@@ -1145,6 +1156,32 @@ async fn generate_and_store(
             Err(error.to_string())
         }
     }
+}
+
+fn generation_diversity_hint(seed: &str) -> String {
+    const ANGLES: &[&str] = &[
+        "从日常可观察的反直觉现象切入",
+        "从形成过程和因果链条切入",
+        "从两个容易混淆的概念对比切入",
+        "从尺度、时间或环境变化切入",
+        "从技术设计为何如此取舍切入",
+        "从一个常见误解及其纠正切入",
+        "从历史演变背后的实际原因切入",
+        "从边界条件和例外情况切入",
+    ];
+    const LEVELS: &[&str] = &["入门但不俗套", "一般难度", "稍有挑战但通俗"];
+    let bytes = seed.as_bytes();
+    let angle = bytes
+        .iter()
+        .fold(0usize, |sum, byte| sum.wrapping_add(usize::from(*byte)));
+    let level = bytes.iter().rev().fold(0usize, |sum, byte| {
+        sum.wrapping_mul(31).wrapping_add(usize::from(*byte))
+    });
+    format!(
+        "{}；难度采用{}",
+        ANGLES[angle % ANGLES.len()],
+        LEVELS[level % LEVELS.len()]
+    )
 }
 
 #[tauri::command(rename_all = "camelCase")]

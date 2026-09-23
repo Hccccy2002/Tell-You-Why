@@ -10,6 +10,7 @@ const request = {
   version: "v1",
   chapter: "c1",
   query: "为什么需要 Cache？",
+  source_sha256: "source",
 };
 const packet: EvidencePacket = {
   ...request,

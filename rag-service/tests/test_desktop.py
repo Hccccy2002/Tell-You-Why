@@ -39,6 +39,36 @@ def test_real_publication_browse_search_source_and_dedup(desktop):
     assert len(list((root / "versions").iterdir())) == 1
 
 
+def test_prepare_records_selected_ocr_mode_and_does_not_reuse_other_mode(desktop, monkeypatch):
+    library, root, args = desktop
+    source = root / "sources" / (args[0]["source_sha256"] + ".pdf")
+    monkeypatch.setattr("tellwhy_kb.models.verify_models", lambda _: {})
+    monkeypatch.setattr("tellwhy_kb.jobs.runtime_versions", lambda: {})
+    result = library.prepare(str(source), ocr_mode="auto")
+    assert not result["reused"]
+    config = read_json(library.kb_root(result["kb"]) / "work" / result["job"] / "job.json")[
+        "config"
+    ]
+    assert config["ocr_mode"] == "auto"
+    assert config["native_text_trusted"] is True
+
+
+def test_related_sources_falls_back_to_current_version_of_same_pdf(desktop):
+    library, _, args = desktop
+    source_sha256 = args[0]["source_sha256"]
+    directory, manifest, chapter = library._related_source_version(
+        "test", "deleted-version", "c1", source_sha256
+    )
+    assert directory.name == "version1"
+    assert manifest["version"] == "version1"
+    assert chapter == "c1"
+    assert library._related_source_version(
+        "test", "deleted-version", "old-chapter", source_sha256
+    )[2] is None
+    with pytest.raises(ValueError, match="不是生成这张学习卡"):
+        library._related_source_version("test", "deleted-version", None, "0" * 64)
+
+
 def test_invalid_paths_queries_pages_and_corrupt_index_fail_closed(desktop):
     library, root, _ = desktop
     with pytest.raises(ValueError):
@@ -82,6 +112,33 @@ def test_lock_and_stale_running_status_enable_safe_resume(desktop):
         assert library.job_status(folder)["status"] == "cancelling"
     library.launch_ready("test", "job1")
     assert not (folder / "cancel.request").exists()
+
+
+def test_delete_removes_paused_or_completed_library(desktop):
+    library, root, args = desktop
+    make_job(library, root, args)
+    assert library.delete("test") == {"deleted": True}
+    assert not root.exists()
+    assert library.delete("test") == {"deleted": False}
+
+
+def test_delete_requests_stop_before_removing_active_library(desktop, monkeypatch):
+    library, root, args = desktop
+    folder = make_job(library, root, args)
+    lock_checks = iter([True, False, False])
+    monkeypatch.setattr("tellwhy_kb.desktop.is_locked", lambda _: next(lock_checks))
+    monkeypatch.setattr("tellwhy_kb.desktop.time.sleep", lambda _: None)
+    assert library.delete("test") == {"deleted": True}
+    assert not root.exists()
+    assert not folder.exists()
+
+
+def test_delete_marker_prevents_resume(desktop):
+    library, root, args = desktop
+    make_job(library, root, args)
+    (root / "delete.request").write_text("delete requested", encoding="utf-8")
+    with pytest.raises(ValueError, match="正在删除"):
+        library.launch_ready("test", "job1")
 
 
 def test_immediate_pause_during_startup_is_not_lost(desktop, monkeypatch):

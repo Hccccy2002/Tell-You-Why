@@ -65,6 +65,7 @@ export function LearningCardDetails({
               kb: card.kb,
               version: card.packet.version,
               chapter: card.packet.chapter,
+              source_sha256: card.packet.source_sha256,
               query: [...card.result.question].slice(0, 1000).join(""),
             }}
             active={expanded === "evidence"}
