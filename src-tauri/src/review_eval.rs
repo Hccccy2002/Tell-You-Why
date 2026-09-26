@@ -169,6 +169,7 @@ async fn evaluate_in(
             StartReview {
                 question_count: None,
                 require_sources: false,
+                mcp_server_ids: vec![],
                 due_only: false,
                 kb: "book".into(),
                 version: "v1".into(),

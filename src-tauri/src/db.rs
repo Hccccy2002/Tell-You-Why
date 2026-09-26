@@ -309,6 +309,11 @@ impl Database {
             transaction.execute_batch(include_str!("search/answer_schema.sql"))?;
             transaction.commit()?;
         }
+        if version < 17 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(include_str!("mcp_schema.sql"))?;
+            transaction.commit()?;
+        }
         connection.execute(
             "UPDATE card_user_state
              SET hidden = 1

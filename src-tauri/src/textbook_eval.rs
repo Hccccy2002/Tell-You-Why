@@ -293,13 +293,14 @@ fn textbook_eval_live() {
                 database,
                 secrets: Arc::new(WindowsCredentialStore),
                 http: transport.clone(),
+                mcp: Arc::new(crate::mcp::McpRuntime::new().unwrap()),
                 exiting: AtomicBool::new(false),
                 generation_in_progress: AtomicBool::new(false),
                 auto_hide: Default::default(),
                 persistence_gate: Default::default(),
             };
             let timer = Instant::now();
-            let id = start_inner(StartReview {question_count:Some(1),require_sources:false,due_only:seed.is_some(),kb:"computer-organization".into(), version:source["knowledge_version"].as_str().unwrap().into(),chapter:None,
+            let id = start_inner(StartReview {question_count:Some(1),require_sources:false,mcp_server_ids:vec![],due_only:seed.is_some(),kb:"computer-organization".into(), version:source["knowledge_version"].as_str().unwrap().into(),chapter:None,
                 goal:"复习Cache写直达与写回的区别。查阅教材后出且仅出一道选择题，答题后记录结果、讲解并结束，不再出题。".into(),provider:profile.provider_id.clone(),region:profile.region.clone()},&state,&LocalReviewLibrary).await.unwrap()["id"].as_str().unwrap().to_string();
             for _ in 0..6 {
                 let run = state.database.review_load(&id).unwrap();

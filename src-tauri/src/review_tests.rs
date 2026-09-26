@@ -116,6 +116,7 @@ pub fn setup(replies: Vec<Value>) -> (tempfile::TempDir, AppState, Arc<Model>, L
         database: db,
         secrets: Arc::new(Keys),
         http: model.clone(),
+        mcp: Arc::new(crate::mcp::McpRuntime::new().unwrap()),
         exiting: AtomicBool::new(false),
         generation_in_progress: AtomicBool::new(false),
         auto_hide: Default::default(),
@@ -135,6 +136,7 @@ pub async fn start(state: &AppState, library: &Library) -> String {
         StartReview {
             question_count: None,
             require_sources: false,
+            mcp_server_ids: vec![],
             due_only: false,
             kb: "book".into(),
             version: "v1".into(),

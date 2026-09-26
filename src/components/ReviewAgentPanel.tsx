@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Chapter, PdfKnowledgeBase } from "../lib/knowledgeBase";
 import { friendlyError } from "../lib/api";
 import { ragProviders } from "../lib/rag";
+import { mcpListServers, type McpServer } from "../lib/mcp";
 import {
   reviewAnswer,
   reviewCancel,
@@ -45,6 +46,8 @@ export function ReviewAgentPanel({
   const [chapter, setChapter] = useState("");
   const [questionCount, setQuestionCount] = useState("auto");
   const [requireSources, setRequireSources] = useState(false);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [selectedMcpIds, setSelectedMcpIds] = useState<string[]>([]);
   const [run, setRun] = useState<ReviewRun | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -88,6 +91,31 @@ export function ReviewAgentPanel({
       live.current = false;
     };
   }, [book.id]);
+  useEffect(() => {
+    if (!active) return;
+    let current = true;
+    void mcpListServers()
+      .then((servers) => {
+        if (current) {
+          setMcpServers(
+            servers.filter(
+              (server) =>
+                server.enabled &&
+                server.status === "connected" &&
+                server.items.some(
+                  (item) => item.kind === "tool" && item.enabled,
+                ),
+            ),
+          );
+        }
+      })
+      .catch((reason) => {
+        if (current) setError(friendlyError(reason));
+      });
+    return () => {
+      current = false;
+    };
+  }, [active]);
   useEffect(() => {
     if (!active || runState !== "running" || !runId) return;
     let current = true;
@@ -192,6 +220,7 @@ export function ReviewAgentPanel({
             ? null
             : Number(questionCount),
         require_sources: requireSources,
+        mcp_server_ids: selectedMcpIds,
       });
       setChoices({});
       return continueRun(value);
@@ -297,6 +326,41 @@ export function ReviewAgentPanel({
             </select>
           </label>
         </div>
+        <fieldset className="review-mcp-picker" disabled={locked}>
+          <legend>本次允许的 MCP 服务器</legend>
+          {mcpServers.length ? (
+            mcpServers.map((server) => {
+              const tools = server.items.filter(
+                (item) => item.kind === "tool" && item.enabled,
+              ).length;
+              return (
+                <label key={server.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedMcpIds.includes(server.id)}
+                    onChange={(event) =>
+                      setSelectedMcpIds((current) =>
+                        event.target.checked
+                          ? [...current, server.id]
+                          : current.filter((id) => id !== server.id),
+                      )
+                    }
+                  />
+                  <span>
+                    {server.name} · {tools} 个工具
+                  </span>
+                </label>
+              );
+            })
+          ) : (
+            <p className="kb-muted">
+              暂无已连接且启用工具的 MCP 服务器，可在“MCP 服务器”页面配置。
+            </p>
+          )}
+          <p className="kb-muted">
+            所选工具会在会话开始时固定为快照，之后的配置变更不会静默扩大权限。
+          </p>
+        </fieldset>
         <div className="review-controls">
           <label className="kb-field">
             复习章节范围
@@ -383,6 +447,14 @@ export function ReviewAgentPanel({
           <p className="kb-muted">
             {run.scope.chapter_path.join(" / ") || "整本教材"} · {run.goal}
           </p>
+          {!!run.mcp_servers?.length && (
+            <p className="review-mcp-snapshot">
+              外部工具快照：
+              {run.mcp_servers
+                .map((server) => `${server.name}（${server.tool_count}）`)
+                .join("、")}
+            </p>
+          )}
           {run.error && <p className="kb-notice">{run.error}</p>}
           {run.questions.map((question) => (
             <article

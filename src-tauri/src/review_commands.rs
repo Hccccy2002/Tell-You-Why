@@ -25,6 +25,8 @@ pub struct StartReview {
     pub question_count: Option<usize>,
     #[serde(default)]
     pub require_sources: bool,
+    #[serde(default)]
+    pub mcp_server_ids: Vec<String>,
 }
 
 pub(crate) async fn start_inner(
@@ -70,6 +72,10 @@ pub(crate) async fn start_inner(
         &profile.provider_id,
         &profile.region,
     );
+    run.mcp_servers = state
+        .database
+        .mcp_snapshots(&request.mcp_server_ids)
+        .map_err(|e| e.to_string())?;
     run.completion.contract.require_sources = request.require_sources;
     if let Some(count) = request.question_count.or(request.due_only.then_some(1)) {
         run.completion.contract.min_questions = count;
@@ -153,13 +159,15 @@ pub(crate) async fn continue_inner(
         .database
         .review_save(&run, None)
         .map_err(|e| e.to_string())?;
-    if let Err(error) = review_agent::drive(
+    if let Err(error) = review_agent::drive_with_mcp(
         &state.database,
         library,
         state.http.as_ref(),
         &context,
         &key,
         &mut run,
+        state.mcp.as_ref(),
+        state.secrets.as_ref(),
     )
     .await
     {

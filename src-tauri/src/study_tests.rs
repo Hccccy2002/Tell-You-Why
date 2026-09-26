@@ -1647,6 +1647,7 @@ fn study_live_provider_smoke() {
         database,
         secrets: Arc::new(WindowsCredentialStore),
         http: Arc::new(LiveTransport(RestrictedHttpClient::new().unwrap())),
+        mcp: Arc::new(crate::mcp::McpRuntime::new().unwrap()),
         exiting: AtomicBool::new(false),
         generation_in_progress: AtomicBool::new(false),
         auto_hide: Default::default(),

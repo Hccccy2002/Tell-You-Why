@@ -80,6 +80,7 @@ pub(crate) fn setup(path: &Path, replies: Vec<Value>) -> Result<AppState, String
         database,
         secrets: Arc::new(SimulatedKeys),
         http: Arc::new(SimulatedModel(Mutex::new(replies.into()))),
+        mcp: Arc::new(crate::mcp::McpRuntime::new().unwrap()),
         exiting: AtomicBool::new(false),
         generation_in_progress: AtomicBool::new(false),
         auto_hide: Default::default(),

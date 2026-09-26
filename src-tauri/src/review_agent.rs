@@ -64,6 +64,8 @@ pub struct ReviewRun {
     pub model_calls: usize,
     pub tool_calls: usize,
     #[serde(default)]
+    pub mcp_servers: Vec<crate::mcp::McpServerSnapshot>,
+    #[serde(default)]
     pub trace: Vec<crate::review_trace::TraceEvent>,
     #[serde(default)]
     pub memory_ids: Vec<String>,
@@ -106,6 +108,7 @@ impl ReviewRun {
             error: None,
             model_calls: 0,
             tool_calls: 0,
+            mcp_servers: vec![],
             trace: vec![],
             memory_ids: vec![],
             due_memory_ids: vec![],
@@ -119,6 +122,7 @@ impl ReviewRun {
             "model_calls":self.model_calls,"tool_calls":self.tool_calls,"sources":self.sources,
             "can_resume":policy::can_resume(self),"stop_reason":self.control.stop,
             "completion":self.completion.last_report,"contract":self.completion.contract,
+            "mcp_servers":self.mcp_servers.iter().map(|server|json!({"id":server.id,"name":server.name,"tool_count":server.tools.len()})).collect::<Vec<_>>(),
             "questions":self.questions.iter().map(|q|json!({"id":q.id,"topic":q.topic,"question":q.question,"options":q.options,"selected_index":q.selected_index,"correct":q.correct,
                 "correct_index":if q.correct.is_some(){Some(q.correct_index)}else{None},"explanation":if q.correct.is_some(){Some(&q.explanation)}else{None},"source_ids":q.source_ids})).collect::<Vec<_>>()})
     }
@@ -175,6 +179,7 @@ fn nonempty(text: &str, max: usize) -> bool {
     !text.trim().is_empty() && text.chars().count() <= max
 }
 
+#[cfg(test)]
 pub async fn drive(
     db: &Database,
     library: &dyn ReviewLibrary,
@@ -183,6 +188,42 @@ pub async fn drive(
     key: &SecretValue,
     run: &mut ReviewRun,
 ) -> Result<(), String> {
+    drive_inner(db, library, transport, context, key, run, None, None).await
+}
+
+pub async fn drive_with_mcp(
+    db: &Database,
+    library: &dyn ReviewLibrary,
+    transport: &dyn ProviderTransport,
+    context: &ProviderContext,
+    key: &SecretValue,
+    run: &mut ReviewRun,
+    mcp: &crate::mcp::McpRuntime,
+    secrets: &dyn crate::secret_store::SecretStore,
+) -> Result<(), String> {
+    drive_inner(
+        db,
+        library,
+        transport,
+        context,
+        key,
+        run,
+        Some(mcp),
+        Some(secrets),
+    )
+    .await
+}
+
+async fn drive_inner(
+    db: &Database,
+    library: &dyn ReviewLibrary,
+    transport: &dyn ProviderTransport,
+    context: &ProviderContext,
+    key: &SecretValue,
+    run: &mut ReviewRun,
+    mcp: Option<&crate::mcp::McpRuntime>,
+    secrets: Option<&dyn crate::secret_store::SecretStore>,
+) -> Result<(), String> {
     run.error = None;
     run.control.stop = None;
     if let Err(reason) = crate::harness::tools::verify_version(db, library, run).await {
@@ -190,7 +231,23 @@ pub async fn drive(
     }
     for _ in 0..run.control.policy.turns_per_slice.max(1) {
         while !run.pending.is_empty() {
-            if let Err(reason) = crate::harness::tools::next(db, library, run).await {
+            let external =
+                crate::mcp::snapshot_tool(&run.mcp_servers, &run.pending[0].name).is_some();
+            let result = if external {
+                match (mcp, secrets) {
+                    (Some(runtime), Some(secret_store)) => {
+                        crate::mcp::execute_review_tool(db, runtime, secret_store, run).await
+                    }
+                    _ => Err(StopReason::new(
+                        "mcp_runtime_unavailable",
+                        "MCP 运行时不可用，请稍后继续",
+                        true,
+                    )),
+                }
+            } else {
+                crate::harness::tools::next(db, library, run).await
+            };
+            if let Err(reason) = result {
                 return stop(db, run, reason);
             }
         }
@@ -201,7 +258,14 @@ pub async fn drive(
         {
             return stop(db, run, StopReason::cancelled());
         }
-        let definitions = tool_definitions();
+        let mut definition_items = tool_definitions().as_array().cloned().unwrap_or_default();
+        definition_items.extend(
+            crate::mcp::tool_definitions(&run.mcp_servers)
+                .as_array()
+                .cloned()
+                .unwrap_or_default(),
+        );
+        let definitions = Value::Array(definition_items);
         let built = match crate::harness::context::build(run, &definitions) {
             Ok(value) => value,
             Err(reason) => return stop(db, run, reason),
