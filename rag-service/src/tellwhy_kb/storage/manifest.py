@@ -7,6 +7,8 @@ import uuid
 from collections import Counter
 from pathlib import Path
 
+from .. import PIPELINE_VERSION
+
 import numpy as np
 
 from ..indexing.embedding import validate_matrix
@@ -139,6 +141,7 @@ def publish_version(
         "version": version,
         "status": "ready" if ready else "partial_ready",
         "job_id": metadata["id"],
+        "pipeline": metadata.get("pipeline", PIPELINE_VERSION),
         "source": {
             "path": document["source_path"],
             "sha256": metadata["source_sha256"],

@@ -47,17 +47,41 @@ class PdfSource:
         try:
             whole = text.get_text_range()
             lines = []
-            # Rectangles follow PDFium's text grouping; the preserved full text is not overwritten.
-            for i in range(text.count_rects()):
-                rect = text.get_rect(i)
-                line = text.get_text_bounded(*rect).strip()
-                if line:
+            # PDFium's page rectangles may represent just a few glyphs even when the
+            # logical text layer contains complete lines. Build line boxes from the
+            # character stream so native extraction never silently drops most text.
+            offset = 0
+            for raw_line in whole.splitlines(keepends=True):
+                line = raw_line.rstrip("\r\n")
+                boxes = []
+                for index, character in enumerate(line, offset):
+                    if character.isspace():
+                        continue
+                    try:
+                        left, bottom, right, top = text.get_charbox(index, loose=True)
+                    except (IndexError, RuntimeError):
+                        continue
+                    if right > left and top > bottom:
+                        boxes.append((left, bottom, right, top))
+                cleaned = line.strip()
+                if cleaned and boxes:
+                    rect = (
+                        min(box[0] for box in boxes),
+                        min(box[1] for box in boxes),
+                        max(box[2] for box in boxes),
+                        max(box[3] for box in boxes),
+                    )
                     lines.append(
                         {
-                            "text": line,
-                            "bbox": display_box(rect, page.get_bbox(), page.get_rotation()).model_dump(),
+                            "text": cleaned,
+                            "bbox": display_box(
+                                rect, page.get_bbox(), page.get_rotation()
+                            ).model_dump(),
                         }
                     )
+                offset += len(raw_line)
+            # splitlines() returns nothing for an empty page and omits a final empty
+            # line, both of which are intentionally ignored.
             width, height = page.get_size()
             return {
                 "number": number,

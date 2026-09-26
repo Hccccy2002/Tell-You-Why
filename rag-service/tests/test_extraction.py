@@ -26,5 +26,6 @@ def test_real_pdf_native_workers_resume_and_page_failures(tmp_path):
     assert extract_pages(folder, tmp_path, pages=[1, 2], workers=2) == counts
     with JobStore(folder) as store:
         assert store.cached(1).blocks[0].bbox.y0 > 0
+        assert store.cached(1).blocks[0].text == "A computer contains hardware and software."
         assert store.db.execute("SELECT attempts FROM pages WHERE page=1").fetchone()[0] == 1
         assert store.cached(3) is None

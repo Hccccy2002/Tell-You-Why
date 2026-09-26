@@ -53,6 +53,23 @@ def test_prepare_records_selected_ocr_mode_and_does_not_reuse_other_mode(desktop
     assert config["native_text_trusted"] is True
 
 
+def test_prepare_does_not_reuse_an_older_pipeline(tmp_path, monkeypatch):
+    root = tmp_path / "knowledge-bases" / "test"
+    root.mkdir(parents=True)
+    args = list(sample(root))
+    args[0]["pipeline"] = "1"
+    publish_version(root, "old-version", *args)
+    library = DesktopLibrary(tmp_path, tmp_path / "models")
+    source = root / "sources" / (args[0]["source_sha256"] + ".pdf")
+    monkeypatch.setattr("tellwhy_kb.models.verify_models", lambda _: {})
+    monkeypatch.setattr("tellwhy_kb.jobs.runtime_versions", lambda: {})
+
+    result = library.prepare(str(source))
+    assert not result["reused"]
+    meta = read_json(library.kb_root(result["kb"]) / "work" / result["job"] / "job.json")
+    assert meta["pipeline"] == "2"
+
+
 def test_related_sources_falls_back_to_current_version_of_same_pdf(desktop):
     library, _, args = desktop
     source_sha256 = args[0]["source_sha256"]

@@ -15,6 +15,7 @@ import sys
 import time
 from pathlib import Path
 
+from . import PIPELINE_VERSION
 from .util import atomic_json, file_hash, read_json, safe_name
 
 REPLY_PREFIX = "TELLWHY_DESKTOP:"
@@ -189,6 +190,7 @@ class DesktopLibrary:
                     if (
                         manifest["source"]["sha256"] == probe["sha256"]
                         and manifest.get("config") == requested_config
+                        and manifest.get("pipeline") == PIPELINE_VERSION
                     ):
                         return {"kb": root.name, "job": manifest["job_id"], "reused": True}
                 jobs = sorted(root.glob("work/*/job.json"), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -197,6 +199,7 @@ class DesktopLibrary:
                     if (
                         meta["source_sha256"] == probe["sha256"]
                         and meta.get("config") == requested_config
+                        and meta.get("pipeline") == PIPELINE_VERSION
                     ):
                         return {"kb": root.name, "job": meta["id"], "reused": False}
         models = verify_models(self.models)
