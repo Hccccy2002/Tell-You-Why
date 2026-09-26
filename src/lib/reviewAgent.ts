@@ -62,6 +62,7 @@ export interface ReviewRun {
   stop_reason?: { code: string; message: string; resumable: boolean } | null;
   questions: ReviewQuestion[];
   sources: Evidence[];
+  mcp_servers?: { id: string; name: string; tool_count: number }[];
 }
 export const reviewStart = (request: {
   kb: string;
@@ -73,6 +74,7 @@ export const reviewStart = (request: {
   due_only?: boolean;
   question_count?: number | null;
   require_sources?: boolean;
+  mcp_server_ids?: string[];
 }) => invoke<ReviewRun>("review_start", { request });
 export const reviewContinue = (id: string) =>
   withAutoHideGuard("review-agent", () =>

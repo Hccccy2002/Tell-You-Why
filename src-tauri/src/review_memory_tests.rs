@@ -204,6 +204,7 @@ fn due_agent_reuses_memory_after_actual_submission_and_updates_the_queue() {
         let request = || StartReview {
             question_count: None,
             require_sources: false,
+            mcp_server_ids: vec![],
             kb: "book".into(),
             version: "v1".into(),
             chapter: Some("chapter1".into()),

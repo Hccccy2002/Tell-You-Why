@@ -70,6 +70,15 @@ PDF 知识库与普通知识卡的陪伴学习分别保存记录。使用陪伴�
 - **⋯ → 开发者工具 → 质量评测**提供 Agent 流程、RAG Top 5 和真实模型评测，以及人工题库编辑、封存、分组、输出复核和 JSON 导出。日常学习不需要使用该面板。
 - 评测区分执行结果、检索指标和人工内容判断；未复核样本不会自动算作正确。
 
+### MCP Client
+
+- “MCP 服务器”页面支持本地 `stdio` 与远程 Streamable HTTP Server，可发现 Tools、Resources、Prompts，查看连接状态、日志与 Schema 错误。
+- Server 和 Tool 可分别启用；PDF 复习 Agent 在每次会话开始前显式选择允许的 Server，并固定工具与 Schema 快照。
+- 远程 Bearer Token 保存到 Windows 凭据库，只在 Rust 传输层附加，不进入模型上下文、SQLite 或执行 Trace。
+- 当前自动调用范围为 PDF 复习 Agent；Resources 与 Prompts 已支持发现和命令层访问，但尚未自动注入学习流程。
+
+配置、安全边界与测试方法见 [MCP Client 使用指南](docs/mcp-client-guide.md)。
+
 ## 最近更新
 
 截至 2026-09-21，近期源码更新包括：
@@ -228,10 +237,12 @@ flowchart TD
     UI[React 桌面界面] --> IPC[Tauri 命令层 / Rust]
     IPC --> Cards[知识卡与陪伴学习 Agent]
     IPC --> PDF[教材问答与复习 Agent]
+    IPC --> MCP[MCP Client / stdio / Streamable HTTP]
     Cards --> DB[(SQLite 本地记录)]
     PDF --> DB
     Cards --> Provider[模型适配器 / 系统凭据]
     PDF --> Provider
+    PDF --> MCP
     Provider --> API[DeepSeek / Kimi API]
     Cards --> Search[搜索路由 / 预算 / 引用校验]
     Search --> Zhipu[智谱 Web Search API]
@@ -244,20 +255,21 @@ flowchart TD
 
 技术栈：Tauri 2、React 19、TypeScript 5.9、Vite 7、Rust、SQLite，以及 Python、PaddleOCR、Sentence Transformers。PDF 检索结合 SQLite FTS5/BM25 和本地向量，不依赖单独部署的数据库服务器。在线模型与智谱搜索请求由 Rust 发起，Python 不持有 API Key。
 
-| 目录 / 文件                                         | 职责                                             |
-| --------------------------------------------------- | ------------------------------------------------ |
-| `src/App.tsx`、`src/screens/`、`src/components/`    | 页面导航、知识卡、学习界面与组件测试             |
-| `src/lib/`                                          | 前端数据类型、Tauri 调用与界面状态辅助           |
-| `src-tauri/src/lib.rs`、`commands.rs`               | 桌面初始化、命令注册与通用应用操作               |
-| `src-tauri/src/study*.rs`                           | 陪伴学习状态、工具执行、保存恢复、练习与疑问跟进 |
-| `src-tauri/src/search/`、`study_search.rs`          | 智谱适配、路由、证据与缓存、引用校验及学习搜索   |
-| `src-tauri/src/rag*.rs`、`review*.rs`、`harness/`   | 教材问答、复习 Agent 与执行预算、取消、追踪      |
-| `src-tauri/src/db.rs`、`providers/`                 | 数据库迁移与在线模型适配                         |
-| `src-tauri/src/evaluation*.rs`、`evals/`            | 开发者评测、人工题库与评分                       |
-| `rag-service/src/tellwhy_kb/`、`rag-service/tests/` | PDF 处理、本地检索和 Python 测试                 |
-| `src-tauri/resources/`、`examples/`                 | 内置演示卡与 JSON/CSV 导入模板                   |
-| `scripts/`、`packaging/`                            | 源码启动、固定发布启动器与 Windows 完整打包      |
-| `docs/`                                             | 使用指南、设计记录与分阶段验收                   |
+| 目录 / 文件                                                 | 职责                                               |
+| ----------------------------------------------------------- | -------------------------------------------------- |
+| `src/App.tsx`、`src/screens/`、`src/components/`            | 页面导航、知识卡、学习界面与组件测试               |
+| `src/lib/`                                                  | 前端数据类型、Tauri 调用与界面状态辅助             |
+| `src-tauri/src/lib.rs`、`commands.rs`                       | 桌面初始化、命令注册与通用应用操作                 |
+| `src-tauri/src/study*.rs`                                   | 陪伴学习状态、工具执行、保存恢复、练习与疑问跟进   |
+| `src-tauri/src/search/`、`study_search.rs`                  | 智谱适配、路由、证据与缓存、引用校验及学习搜索     |
+| `src-tauri/src/rag*.rs`、`review*.rs`、`harness/`           | 教材问答、复习 Agent 与执行预算、取消、追踪        |
+| `src-tauri/src/mcp.rs`、`src/screens/McpSettingsScreen.tsx` | MCP 连接、能力发现、权限快照、外部工具执行与管理页 |
+| `src-tauri/src/db.rs`、`providers/`                         | 数据库迁移与在线模型适配                           |
+| `src-tauri/src/evaluation*.rs`、`evals/`                    | 开发者评测、人工题库与评分                         |
+| `rag-service/src/tellwhy_kb/`、`rag-service/tests/`         | PDF 处理、本地检索和 Python 测试                   |
+| `src-tauri/resources/`、`examples/`                         | 内置演示卡与 JSON/CSV 导入模板                     |
+| `scripts/`、`packaging/`                                    | 源码启动、固定发布启动器与 Windows 完整打包        |
+| `docs/`                                                     | 使用指南、设计记录与分阶段验收                     |
 
 学习 Agent 的关键约束由程序执行：用户提交先持久化，模型工具参数需校验，关键写入与检查点一同保存，迟到响应不能覆盖已暂停或结束的状态。本地知识卡查找使用 SQLite 关键词，PDF 检索使用本地向量，公开网页检索使用智谱接口。
 

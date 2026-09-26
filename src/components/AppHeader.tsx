@@ -5,6 +5,7 @@ export type AppView =
   | "home"
   | "interests"
   | "models"
+  | "mcp"
   | "library"
   | "settings"
   | "knowledge-base"
@@ -25,6 +26,7 @@ const menuItems: Array<[AppView, string, string]> = [
   ["study", "学习中心", "◈"],
   ["interests", "兴趣设置", "◇"],
   ["models", "模型设置", "◎"],
+  ["mcp", "MCP 服务器", "⌁"],
   ["library", "收藏与历史", "☆"],
   ["knowledge-base", "PDF 知识库", "▤"],
   ["settings", "通用设置", "⚙"],

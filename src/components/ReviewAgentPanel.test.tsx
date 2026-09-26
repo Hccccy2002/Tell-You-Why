@@ -6,6 +6,7 @@ import * as api from "../lib/reviewAgent";
 import { ragProviders, ragRelatedSources } from "../lib/rag";
 import type { ReviewRun } from "../lib/reviewAgent";
 import type { PdfKnowledgeBase } from "../lib/knowledgeBase";
+import { mcpListServers } from "../lib/mcp";
 
 vi.mock("../lib/reviewAgent", () => ({
   reviewStart: vi.fn(),
@@ -23,6 +24,13 @@ vi.mock("../lib/rag", () => ({
   ragProviders: vi.fn(),
   ragRelatedSources: vi.fn(),
 }));
+vi.mock("../lib/mcp", async (importOriginal) => {
+  const actual = await importOriginal();
+  if (!actual || typeof actual !== "object") {
+    throw new Error("Failed to load the real MCP module for this test");
+  }
+  return { ...actual, mcpListServers: vi.fn() };
+});
 const book: PdfKnowledgeBase = {
   id: "book",
   version: "v1",
@@ -150,6 +158,7 @@ beforeEach(() => {
   vi.mocked(api.reviewContinue).mockResolvedValue(waiting);
   vi.mocked(api.reviewRead).mockResolvedValue(waiting);
   vi.mocked(api.reviewCancel).mockResolvedValue();
+  vi.mocked(mcpListServers).mockResolvedValue([]);
 });
 it("starts a due review and shows actual counts without inventing mastery", async () => {
   vi.mocked(api.reviewMemory).mockResolvedValue(dueMemory);
@@ -177,6 +186,55 @@ it("starts with the selected question count and textbook requirement", async () 
   await waitFor(() =>
     expect(api.reviewStart).toHaveBeenCalledWith(
       expect.objectContaining({ question_count: 2, require_sources: true }),
+    ),
+  );
+});
+
+it("snapshots only the MCP servers explicitly allowed for this review", async () => {
+  vi.mocked(mcpListServers).mockResolvedValue([
+    {
+      id: "study-tools",
+      name: "Study Tools",
+      transport: {
+        transport: "streamable_http",
+        url: "https://example.com/mcp",
+      },
+      enabled: true,
+      credential_configured: false,
+      key_last4: null,
+      status: "connected",
+      protocol_version: "2025-11-25",
+      capabilities: { tools: {} },
+      instructions: null,
+      last_error: null,
+      last_connected_at: "2026-09-26T00:00:00Z",
+      created_at: "2026-09-26T00:00:00Z",
+      updated_at: "2026-09-26T00:00:00Z",
+      items: [
+        {
+          kind: "tool",
+          name: "lookup",
+          enabled: true,
+          schema_hash: "hash",
+          record: { name: "lookup", inputSchema: { type: "object" } },
+          discovered_at: "2026-09-26T00:00:00Z",
+        },
+      ],
+    },
+  ]);
+  const user = userEvent.setup();
+  render(<ReviewAgentPanel {...props()} />);
+
+  const server = await screen.findByRole("checkbox", {
+    name: "Study Tools · 1 个工具",
+  });
+  expect(server).not.toBeChecked();
+  await user.click(server);
+  await user.click(screen.getByRole("button", { name: "开始复习" }));
+
+  await waitFor(() =>
+    expect(api.reviewStart).toHaveBeenCalledWith(
+      expect.objectContaining({ mcp_server_ids: ["study-tools"] }),
     ),
   );
 });

@@ -2223,6 +2223,208 @@ input[type="checkbox"] {
   background: var(--surface);
 }
 
+.mcp-heading,
+.mcp-detail-heading,
+.mcp-log-heading,
+.mcp-form-actions,
+.mcp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mcp-heading > div,
+.mcp-detail-heading > div {
+  min-width: 0;
+}
+
+.mcp-message,
+.mcp-error {
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.mcp-error {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+}
+
+.mcp-editor textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.mcp-form-actions {
+  justify-content: flex-end;
+}
+
+.mcp-layout {
+  display: grid;
+  grid-template-columns: minmax(135px, 0.7fr) minmax(0, 1.7fr);
+  gap: 10px;
+}
+
+.mcp-server-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.mcp-server {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mcp-server.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.mcp-status {
+  color: var(--text-faint);
+}
+
+.mcp-status.connected {
+  color: #43845e;
+}
+
+.mcp-status.error {
+  color: var(--danger);
+}
+
+.mcp-detail {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+
+.mcp-detail h2,
+.mcp-capability h3 {
+  margin: 0;
+}
+
+.mcp-detail-heading p,
+.mcp-capability > p {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.mcp-switch,
+.mcp-tool-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-soft);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mcp-actions {
+  justify-content: flex-start;
+  margin: 11px 0;
+}
+
+.mcp-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0 0 12px;
+}
+
+.mcp-meta div {
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.mcp-meta dt {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.mcp-meta dd {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.mcp-capability {
+  margin-top: 12px;
+}
+
+.mcp-capability h3 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.mcp-capability h3 span {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.mcp-capability details {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.mcp-capability summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.mcp-capability pre,
+.mcp-logs {
+  max-height: 200px;
+  margin: 0;
+  padding: 9px;
+  background: #17201d;
+  color: #d4e2dc;
+  font-size: 9px;
+  line-height: 1.5;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mcp-log-heading button {
+  padding: 3px 7px;
+}
+
+@media (max-width: 560px) {
+  .mcp-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .mcp-meta {
+    grid-template-columns: 1fr;
+  }
+}
+
 .field-label {
   display: grid;
   gap: 4px;
@@ -2619,12 +2821,31 @@ input[type="checkbox"] {
     scroll-behavior: auto !important;
   }
 }
-.follow-up-search-toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
-.follow-up-search-toggle input { width: auto; }
-.search-answer { min-width: 0; overflow-wrap: anywhere; }
-.search-answer p { white-space: pre-wrap; }
-.search-answer small { display: block; color: var(--text-soft); }
-.search-limitation { font-size: 12px; line-height: 1.6; }
+.follow-up-search-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.follow-up-search-toggle input {
+  width: auto;
+}
+.search-answer {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.search-answer p {
+  white-space: pre-wrap;
+}
+.search-answer small {
+  display: block;
+  color: var(--text-soft);
+}
+.search-limitation {
+  font-size: 12px;
+  line-height: 1.6;
+}
 
 .citation-button {
   display: inline-flex;

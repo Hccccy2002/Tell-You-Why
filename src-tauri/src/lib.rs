@@ -15,6 +15,7 @@ mod learning_generation;
 #[cfg(test)]
 mod learning_live_tests;
 mod learning_store;
+mod mcp;
 mod models;
 mod navigation;
 mod pdf_runtime;
@@ -68,6 +69,7 @@ pub struct AppState {
     pub database: Database,
     pub secrets: Arc<dyn SecretStore>,
     pub http: Arc<dyn ProviderTransport>,
+    pub mcp: Arc<mcp::McpRuntime>,
     pub exiting: AtomicBool,
     pub generation_in_progress: AtomicBool,
     pub auto_hide: auto_hide::AutoHideController,
@@ -117,6 +119,7 @@ pub fn run() {
                 database,
                 secrets: Arc::new(WindowsCredentialStore),
                 http: Arc::new(http),
+                mcp: Arc::new(mcp::McpRuntime::new().map_err(std::io::Error::other)?),
                 exiting: AtomicBool::new(false),
                 generation_in_progress: AtomicBool::new(false),
                 auto_hide: auto_hide::AutoHideController::default(),
@@ -192,6 +195,17 @@ pub fn run() {
             study_commands::study_pause,
             study_commands::study_history,
             study_commands::study_reset,
+            mcp::mcp_list_servers,
+            mcp::mcp_save_server,
+            mcp::mcp_delete_server,
+            mcp::mcp_delete_credential,
+            mcp::mcp_test_connection,
+            mcp::mcp_set_server_enabled,
+            mcp::mcp_set_item_enabled,
+            mcp::mcp_call_tool,
+            mcp::mcp_read_resource,
+            mcp::mcp_get_prompt,
+            mcp::mcp_logs,
             evaluation::evaluation_list,
             evaluation::evaluation_start,
             evaluation::evaluation_read,

@@ -19,6 +19,7 @@ fn state() -> (tempfile::TempDir, AppState) {
             database,
             secrets: Arc::new(MemorySecretStore::default()),
             http: Arc::new(RestrictedHttpClient::new().unwrap()),
+            mcp: Arc::new(crate::mcp::McpRuntime::new().unwrap()),
             exiting: AtomicBool::new(false),
             generation_in_progress: AtomicBool::new(false),
             auto_hide: Default::default(),

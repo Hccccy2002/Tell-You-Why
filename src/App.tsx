@@ -35,6 +35,7 @@ import { LibraryScreen } from "./screens/LibraryScreen";
 import { KnowledgeBaseScreen } from "./screens/KnowledgeBaseScreen";
 import { EvaluationScreen } from "./screens/EvaluationScreen";
 import { ModelSettingsScreen } from "./screens/ModelSettingsScreen";
+import { McpSettingsScreen } from "./screens/McpSettingsScreen";
 import type {
   AppSettings,
   BootstrapData,
@@ -1007,6 +1008,7 @@ export default function App() {
           onProvidersChanged={updateProviders}
         />
       ) : null}
+      {view === "mcp" ? <McpSettingsScreen /> : null}
       {view === "settings" ? (
         <GeneralSettingsScreen
           initialSettings={data.settings}
