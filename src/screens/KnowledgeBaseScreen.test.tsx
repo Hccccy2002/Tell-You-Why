@@ -215,6 +215,7 @@ it("selects a PDF then explicitly starts import; repeat clicks cannot duplicate 
   );
   await user.click(await screen.findByRole("button", { name: "选择 PDF" }));
   expect(kb.importPdf).not.toHaveBeenCalled();
+  await user.click(screen.getByText("导入选项"));
   await user.clear(screen.getByLabelText("正文起始页"));
   await user.type(screen.getByLabelText("正文起始页"), "3");
   expect(screen.getByRole("radio", { name: /始终 OCR/ })).toBeChecked();

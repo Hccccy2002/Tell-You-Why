@@ -1,10 +1,5 @@
 import { useMemo, useState } from "react";
-import type {
-  KnowledgeCard,
-  OnboardingInput,
-  ReminderPreset,
-  TopicPreference,
-} from "../types";
+import type { KnowledgeCard, OnboardingInput, TopicPreference } from "../types";
 
 interface Props {
   topics: TopicPreference[];
@@ -27,13 +22,11 @@ export function Onboarding({ topics, previewCard, busy, onComplete }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [customText, setCustomText] = useState("");
   const [customInterests, setCustomInterests] = useState<string[]>([]);
-  const [reminderPreset, setReminderPreset] =
-    useState<ReminderPreset>("manual");
   const [error, setError] = useState<string | null>(null);
 
   const selectedCount = selected.length + customInterests.length;
   const canContinue = selectedCount >= 3;
-  const progressLabel = useMemo(() => `第 ${step + 1} 步，共 3 步`, [step]);
+  const progressLabel = useMemo(() => `第 ${step + 1} 步，共 2 步`, [step]);
 
   function toggleTopic(id: string) {
     setSelected((value) =>
@@ -65,7 +58,7 @@ export function Onboarding({ topics, previewCard, busy, onComplete }: Props) {
   return (
     <main className="onboarding">
       <div className="onboarding-progress" aria-label={progressLabel}>
-        {[0, 1, 2].map((index) => (
+        {[0, 1].map((index) => (
           <span key={index} className={index <= step ? "active" : ""} />
         ))}
       </div>
@@ -73,17 +66,13 @@ export function Onboarding({ topics, previewCard, busy, onComplete }: Props) {
       {step === 0 ? (
         <section className="welcome-step">
           <span className="eyebrow">欢迎来到 Tell You Why</span>
-          <h1>给工作间隙留一点安静的好奇心。</h1>
-          <p>每次用 30–90 秒：看到问题，先想一下，再了解为什么。</p>
+          <h1>每天，弄懂一个为什么。</h1>
+          <p>先想一想，再用一分钟看懂答案。</p>
           <aside className="preview-question">
             <span>今天的问题</span>
             <strong>{previewCard.question}</strong>
           </aside>
-          <ul className="privacy-list">
-            <li>无需注册或 API Key</li>
-            <li>兴趣和阅读记录默认只在本机</li>
-            <li>默认不主动提醒</li>
-          </ul>
+          <p className="onboarding-privacy">无需注册，记录默认保存在本机。</p>
           <button className="primary-button wide" onClick={() => setStep(1)}>
             选择我的兴趣
           </button>
@@ -92,9 +81,9 @@ export function Onboarding({ topics, previewCard, busy, onComplete }: Props) {
 
       {step === 1 ? (
         <section className="interest-step">
-          <span className="eyebrow">先选至少 3 个</span>
+          <span className="eyebrow">选择兴趣</span>
           <h1>你想多看到哪些内容？</h1>
-          <p className="supporting">稍后可以随时修改，选择只保存在本机。</p>
+          <p className="supporting">至少选择 3 个，稍后可以随时修改。</p>
           <div className="topic-grid">
             {topics
               .filter((topic) => !topic.custom)
@@ -160,71 +149,12 @@ export function Onboarding({ topics, previewCard, busy, onComplete }: Props) {
             <span>{selectedCount}/3 已选择</span>
             <button
               className="primary-button"
-              disabled={!canContinue}
-              onClick={() => {
-                if (!canContinue) setError("请至少选择 3 个兴趣。");
-                else setStep(2);
-              }}
-            >
-              继续
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {step === 2 ? (
-        <section className="reminder-step">
-          <span className="eyebrow">最后一步</span>
-          <h1>什么时候提醒你看看？</h1>
-          <p className="supporting">
-            默认仅手动打开。通知不会直接展开窗口，也不会播放声音。
-          </p>
-          <div className="radio-stack">
-            {(
-              [
-                ["manual", "仅手动打开", "通过托盘或 Alt + Shift + Y 唤起"],
-                ["weekday_once", "工作日每天 1 次", "默认在 11:00 安静提醒"],
-                [
-                  "weekday_twice",
-                  "工作日每天 2 次",
-                  "默认在 11:00 和 16:00 提醒",
-                ],
-              ] as const
-            ).map(([value, label, note]) => (
-              <label
-                key={value}
-                className={
-                  reminderPreset === value
-                    ? "radio-card selected"
-                    : "radio-card"
-                }
-              >
-                <input
-                  type="radio"
-                  name="reminder"
-                  value={value}
-                  checked={reminderPreset === value}
-                  onChange={() => setReminderPreset(value)}
-                />
-                <span>
-                  <strong>{label}</strong>
-                  <small>{note}</small>
-                </span>
-              </label>
-            ))}
-          </div>
-          <div className="onboarding-final-actions">
-            <button className="text-button" onClick={() => setStep(1)}>
-              返回修改
-            </button>
-            <button
-              className="primary-button"
-              disabled={busy}
+              disabled={!canContinue || busy}
               onClick={() =>
                 void onComplete({
                   selectedTopicIds: selected,
                   customInterests,
-                  reminderPreset,
+                  reminderPreset: "manual",
                 })
               }
             >

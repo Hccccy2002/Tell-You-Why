@@ -182,6 +182,7 @@ describe("KnowledgeCardView", () => {
     expect(screen.getByRole("region", { name: "详细解释" })).toBeVisible();
     expect(baseHandlers.onInteraction).toHaveBeenCalledWith("expanded");
 
+    await user.click(screen.getByText("更多", { exact: true }));
     await user.click(
       screen.getByRole("button", {
         name: "再次生成随机领域知识点",
@@ -189,7 +190,7 @@ describe("KnowledgeCardView", () => {
     );
     expect(baseHandlers.onGenerateRandomTopic).toHaveBeenCalledOnce();
 
-    await user.click(screen.getByRole("button", { name: "已狠狠涨知识" }));
+    await user.click(screen.getByRole("button", { name: "已掌握" }));
     const firstMasterDialog = screen.getByRole("dialog", {
       name: "将这张知识卡标记为已掌握？",
     });
@@ -199,7 +200,7 @@ describe("KnowledgeCardView", () => {
     );
     expect(baseHandlers.onMaster).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "已狠狠涨知识" }));
+    await user.click(screen.getByRole("button", { name: "已掌握" }));
     const reopenedMasterDialog = screen.getByRole("dialog", {
       name: "将这张知识卡标记为已掌握？",
     });

@@ -1,4 +1,18 @@
 import { useEffect, useRef } from "react";
+import {
+  BookOpen,
+  Brain,
+  FlaskConical,
+  Heart,
+  Home,
+  Library,
+  Menu,
+  MoreHorizontal,
+  Plug,
+  Settings,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { useAutoHideGuard } from "../lib/autoHideGuard";
 
 export type AppView =
@@ -21,15 +35,17 @@ interface Props {
   onNavigate: (view: AppView) => void;
 }
 
-const menuItems: Array<[AppView, string, string]> = [
-  ["home", "知识小窗", "⌂"],
-  ["study", "学习中心", "◈"],
-  ["interests", "兴趣设置", "◇"],
-  ["models", "模型设置", "◎"],
-  ["mcp", "MCP 服务器", "⌁"],
-  ["library", "收藏与历史", "☆"],
-  ["knowledge-base", "PDF 知识库", "▤"],
-  ["settings", "通用设置", "⚙"],
+const menuItems: Array<[AppView, string, LucideIcon]> = [
+  ["home", "知识小窗", Home],
+  ["study", "学习中心", Brain],
+  ["library", "收藏与历史", Library],
+  ["knowledge-base", "PDF 知识库", BookOpen],
+  ["settings", "设置", Settings],
+];
+
+const preferenceItems: Array<[AppView, string, LucideIcon]> = [
+  ["interests", "兴趣设置", Heart],
+  ["models", "AI 模型", Sparkles],
 ];
 
 export function AppHeader({
@@ -71,7 +87,8 @@ export function AppHeader({
             aria-label="打开学习中心"
             aria-current={view === "study" ? "page" : undefined}
           >
-            学习
+            <Brain size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>学习</span>
           </button>
         ) : null}
         <button
@@ -81,7 +98,8 @@ export function AppHeader({
           aria-label="PDF 知识库"
           aria-current={view === "knowledge-base" ? "page" : undefined}
         >
-          PDF
+          <BookOpen size={16} strokeWidth={1.8} aria-hidden="true" />
+          <span>PDF</span>
         </button>
         <button
           className="icon-button"
@@ -91,7 +109,7 @@ export function AppHeader({
           aria-controls="main-menu"
           onClick={onMenuToggle}
         >
-          <span aria-hidden="true">•••</span>
+          <Menu size={18} strokeWidth={1.8} aria-hidden="true" />
         </button>
       </div>
       {menuOpen ? (
@@ -108,7 +126,7 @@ export function AppHeader({
                 当前操作正在进行，完成后可切换页面。
               </p>
             ) : null}
-            {menuItems.map(([target, label, icon]) => (
+            {menuItems.map(([target, label, Icon]) => (
               <button
                 key={target}
                 className={target === view ? "menu-item active" : "menu-item"}
@@ -121,15 +139,50 @@ export function AppHeader({
                 disabled={navigationLocked}
                 title={navigationLocked ? "请等待当前操作完成" : undefined}
               >
-                <span aria-hidden="true">{icon}</span>
+                <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
                 {label}
               </button>
             ))}
             <details
+              className="menu-section"
+              open={
+                view === "interests" || view === "models" ? true : undefined
+              }
+            >
+              <summary>
+                <MoreHorizontal
+                  size={17}
+                  strokeWidth={1.8}
+                  aria-hidden="true"
+                />
+                更多设置
+              </summary>
+              {preferenceItems.map(([target, label, Icon]) => (
+                <button
+                  key={target}
+                  className={target === view ? "menu-item active" : "menu-item"}
+                  onClick={() => onNavigate(target)}
+                  aria-current={target === view ? "page" : undefined}
+                  disabled={navigationLocked}
+                >
+                  <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </details>
+            <details
               className="developer-menu"
-              open={view === "evaluation" ? true : undefined}
+              open={view === "evaluation" || view === "mcp" ? true : undefined}
             >
               <summary>开发者工具</summary>
+              <button
+                className={view === "mcp" ? "menu-item active" : "menu-item"}
+                disabled={navigationLocked}
+                onClick={() => onNavigate("mcp")}
+              >
+                <Plug size={17} strokeWidth={1.8} aria-hidden="true" />
+                MCP 服务器
+              </button>
               <button
                 className={
                   view === "evaluation" ? "menu-item active" : "menu-item"
@@ -137,7 +190,8 @@ export function AppHeader({
                 disabled={navigationLocked}
                 onClick={() => onNavigate("evaluation")}
               >
-                <span aria-hidden="true">▥</span>质量评测
+                <FlaskConical size={17} strokeWidth={1.8} aria-hidden="true" />
+                质量评测
               </button>
             </details>
           </nav>

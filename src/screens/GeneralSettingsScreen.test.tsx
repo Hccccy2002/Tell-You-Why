@@ -67,6 +67,7 @@ describe("GeneralSettingsScreen", () => {
       />,
     );
 
+    await user.click(screen.getByText("生成额度"));
     expect(await screen.findByText("已生成 0/10")).toBeVisible();
     const input = screen.getByRole("spinbutton", {
       name: "每日生成总数",
@@ -99,6 +100,7 @@ describe("GeneralSettingsScreen", () => {
       />,
     );
 
+    await user.click(screen.getByText("窗口与启动"));
     const autoHide = screen.getByRole("checkbox", {
       name: /鼠标移出后自动收起/,
     });
@@ -128,6 +130,7 @@ describe("GeneralSettingsScreen", () => {
         />,
       );
 
+      await user.click(screen.getByText("内容与数据"));
       const entry = screen.getByRole("button", { name: entryName });
       await user.click(entry);
       const firstDialog = screen.getByRole("dialog", { name: title });
@@ -173,6 +176,7 @@ describe("GeneralSettingsScreen", () => {
       />,
     );
 
+    await user.click(screen.getByText("内容与数据"));
     await user.click(screen.getByRole("button", { name: /清除全部本地数据/ }));
     const dialog = screen.getByRole("dialog", {
       name: "清除全部本地数据？",
@@ -203,6 +207,7 @@ describe("GeneralSettingsScreen", () => {
       />,
     );
 
+    await user.click(screen.getByText("内容与数据"));
     await user.click(screen.getByRole("button", { name: /清除阅读记录/ }));
     const dialog = screen.getByRole("dialog", {
       name: "清除所有阅读记录？",
