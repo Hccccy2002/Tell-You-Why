@@ -43,7 +43,6 @@ async function openFirstLocalCard() {
   await user.click(screen.getByRole("button", { name: "自然科学" }));
   await user.click(screen.getByRole("button", { name: "历史与文明" }));
   await user.click(screen.getByRole("button", { name: "计算机与互联网" }));
-  await user.click(screen.getByRole("button", { name: "继续" }));
   await user.click(screen.getByRole("button", { name: "开始探索" }));
   await user.click(screen.getByRole("button", { name: /浏览现有知识点/ }));
   return user;
@@ -77,7 +76,7 @@ describe("follow-up navigation lock", () => {
     expect(screen.getByRole("button", { name: "返回知识小窗" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "打开学习中心" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "打开菜单" }));
-    expect(screen.getByRole("button", { name: "模型设置" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "设置" })).toBeDisabled();
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() =>

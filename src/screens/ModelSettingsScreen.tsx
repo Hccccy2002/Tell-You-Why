@@ -50,7 +50,9 @@ export function ModelSettingsScreen({
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [searchBusy, setSearchBusy] = useState(false);
-  const [searchSettings, setSearchSettings] = useState<SearchSettings | null>(null);
+  const [searchSettings, setSearchSettings] = useState<SearchSettings | null>(
+    null,
+  );
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<ProviderKeyDeleteConfirmation | null>(null);
   const [replaceConfirmation, setReplaceConfirmation] =
@@ -222,9 +224,8 @@ export function ModelSettingsScreen({
   return (
     <main className="page-view model-settings">
       <div className="page-heading">
-        <span className="eyebrow">在线生成与搜索 · 本地识别与检索</span>
         <h1>模型设置</h1>
-        <p>配置在线生成模型和智谱搜索，查看 PDF 知识库使用的本地模型。</p>
+        <p>在线生成与搜索，以及 PDF 使用的本地模型。</p>
       </div>
       <div
         className="segmented-control model-section-switcher"

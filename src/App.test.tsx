@@ -31,7 +31,6 @@ describe("critical local user flow", () => {
     await user.click(screen.getByRole("button", { name: "自然科学" }));
     await user.click(screen.getByRole("button", { name: "历史与文明" }));
     await user.click(screen.getByRole("button", { name: "计算机与互联网" }));
-    await user.click(screen.getByRole("button", { name: "继续" }));
     await user.click(screen.getByRole("button", { name: "开始探索" }));
 
     expect(
@@ -71,6 +70,7 @@ describe("critical local user flow", () => {
     const firstQuestion = screen.getByRole("heading", { level: 1 }).textContent;
     await user.click(reveal);
     expect(screen.getByText("简短答案")).toBeVisible();
+    await user.click(screen.getByText("更多", { exact: true }));
     await user.click(
       screen.getByRole("button", {
         name: "再次生成随机领域知识点",
@@ -166,7 +166,6 @@ describe("critical local user flow", () => {
     await user.click(screen.getByRole("button", { name: "自然科学" }));
     await user.click(screen.getByRole("button", { name: "历史与文明" }));
     await user.click(screen.getByRole("button", { name: "计算机与互联网" }));
-    await user.click(screen.getByRole("button", { name: "继续" }));
     await user.click(screen.getByRole("button", { name: "开始探索" }));
     await user.click(screen.getByRole("button", { name: /浏览现有知识点/ }));
 
@@ -212,7 +211,6 @@ describe("critical local user flow", () => {
     await user.click(screen.getByRole("button", { name: "自然科学" }));
     await user.click(screen.getByRole("button", { name: "历史与文明" }));
     await user.click(screen.getByRole("button", { name: "计算机与互联网" }));
-    await user.click(screen.getByRole("button", { name: "继续" }));
     await user.click(screen.getByRole("button", { name: "开始探索" }));
     await user.click(screen.getByRole("button", { name: /浏览现有知识点/ }));
 

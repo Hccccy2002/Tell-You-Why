@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { AppHeader } from "./AppHeader";
@@ -40,27 +40,34 @@ describe("AppHeader", () => {
     );
     const developerTools = screen.getByText("开发者工具").closest("details");
     expect(developerTools).not.toHaveAttribute("open");
+    const moreSettings = screen.getByText("更多设置").closest("details");
+    expect(moreSettings).not.toHaveAttribute("open");
+    await user.click(screen.getByText("更多设置"));
+    expect(moreSettings).toHaveAttribute("open");
     await user.click(screen.getByText("开发者工具"));
     expect(developerTools).toHaveAttribute("open");
+    const menu = screen.getByRole("navigation", { name: "主要页面" });
     const navigationButtons = [
       "知识小窗",
       "学习中心",
       "兴趣设置",
-      "模型设置",
+      "AI 模型",
+      "MCP 服务器",
       "收藏与历史",
-      "通用设置",
+      "PDF 知识库",
+      "设置",
       "质量评测",
     ].map((name) =>
-      screen.getByRole("button", { name: new RegExp(`^${name}$`) }),
+      within(menu).getByRole("button", { name: new RegExp(`^${name}$`) }),
     );
-    expect(navigationButtons).toHaveLength(7);
+    expect(navigationButtons).toHaveLength(9);
     for (const button of navigationButtons) {
       expect(button).toBeDisabled();
     }
 
     await user.click(screen.getByRole("button", { name: "关闭菜单" }));
     expect(onMenuToggle).toHaveBeenCalledOnce();
-    await user.click(screen.getByRole("button", { name: "模型设置" }));
+    await user.click(screen.getByRole("button", { name: "AI 模型" }));
     expect(onNavigate).not.toHaveBeenCalled();
 
     rerender(
@@ -72,7 +79,7 @@ describe("AppHeader", () => {
         onNavigate={onNavigate}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "模型设置" }));
+    await user.click(screen.getByRole("button", { name: "AI 模型" }));
     expect(onNavigate).toHaveBeenCalledWith("models");
     await user.click(screen.getByRole("button", { name: "质量评测" }));
     expect(onNavigate).toHaveBeenCalledWith("evaluation");

@@ -31,15 +31,13 @@ describe("Onboarding", () => {
     expect(screen.getByText(fallbackCards[0]!.question)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "选择我的兴趣" }));
 
-    const continueButton = screen.getByRole("button", { name: "继续" });
-    expect(continueButton).toBeDisabled();
+    const startButton = screen.getByRole("button", { name: "开始探索" });
+    expect(startButton).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "自然科学" }));
     await user.click(screen.getByRole("button", { name: "历史与文明" }));
     await user.click(screen.getByRole("button", { name: "计算机与互联网" }));
-    expect(continueButton).toBeEnabled();
-
-    await user.click(continueButton);
-    await user.click(screen.getByRole("button", { name: "开始探索" }));
+    expect(startButton).toBeEnabled();
+    await user.click(startButton);
 
     expect(onComplete).toHaveBeenCalledWith({
       selectedTopicIds: [

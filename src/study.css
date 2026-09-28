@@ -180,11 +180,11 @@
   padding-left: 0;
 }
 .study-heading {
-  margin: 18px 0 22px;
+  margin: 10px 0 14px;
 }
 .study-heading h1 {
   font-size: 26px;
-  margin: 6px 0;
+  margin: 0;
 }
 .study-heading p {
   color: var(--text-soft);

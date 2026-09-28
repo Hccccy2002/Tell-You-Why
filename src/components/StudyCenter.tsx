@@ -64,7 +64,6 @@ export function StudyCenter({
         </div>
       ) : null}
       <header className="study-heading">
-        <span className="eyebrow">学习中心</span>
         <h1 id="study-center-title">接着学一点</h1>
       </header>
       <StudyHome

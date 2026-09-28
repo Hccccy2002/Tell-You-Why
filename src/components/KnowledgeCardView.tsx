@@ -1,5 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  Check,
+  ChevronDown,
+  House,
+  MoreHorizontal,
+  RefreshCw,
+  Shuffle,
+} from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -705,7 +713,7 @@ export function KnowledgeCardView({
               disabled={followUpLoading}
               onClick={onReturnHome}
             >
-              <span aria-hidden="true">⌂</span>
+              <House size={16} strokeWidth={1.8} aria-hidden="true" />
             </button>
             <span className="topic-pill">{card.topicLabel}</span>
             <span
@@ -775,19 +783,28 @@ export function KnowledgeCardView({
                 </section>
               ) : null}
               {card.sourceRefs.length > 0 ? (
-                <section className="sources" aria-label="内容来源">
-                  <span>来源</span>
-                  {card.sourceRefs.map((source) => (
-                    <button
-                      key={source.url}
-                      className="source-link"
-                      onClick={() => void openSourceUrl(source.url)}
-                    >
-                      {source.publisher ?? source.title}
-                      <span className="sr-only">（在浏览器中打开）</span>
-                    </button>
-                  ))}
-                </section>
+                <details className="sources">
+                  <summary>
+                    <span>查看来源</span>
+                    <ChevronDown
+                      size={15}
+                      strokeWidth={1.8}
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div className="sources-list" aria-label="内容来源">
+                    {card.sourceRefs.map((source) => (
+                      <button
+                        key={source.url}
+                        className="source-link"
+                        onClick={() => void openSourceUrl(source.url)}
+                      >
+                        {source.publisher ?? source.title}
+                        <span className="sr-only">（在浏览器中打开）</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
               ) : null}
               {onStartStudy ? (
                 <button
@@ -1018,33 +1035,50 @@ export function KnowledgeCardView({
               返回
             </button>
             <div className="footer-center">
-              <button
-                className="random-footer-button"
-                disabled={cardBusy}
-                onClick={() => void onGenerateRandomTopic()}
-              >
-                {busy ? "正在生成…" : "再次生成随机领域知识点"}
-              </button>
-              <button
-                className="mastered-button"
-                disabled={cardBusy}
-                onClick={() => {
-                  setCardActionError(null);
-                  setCardActionConfirmation({
-                    action: "master",
-                    cardId: card.id,
-                  });
-                }}
-              >
-                已狠狠涨知识
-              </button>
-              <button
-                className="same-topic-button"
-                disabled={cardBusy}
-                onClick={() => void onGenerateSameTopic()}
-              >
-                {busy ? "正在生成…" : "再次生成同领域知识点"}
-              </button>
+              <details className="card-more-actions">
+                <summary aria-label="更多操作">
+                  <MoreHorizontal
+                    size={18}
+                    strokeWidth={1.8}
+                    aria-hidden="true"
+                  />
+                  更多
+                </summary>
+                <div className="card-more-menu">
+                  <button
+                    className="mastered-button"
+                    disabled={cardBusy}
+                    onClick={() => {
+                      setCardActionError(null);
+                      setCardActionConfirmation({
+                        action: "master",
+                        cardId: card.id,
+                      });
+                    }}
+                  >
+                    <Check size={16} strokeWidth={1.8} aria-hidden="true" />
+                    已掌握
+                  </button>
+                  <button
+                    className="random-footer-button"
+                    aria-label="再次生成随机领域知识点"
+                    disabled={cardBusy}
+                    onClick={() => void onGenerateRandomTopic()}
+                  >
+                    <Shuffle size={16} strokeWidth={1.8} aria-hidden="true" />
+                    {busy ? "正在生成…" : "随机生成"}
+                  </button>
+                  <button
+                    className="same-topic-button"
+                    aria-label="再次生成同领域知识点"
+                    disabled={cardBusy}
+                    onClick={() => void onGenerateSameTopic()}
+                  >
+                    <RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />
+                    {busy ? "正在生成…" : "同领域生成"}
+                  </button>
+                </div>
+              </details>
             </div>
             <button
               className="footer-side-button next-button"

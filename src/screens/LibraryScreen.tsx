@@ -7,6 +7,7 @@ import {
 } from "../lib/api";
 import type { KnowledgeCard, LibraryItem, TopicPreference } from "../types";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
+import { Bookmark, Clock3 } from "lucide-react";
 
 type DeleteConfirmation =
   | { kind: "card"; cardId: string; question: string }
@@ -90,7 +91,6 @@ export function LibraryScreen({
   return (
     <main className="page-view library-view">
       <div className="page-heading">
-        <span className="eyebrow">留住值得再看的内容</span>
         <h1>收藏与历史</h1>
       </div>
       <div className="segmented-control" aria-label="内容列表类型">
@@ -170,7 +170,11 @@ export function LibraryScreen({
       ) : null}
       {!loading && !error && items.length === 0 ? (
         <div className="empty-state">
-          <span aria-hidden="true">{mode === "favorites" ? "☆" : "◷"}</span>
+          {mode === "favorites" ? (
+            <Bookmark aria-hidden="true" />
+          ) : (
+            <Clock3 aria-hidden="true" />
+          )}
           <h2>{mode === "favorites" ? "还没有收藏" : "还没有浏览记录"}</h2>
           <p>
             {mode === "favorites"

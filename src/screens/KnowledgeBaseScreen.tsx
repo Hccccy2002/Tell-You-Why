@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FileText } from "lucide-react";
 import { LearningPanel } from "../components/LearningPanel";
 import { ReviewAgentPanel } from "../components/ReviewAgentPanel";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
@@ -171,9 +172,8 @@ export function KnowledgeBaseScreen() {
   return (
     <main className="page-view kb-view">
       <div className="page-heading">
-        <span className="eyebrow">从自己的资料开始</span>
         <h1>PDF 知识库</h1>
-        <p className="kb-muted">导入教材或文档，按章节阅读、检索并核对原文。</p>
+        <p className="kb-muted">导入、阅读并检索自己的资料。</p>
       </div>
       {error || pollError ? (
         <div className="kb-error" role="alert">
@@ -303,11 +303,11 @@ export function KnowledgeBaseScreen() {
           <section className="kb-panel kb-import" aria-label="导入 PDF">
             <div className="kb-import-heading">
               <span className="kb-document-icon" aria-hidden="true">
-                PDF
+                <FileText />
               </span>
               <div>
-                <h2>把书放进知识库</h2>
-                <p className="kb-muted">支持扫描版 PDF · 在本机处理与保存</p>
+                <h2>导入 PDF</h2>
+                <p className="kb-muted">支持扫描版 · 本机处理与保存</p>
               </div>
             </div>
             {selection ? (
@@ -317,82 +317,84 @@ export function KnowledgeBaseScreen() {
                   {selection.pages} 页 ·{" "}
                   {(selection.bytes / 1024 / 1024).toFixed(1)} MB
                 </p>
-                <label className="kb-field">
-                  正文起始页
-                  <input
-                    type="number"
-                    min={1}
-                    max={selection.pages}
-                    value={firstPage}
-                    onChange={(e) => setFirstPage(Number(e.target.value))}
-                    disabled={busy}
-                  />
-                </label>
-                <p className="kb-muted">
-                  使用 PDF
-                  的实际页序号。此前页面仍会保留原文，但不纳入知识片段。
-                </p>
-                <fieldset className="kb-ocr-field" disabled={busy}>
-                  <legend>文字识别模式</legend>
-                  <div className="kb-ocr-options">
-                    <label
-                      className={
-                        ocrMode === "always"
-                          ? "kb-ocr-option selected"
-                          : "kb-ocr-option"
-                      }
-                    >
-                      <input
-                        type="radio"
-                        name="ocr-mode"
-                        value="always"
-                        checked={ocrMode === "always"}
-                        aria-describedby="kb-ocr-always-tip"
-                        onChange={() => setOcrMode("always")}
-                      />
-                      <span>
-                        <strong>始终 OCR</strong>
-                        <small>always · 扫描件优先</small>
-                      </span>
-                      <span
-                        id="kb-ocr-always-tip"
-                        role="tooltip"
-                        className="kb-ocr-tooltip"
+                <details className="kb-import-options">
+                  <summary>导入选项</summary>
+                  <label className="kb-field">
+                    正文起始页
+                    <input
+                      type="number"
+                      min={1}
+                      max={selection.pages}
+                      value={firstPage}
+                      onChange={(e) => setFirstPage(Number(e.target.value))}
+                      disabled={busy}
+                    />
+                  </label>
+                  <p className="kb-muted">
+                    使用 PDF 的实际页序号。此前页面保留原文，但不纳入知识片段。
+                  </p>
+                  <fieldset className="kb-ocr-field" disabled={busy}>
+                    <legend>文字识别模式</legend>
+                    <div className="kb-ocr-options">
+                      <label
+                        className={
+                          ocrMode === "always"
+                            ? "kb-ocr-option selected"
+                            : "kb-ocr-option"
+                        }
                       >
-                        每页都渲染并进行 OCR。适合扫描版或文字层不可靠的
-                        PDF；速度较慢，电子版文字也会重新识别。
-                      </span>
-                    </label>
-                    <label
-                      className={
-                        ocrMode === "auto"
-                          ? "kb-ocr-option selected"
-                          : "kb-ocr-option"
-                      }
-                    >
-                      <input
-                        type="radio"
-                        name="ocr-mode"
-                        value="auto"
-                        checked={ocrMode === "auto"}
-                        aria-describedby="kb-ocr-auto-tip"
-                        onChange={() => setOcrMode("auto")}
-                      />
-                      <span>
-                        <strong>智能选择</strong>
-                        <small>auto · 电子版更快</small>
-                      </span>
-                      <span
-                        id="kb-ocr-auto-tip"
-                        role="tooltip"
-                        className="kb-ocr-tooltip"
+                        <input
+                          type="radio"
+                          name="ocr-mode"
+                          value="always"
+                          checked={ocrMode === "always"}
+                          aria-describedby="kb-ocr-always-tip"
+                          onChange={() => setOcrMode("always")}
+                        />
+                        <span>
+                          <strong>始终 OCR</strong>
+                          <small>always · 扫描件优先</small>
+                        </span>
+                        <span
+                          id="kb-ocr-always-tip"
+                          role="tooltip"
+                          className="kb-ocr-tooltip"
+                        >
+                          每页都渲染并进行 OCR。适合扫描版或文字层不可靠的
+                          PDF；速度较慢，电子版文字也会重新识别。
+                        </span>
+                      </label>
+                      <label
+                        className={
+                          ocrMode === "auto"
+                            ? "kb-ocr-option selected"
+                            : "kb-ocr-option"
+                        }
                       >
-                        优先使用 PDF 自带的可用文字层，无法使用的页面再执行
-                        OCR。适合电子版或混合 PDF，通常更快。
-                      </span>
-                    </label>
-                  </div>
-                </fieldset>
+                        <input
+                          type="radio"
+                          name="ocr-mode"
+                          value="auto"
+                          checked={ocrMode === "auto"}
+                          aria-describedby="kb-ocr-auto-tip"
+                          onChange={() => setOcrMode("auto")}
+                        />
+                        <span>
+                          <strong>智能选择</strong>
+                          <small>auto · 电子版更快</small>
+                        </span>
+                        <span
+                          id="kb-ocr-auto-tip"
+                          role="tooltip"
+                          className="kb-ocr-tooltip"
+                        >
+                          优先使用 PDF 自带的可用文字层，无法使用的页面再执行
+                          OCR。适合电子版或混合 PDF，通常更快。
+                        </span>
+                      </label>
+                    </div>
+                  </fieldset>
+                </details>
                 <div className="kb-actions">
                   <button
                     className="primary-button"
@@ -424,9 +426,7 @@ export function KnowledgeBaseScreen() {
                 {busy ? "正在读取 PDF…" : "选择 PDF"}
               </button>
             )}
-            <p className="kb-muted">
-              大部头教材需要较长时间，可查看进度或暂停后继续。
-            </p>
+            <p className="kb-muted">大文件会在后台处理，可随时查看进度。</p>
             {catalog?.import_running ? (
               <p className="kb-notice">
                 已有资料正在处理，请在下方打开查看进度。

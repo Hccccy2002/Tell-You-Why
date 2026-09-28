@@ -182,260 +182,281 @@ export function GeneralSettingsScreen({
   return (
     <main className="page-view general-settings">
       <div className="page-heading">
-        <span className="eyebrow">安静、可控、只在需要时出现</span>
         <h1>通用设置</h1>
       </div>
-      <section className="settings-group">
-        <h2>窗口与启动</h2>
-        <label className="switch-row">
-          <span>
-            <strong>始终置顶</strong>
-            <small>默认关闭</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.alwaysOnTop}
-            onChange={(event) => update("alwaysOnTop", event.target.checked)}
-          />
-        </label>
-        <label className="switch-row">
-          <span>
-            <strong>鼠标移出后自动收起</strong>
-            <small>
-              离开窗口约 0.7 秒后收至系统托盘；弹窗或拖动时不会触发。
-            </small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.autoHideOnMouseLeave}
-            onChange={(event) =>
-              update("autoHideOnMouseLeave", event.target.checked)
-            }
-          />
-        </label>
-        <label className="switch-row">
-          <span>
-            <strong>开机启动</strong>
-            <small>只启动到托盘</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.autostart}
-            onChange={(event) => update("autostart", event.target.checked)}
-          />
-        </label>
-        <label className="field-row">
-          <span>主题</span>
-          <select
-            value={settings.theme}
-            onChange={(event) =>
-              update("theme", event.target.value as AppSettings["theme"])
-            }
-          >
-            <option value="system">跟随系统</option>
-            <option value="light">浅色</option>
-            <option value="dark">深色</option>
-          </select>
-        </label>
-        <label className="field-row stacked">
-          <span>全局快捷键</span>
-          <input
-            value={settings.globalShortcut}
-            onChange={(event) => update("globalShortcut", event.target.value)}
-          />
-          <small>默认 Alt+Shift+Y；冲突时保存会给出提示。</small>
-        </label>
-      </section>
+      <details className="settings-group settings-disclosure">
+        <summary>
+          <span>窗口与启动</span>
+          <small>主题、启动</small>
+        </summary>
+        <div className="settings-disclosure-content">
+          <label className="switch-row">
+            <span>
+              <strong>始终置顶</strong>
+              <small>让窗口保持在最前</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings.alwaysOnTop}
+              onChange={(event) => update("alwaysOnTop", event.target.checked)}
+            />
+          </label>
+          <label className="switch-row">
+            <span>
+              <strong>鼠标移出后自动收起</strong>
+              <small>离开窗口约 0.7 秒后收至托盘</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings.autoHideOnMouseLeave}
+              onChange={(event) =>
+                update("autoHideOnMouseLeave", event.target.checked)
+              }
+            />
+          </label>
+          <label className="switch-row">
+            <span>
+              <strong>开机启动</strong>
+              <small>在系统托盘启动</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings.autostart}
+              onChange={(event) => update("autostart", event.target.checked)}
+            />
+          </label>
+          <label className="field-row">
+            <span>主题</span>
+            <select
+              value={settings.theme}
+              onChange={(event) =>
+                update("theme", event.target.value as AppSettings["theme"])
+              }
+            >
+              <option value="system">跟随系统</option>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+            </select>
+          </label>
+          <label className="field-row stacked">
+            <span>全局快捷键</span>
+            <input
+              value={settings.globalShortcut}
+              onChange={(event) => update("globalShortcut", event.target.value)}
+            />
+            <small>保存时会检查快捷键冲突。</small>
+          </label>
+        </div>
+      </details>
 
-      <section className="settings-group">
-        <h2>提醒</h2>
-        <label className="field-row">
-          <span>频率</span>
-          <select
-            value={settings.reminderPreset}
-            onChange={(event) =>
-              changeReminderPreset(event.target.value as ReminderPreset)
-            }
-          >
-            <option value="manual">仅手动打开</option>
-            <option value="weekday_once">工作日每天 1 次</option>
-            <option value="weekday_twice">工作日每天 2 次</option>
-            <option value="custom">自定义时间</option>
-          </select>
-        </label>
-        {settings.reminderPreset !== "manual" ? (
-          <>
-            <div className="two-fields">
-              <label className="field-row stacked">
-                <span>提醒时间</span>
-                <input
-                  type="time"
-                  value={settings.reminderTimes[0] ?? "10:30"}
-                  onChange={(event) =>
-                    updateReminderTime(0, event.target.value)
-                  }
-                />
-              </label>
-              {settings.reminderPreset === "weekday_twice" ||
-              settings.reminderPreset === "custom" ? (
+      <details className="settings-group settings-disclosure">
+        <summary>
+          <span>提醒</span>
+          <small>
+            {settings.reminderPreset === "manual" ? "仅手动打开" : "已开启"}
+          </small>
+        </summary>
+        <div className="settings-disclosure-content">
+          <label className="field-row">
+            <span>频率</span>
+            <select
+              value={settings.reminderPreset}
+              onChange={(event) =>
+                changeReminderPreset(event.target.value as ReminderPreset)
+              }
+            >
+              <option value="manual">仅手动打开</option>
+              <option value="weekday_once">工作日每天 1 次</option>
+              <option value="weekday_twice">工作日每天 2 次</option>
+              <option value="custom">自定义时间</option>
+            </select>
+          </label>
+          {settings.reminderPreset !== "manual" ? (
+            <>
+              <div className="two-fields">
                 <label className="field-row stacked">
-                  <span>第二次提醒</span>
+                  <span>提醒时间</span>
                   <input
                     type="time"
-                    value={settings.reminderTimes[1] ?? "15:30"}
+                    value={settings.reminderTimes[0] ?? "10:30"}
                     onChange={(event) =>
-                      updateReminderTime(1, event.target.value)
+                      updateReminderTime(0, event.target.value)
                     }
                   />
                 </label>
-              ) : (
-                <div />
-              )}
-            </div>
-            <fieldset className="weekday-picker">
-              <legend>提醒日</legend>
-              {[
-                [1, "一"],
-                [2, "二"],
-                [3, "三"],
-                [4, "四"],
-                [5, "五"],
-                [6, "六"],
-                [7, "日"],
-              ].map(([day, label]) => (
-                <label key={day}>
-                  <input
-                    type="checkbox"
-                    checked={settings.weekdays.includes(day as number)}
-                    onChange={() => toggleWeekday(day as number)}
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </fieldset>
-          </>
-        ) : null}
-        <div className="two-fields">
-          <label className="field-row stacked">
-            <span>静默开始</span>
-            <input
-              type="time"
-              value={settings.quietStart}
-              onChange={(event) => update("quietStart", event.target.value)}
-            />
-          </label>
-          <label className="field-row stacked">
-            <span>静默结束</span>
-            <input
-              type="time"
-              value={settings.quietEnd}
-              onChange={(event) => update("quietEnd", event.target.value)}
-            />
-          </label>
+                {settings.reminderPreset === "weekday_twice" ||
+                settings.reminderPreset === "custom" ? (
+                  <label className="field-row stacked">
+                    <span>第二次提醒</span>
+                    <input
+                      type="time"
+                      value={settings.reminderTimes[1] ?? "15:30"}
+                      onChange={(event) =>
+                        updateReminderTime(1, event.target.value)
+                      }
+                    />
+                  </label>
+                ) : (
+                  <div />
+                )}
+              </div>
+              <fieldset className="weekday-picker">
+                <legend>提醒日</legend>
+                {[
+                  [1, "一"],
+                  [2, "二"],
+                  [3, "三"],
+                  [4, "四"],
+                  [5, "五"],
+                  [6, "六"],
+                  [7, "日"],
+                ].map(([day, label]) => (
+                  <label key={day}>
+                    <input
+                      type="checkbox"
+                      checked={settings.weekdays.includes(day as number)}
+                      onChange={() => toggleWeekday(day as number)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </fieldset>
+            </>
+          ) : null}
+          <div className="two-fields">
+            <label className="field-row stacked">
+              <span>静默开始</span>
+              <input
+                type="time"
+                value={settings.quietStart}
+                onChange={(event) => update("quietStart", event.target.value)}
+              />
+            </label>
+            <label className="field-row stacked">
+              <span>静默结束</span>
+              <input
+                type="time"
+                value={settings.quietEnd}
+                onChange={(event) => update("quietEnd", event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="button-pair">
+            <button
+              className="secondary-button"
+              disabled={busy != null}
+              onClick={() => void pause("thirty_minutes")}
+            >
+              暂停 30 分钟
+            </button>
+            <button
+              className="secondary-button"
+              disabled={busy != null}
+              onClick={() => void pause("today")}
+            >
+              今天暂停
+            </button>
+          </div>
         </div>
-        <div className="button-pair">
-          <button
-            className="secondary-button"
-            disabled={busy != null}
-            onClick={() => void pause("thirty_minutes")}
-          >
-            暂停 30 分钟
-          </button>
-          <button
-            className="secondary-button"
-            disabled={busy != null}
-            onClick={() => void pause("today")}
-          >
-            今天暂停
-          </button>
-        </div>
-      </section>
+      </details>
 
-      <section className="settings-group">
-        <h2>模型成本</h2>
-        <label className="field-row stacked">
-          <span>每日生成总数</span>
-          <input
-            aria-label="每日生成总数"
-            type="number"
-            min="1"
-            max="1000"
-            step="1"
-            value={settings.dailyGenerationLimit}
-            onWheel={(event) => {
-              event.preventDefault();
-              event.currentTarget.blur();
+      <details className="settings-group settings-disclosure">
+        <summary>
+          <span>生成额度</span>
+          <small>
+            {generatedToday}/{settings.dailyGenerationLimit}
+          </small>
+        </summary>
+        <div className="settings-disclosure-content">
+          <label className="field-row stacked">
+            <span>每日生成总数</span>
+            <input
+              aria-label="每日生成总数"
+              type="number"
+              min="1"
+              max="1000"
+              step="1"
+              value={settings.dailyGenerationLimit}
+              onWheel={(event) => {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }}
+              onChange={(event) =>
+                update(
+                  "dailyGenerationLimit",
+                  Math.trunc(Number(event.target.value)),
+                )
+              }
+            />
+            <strong className="generation-usage" aria-live="polite">
+              已生成 {generatedToday}/{settings.dailyGenerationLimit}
+            </strong>
+            <small>可自定义 1–1000 张；只统计今天成功入库的知识点。</small>
+          </label>
+        </div>
+      </details>
+
+      <details className="settings-group settings-disclosure">
+        <summary>
+          <span>内容与数据</span>
+          <small>导入、清理</small>
+        </summary>
+        <div className="settings-disclosure-content">
+          <button
+            className="settings-action"
+            disabled={busy != null}
+            onClick={() => void importCards()}
+          >
+            <span>
+              <strong>导入知识卡</strong>
+              <small>支持经过字段校验的 JSON / CSV</small>
+            </span>
+            <span>{busy === "import" ? "导入中…" : "›"}</span>
+          </button>
+          <button
+            className="settings-action"
+            disabled={busy != null}
+            onClick={() => {
+              setMessage(null);
+              setClearConfirmation("history");
             }}
-            onChange={(event) =>
-              update(
-                "dailyGenerationLimit",
-                Math.trunc(Number(event.target.value)),
-              )
-            }
-          />
-          <strong className="generation-usage" aria-live="polite">
-            已生成 {generatedToday}/{settings.dailyGenerationLimit}
-          </strong>
-          <small>可自定义 1–1000 张；只统计今天成功入库的知识点。</small>
-        </label>
-      </section>
-
-      <section className="settings-group">
-        <h2>内容与数据</h2>
-        <button
-          className="settings-action"
-          disabled={busy != null}
-          onClick={() => void importCards()}
-        >
-          <span>
-            <strong>导入知识卡</strong>
-            <small>支持经过字段校验的 JSON / CSV</small>
-          </span>
-          <span>{busy === "import" ? "导入中…" : "›"}</span>
-        </button>
-        <button
-          className="settings-action"
-          disabled={busy != null}
-          onClick={() => {
-            setMessage(null);
-            setClearConfirmation("history");
-          }}
-        >
-          <span>
-            <strong>清除阅读记录</strong>
-            <small>本机最多保留最近 500 条；清除不会删除收藏</small>
-          </span>
-          <span>›</span>
-        </button>
-        <button
-          className="settings-action"
-          disabled={busy != null}
-          onClick={() => {
-            setMessage(null);
-            setClearConfirmation("preferences");
-          }}
-        >
-          <span>
-            <strong>清除偏好</strong>
-            <small>重置兴趣权重和自定义兴趣</small>
-          </span>
-          <span>›</span>
-        </button>
-        <button
-          className="settings-action danger"
-          disabled={busy != null}
-          onClick={() => {
-            setMessage(null);
-            setClearConfirmation("all");
-          }}
-        >
-          <span>
-            <strong>清除全部本地数据</strong>
-            <small>包括模型系统凭据</small>
-          </span>
-          <span>›</span>
-        </button>
-      </section>
+          >
+            <span>
+              <strong>清除阅读记录</strong>
+              <small>本机最多保留最近 500 条；清除不会删除收藏</small>
+            </span>
+            <span>›</span>
+          </button>
+          <button
+            className="settings-action"
+            disabled={busy != null}
+            onClick={() => {
+              setMessage(null);
+              setClearConfirmation("preferences");
+            }}
+          >
+            <span>
+              <strong>清除偏好</strong>
+              <small>重置兴趣权重和自定义兴趣</small>
+            </span>
+            <span>›</span>
+          </button>
+          <button
+            className="settings-action danger"
+            disabled={busy != null}
+            onClick={() => {
+              setMessage(null);
+              setClearConfirmation("all");
+            }}
+          >
+            <span>
+              <strong>清除全部本地数据</strong>
+              <small>包括模型系统凭据</small>
+            </span>
+            <span>›</span>
+          </button>
+        </div>
+      </details>
       {message && !clearConfirmation ? (
         <p className="form-message" role="status">
           {message}
@@ -453,7 +474,7 @@ export function GeneralSettingsScreen({
       </button>
       <p className="privacy-footnote">
         兴趣、历史和反馈保存在本机。使用 AI
-        功能时，会将相关问题、卡片及启用个性化时的相关学习记录发送给所选模型。不读取屏幕、浏览器记录、工作文件或剪贴板。
+        时，仅向所选模型发送当前任务所需内容。
       </p>
       {clearConfirmation ? (
         <ConfirmationDialog
