@@ -1,6 +1,6 @@
 # Python PDF 知识库模块
 
-本模块完成 `PDF → 提取/OCR → 章节 → 分块 → 关键词与向量索引 → 本地知识库`，并通过 `desktop.evidence` 为 RAG 提供带版本和原文位置的证据包。已支持通过桌面 APP 的 **PDF 知识库** 页面点击操作，CLI 继续保留。Tauri 调用相同的知识库流程，生成模型和业务持久化由 Rust 负责。详见 [PDF 界面](../docs/pdf-desktop-guide.md)及[教材问答与学习卡](../docs/rag-minimal-loop-guide.md)。随机学习调度留到下一阶段。
+本模块完成 `PDF → 提取/OCR → 章节 → 分块 → 关键词与向量索引 → 本地知识库`，并通过 `desktop.evidence` 为 RAG 提供带版本和原文位置的证据包。已支持通过桌面 APP 的 **PDF 知识库** 页面点击操作，CLI 继续保留。Tauri 调用相同的知识库流程，生成模型和业务持久化由 Rust 负责。详见 [PDF 界面](../docs/pdf-desktop-guide.md)、[教材问答与学习卡](../docs/rag-minimal-loop-guide.md)及[随机学习](../docs/random-learning-guide.md)。
 
 一份 PDF 对应一次知识库构建。相同文件、配置和运行时复用任务；更换文件或配置生成新任务，已发布版本保留。当前不把多份 PDF 自动合并成一个索引。
 
@@ -16,7 +16,7 @@
 
 ## 安装与模型准备
 
-以下命令均在项目根目录 `D:\Tell-You-Why` 执行。完整的 Python / Conda 安装分支、依赖检查和错误排查见 [根目录 README](../README.md#pdf-知识库运行环境)。已有环境先执行 `python.exe --version` 和 `python.exe -m pip check`；依赖安装完成后仍需准备并验证模型。
+以下命令均在克隆后的项目根目录执行。Python 环境、依赖与模型准备见 [根目录 README](../README.md#pdf-知识库运行环境)。已有环境先执行 `python.exe --version` 和 `python.exe -m pip check`；依赖安装完成后仍需准备并验证模型。
 
 ```powershell
 py -3.12 -m venv rag-service\.venv
@@ -43,6 +43,8 @@ py -3.12 -m venv rag-service\.venv
 Top 5 使用生成后的题目查询：BM25 + BGE 向量混合召回 24 个候选分块，取来源正文及同节可用相邻段落，按完整段落去重，再通过交叉编码器逐条评分、降序选出最多 5 条。长段落分窗口评分并保留完整展示文字和 PDF 页码。检索仍遵守教材、版本和章节范围；不靠补造摘录凑满数量。原有生成证据包及引用快照保留用于核对，不被展示结果覆盖。实现与评测见 [Top 5 原文检索](../docs/related-sources-top5.md)。
 
 ## 按阶段执行教材案例
+
+以下是历史《计算机组成原理》案例的复现命令，PDF 不随源码分发，需自行准备匹配原件。处理自己的 PDF 时使用新的知识库名，并省略本书专用的配置和修正文件；可直接从 APP 选择资料导入。
 
 ```powershell
 # 1. 查看页数、哈希、书签和已有文本层的来源

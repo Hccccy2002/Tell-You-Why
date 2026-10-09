@@ -1,6 +1,6 @@
 # MCP Client 使用与安全边界
 
-入口：**⋯ → MCP 服务器**。本阶段让 Tell You Why 成为 MCP Client，支持本地 `stdio` 与远程 Streamable HTTP Server，并将明确允许的外部 Tools 接入 PDF 复习 Agent。
+入口：**菜单 → 开发者工具 → MCP 服务器**。Tell You Why 作为 MCP Client，支持本地 `stdio` 与远程 Streamable HTTP Server，并将明确允许的外部 Tools 接入 PDF 复习 Agent。
 
 ## 添加服务器
 

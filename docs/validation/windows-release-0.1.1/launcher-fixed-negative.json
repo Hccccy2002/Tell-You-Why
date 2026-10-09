@@ -1,7 +1,0 @@
-{
-  "powershell": "Windows PowerShell 5.1",
-  "case": "corrupt installer after direct .NET SHA256 fix",
-  "exit": 1,
-  "blocked": true,
-  "installationCreated": false
-}

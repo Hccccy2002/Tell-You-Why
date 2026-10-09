@@ -1,98 +1,73 @@
 # Windows 完整包 0.1.1
 
-2026-09-16，目标为 Windows 10 1903+ / Windows 11 x64。仓库按用户选择保持私有；下载使用有权限的 GitHub 账号。
+本页汇总 2026-09-16 的历史分发实现与验收结果，目标为 Windows 10 1903+ / Windows 11 x64。该版本早于 main 的后续功能。机器运行 JSON、截图和完整失败日志不随当前源码分发；以下是历史记录，不是本次仓库整理的重新验收结果。
 
-## 分发内容
+## 分发与构建
 
-- Inno Setup 7 EXE 完整安装程序：Python 3.12.14、项目锁定依赖、五组固定修订的本地模型、MSVC app-local DLL、WebView2 离线安装组件。
-- `start.cmd` / 中文别名：下载固定 Release、核对 SHA256、当前用户安装并启动。支持 Git Credential Manager、GitHub CLI 和用户手动下载到源码根目录的同名安装包。
-- `scripts/start-source.ps1`：编译运行当前源码。
-- `scripts/build-windows.ps1`：准备资源、构建安装包、生成 SHA256 和启动清单。
-- `--check-pdf <output.json>`：通过实际 Rust 适配器读取 PDF 组件状态，供安装诊断使用。
-- `pdf-runtime/check_runtime.py --out <directory>`：模型文件校验和真实离线 PDF / OCR / Embedding / Reranker 推理。
+- Inno Setup 7 EXE 完整安装程序包含独立 Python 3.12.14、锁定依赖、五组本地模型、MSVC app-local DLL 和 WebView2 离线组件。
+- `start.cmd` / 中文别名下载固定 Release，校验大小与 SHA-256，再按当前用户安装并启动。下载支持公开资产；需要鉴权时可以使用 Git Credential Manager 或 GitHub CLI。
+- `scripts/start-source.ps1` 编译运行当前源码。
+- `scripts/build-windows.ps1` 准备资源并构建完整安装包，生成哈希与发布清单。
+- `--check-pdf <output.json>` 通过实际 Rust 适配器读取 PDF 组件状态。
+- 随包的 `pdf-runtime/check_runtime.py --out <directory>` 检查模型并执行本地 PDF / OCR / Embedding / Reranker 推理。
 
-Git 中只保存代码、文档、版本与校验清单。安装包上传 Release。个人 PDF、知识库、API Key、账号凭据均不进入安装包。Python 依赖随原始许可证分发，模型卡、来源修订和许可位于 `pdf-runtime/third-party/`。
+源码仓库只保留构建代码、版本及校验清单；安装包放在 GitHub Releases。个人 PDF、知识库和账号凭据不进入安装包。构建脚本收集第三方许可证、模型来源与固定修订。
 
 ## 运行路径
 
 | 内容                            | 完整安装版                                         |
 | ------------------------------- | -------------------------------------------------- |
 | Python / 服务 / 模型 / 评测脚本 | EXE 同级 `pdf-runtime/`                            |
-| PDF 数据及模型运行缓存          | `%LOCALAPPDATA%/com.tellyouwhy.desktop/pdf-data/`  |
+| PDF 数据与运行缓存              | `%LOCALAPPDATA%/com.tellyouwhy.desktop/pdf-data/`  |
 | 主数据库                        | `%APPDATA%/com.tellyouwhy.desktop/tell-you-why.db` |
-| 一键启动默认安装位置            | `%LOCALAPPDATA%/Programs/Tell You Why/`            |
+| 默认安装位置                    | `%LOCALAPPDATA%/Programs/Tell You Why/`            |
 | 下载缓存                        | `%LOCALAPPDATA%/TellYouWhy-Installer/<version>/`   |
 
-Debug 模式保留项目 .venv/data 布局，Release 不回退到构建机路径。显式环境变量覆盖由启动进程继承，通常无须设置。代码与模型只读取；缓存和用户资料写入用户目录。默认不迁移开发目录中的旧知识库。
+Debug 模式使用项目 `.venv` / `data` 布局，Release 不回退到构建机路径。模型与程序资源只读，用户资料和缓存写入用户目录；不会自动迁移开发目录知识库。
 
-## 环境与检查
-
-- Windows 11 10.0.26200 x64。
-- Node 24.19.0 / npm 11.17.0 / Rust 1.98.0 / MSVC Build Tools。
-- 独立 CPython 3.12.14，来源及 SHA256 固定在 `packaging/python-runtime.json`。
-- 前端 132/132 测试通过，生产构建通过。
-- Rust 167 项通过、9 项显式集成/真实模型测试忽略；新增测试覆盖 Release 路径、中文空格路径与 Debug 回退。
-- Python 原有 69 项通过；新增 1 项缓存隔离测试通过。
-- 严格 Clippy、ESLint 通过。最终构建和安装检查结果见下文。
-
-## 已知限制
-
-- 本次不是全新 Windows 虚拟机验收。宿主机已安装 WebView2，缺失 WebView2 时的安装分支尚需干净机器验证。
-- 未配置代码签名，可能出现 Windows 未知发布者提示。
-- 内置知识卡为演示数据，不等同于正式审核内容。真实模型付费调用未在本次分发验证中执行。
-- PDF 的 OCR 质量仍取决于资料；推理组件可运行不代表所有 PDF 都能无误识别。
-- 没有整体项目开源许可证变更；仓库保持私有。第三方组件继续适用各自许可证。
-
-## 失败样本与修正
-
-最初使用 Tauri 的 NSIS 完整打包。编译程序成功，但 NSIS 压缩约 2.7 GB 资源时失败：`Internal compiler error #12345: error mmapping datablock to 2735420`。此构建没有产生可交付安装包，未标为通过。
-
-最终改为官方 Inno Setup 7.1.0 x64 编译器；Windows 安装脚本单独版本化，直接打包同一 Release EXE 与经过校验的运行时。保留原始 NSIS 失败日志摘要。安装器工具及微软 WebView2 离线组件先校验固定 SHA256 和发布者签名。
-
-## PDF 处理实测
-
-- 独立 Python 在仅包含 Windows 系统目录的 PATH 下完成模型哈希校验、PDF 渲染、OCR、2 × 512 向量编码和 Reranker 推理；不使用 Conda / 全局 Python / 模型 API。
-- 实际桌面适配器流程：合成 PDF → prepare → run_import → 发布版本 → CPU 混合检索 → 重复选择同一文件。发布 1 页、2 个 chunk，检索有结果，重复导入复用旧版本。
-- 导入状态为 **partial_ready**：7 个块中 3 个可索引，其余内容被质量过滤。此样本证明组件与发布/检索链路可运行，不表示 OCR 全文质量验收通过。完整结果保留在验收 JSON 中。
-- Windows PowerShell 5.1 下，损坏安装包被 SHA256 检查拒绝，没有创建安装目录或执行文件。
-
-### 中文安装目录的原生库问题
-
-首次实际安装到包含中文和空格的目录后，Rust catalog 和 PDF 渲染通过，但 Paddle 3.0.0 读取 `models/det/inference.json` 失败。文件存在，Windows 短路径也没有可用的 ASCII 替代名；宿主默认代码页为 936。此样本按失败保留，最初草稿安装包不发布。
-
-修正为构建时保留 Python 原有清单内容，给随包的 `python.exe` 与 `pythonw.exe` 添加 `activeCodePage=UTF-8`。运行时进程代码页变为 65001，同一中文路径下真实 OCR、Embedding 和 Reranker 均通过。该修改不改变系统区域设置。构建脚本自动执行清单修改与代码页断言，并重新生成安装包。
-
-最低系统要求相应设为 Windows 10 1903，详见 [Microsoft 进程级 UTF-8 文档](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/use-utf8-code-page)。第三方说明标记了对 Python EXE 清单的这项修改。原始失败与修复结果保存在 `docs/validation/windows-release-0.1.1/`。
-
-## 最终文件
+## 发布文件
 
 - 文件：`Tell-You-Why_0.1.1_windows-x64-full-setup.exe`
 - 大小：1,754,396,463 字节（约 1.75 GB）
-- SHA256：`3752601b786aa59955f528441baa88a71059fdc233cb8c8937697db090c83cd1`
-- 完整性清单：`packaging/release.json`，Release 同时提供 `SHA256SUMS.txt`。
+- SHA-256：`3752601b786aa59955f528441baa88a71059fdc233cb8c8937697db090c83cd1`
+- 完整性清单：[packaging/release.json](../packaging/release.json)
 
-## 最终安装包验收（2026-09-16）
+构建工具、Python 运行时和模型来源固定在 `packaging/` 的清单及准备脚本中。重新发布时须让版本、安装包与哈希保持一致。
 
-最终 SHA256 对应的安装包通过 Windows PowerShell 5.1 一键脚本安装到全新目录 `tmp/完整安装 复测/Tell You Why`，安装退出码为 0。安装后的检查全部使用该目录内的 EXE、Python 与模型：
+## 历史验证
 
-| 检查                           | 结果                                                     | 证据                                   |
-| ------------------------------ | -------------------------------------------------------- | -------------------------------------- |
-| 实际 Rust PDF 适配器           | 通过；组件与模型就绪，首次资料列表为空                   | `final-installed-adapter.json`         |
-| Python 进程代码页              | 通过；65001，中文和空格路径可加载模型                    | `final-installed-runtime.json`         |
-| PDF 渲染、OCR、向量与重排      | 通过；向量尺寸 2 × 512，相关文本重排得分高于无关文本     | `final-installed-runtime.json`         |
-| 实际导入、发布、检索、重复导入 | 链路通过；1 页、2 个 chunk、有检索结果，重复导入复用版本 | `final-installed-import.json`          |
-| 导入内容完整性                 | 部分就绪；需要人工复核，不能标为全文质量通过             | 同上，`partial_ready` / `needs_review` |
+| 检查           | 当时结果与范围                                                                   |
+| -------------- | -------------------------------------------------------------------------------- |
+| 前端           | 132 项测试通过，生产构建通过                                                     |
+| Rust           | 167 项通过、9 项显式集成 / 真实模型测试默认忽略                                  |
+| Python         | 原有 69 项通过，新增缓存隔离测试通过                                             |
+| 静态检查       | Clippy 与 ESLint 通过                                                            |
+| 独立运行时     | 仅包含 Windows 系统目录的 PATH 下，模型校验、PDF 渲染、OCR、向量编码与重排可执行 |
+| 安装后适配器   | 组件及模型就绪，初始资料列表为空                                                 |
+| 合成 PDF 导入  | 导入、发布、CPU 混合检索与重复导入复用通过                                       |
+| 中文与空格目录 | 修正 Python 进程清单后，OCR、Embedding 与 Reranker 可执行                        |
+| 损坏安装包     | SHA-256 校验拒绝，不进入安装                                                     |
+| 根目录启动器   | 下载校验修正后，固定版本安装、复用已安装版本及 GUI 启动通过                      |
 
-上述证据位于 `docs/validation/windows-release-0.1.1/`。没有把开发虚拟环境复制为安装运行时；没有修改 Windows 系统区域设置。
+合成导入样本只发布 1 页、2 个 chunk，资料状态为 `partial_ready` / `needs_review`。链路通过不代表 OCR 全文质量通过。启动器复用已安装版本的耗时也不等于 GUI 启动耗时。
 
-### 在线一键启动的兼容性修正
+## 失败与修正
 
-从私有 GitHub 克隆发布源码并实际运行 `start.cmd -NoLaunch`。首次通过 Git Credential Manager 完成了 1,754,396,463 字节下载，但 Windows PowerShell 5.1 在下载函数返回后无法解析 `Get-FileHash`，因此校验阶段停止，未执行安装。已保留该失败结论，不能把这次尝试标为一键启动成功。
+### 大体积资源的安装器
 
-启动脚本改为使用 .NET SHA256 流式计算，不依赖该 PowerShell 函数的模块自动加载。对于已完整下载的 `.partial` 文件，仅在长度和 SHA256 都一致后复用；不完整或不匹配的文件重新下载。修复后的损坏文件测试仍在执行安装前拒绝。安装包无需重建，文件大小与哈希均不变。
+最初使用 Tauri NSIS 打包约 2.7 GB 资源时，出现 `error mmapping datablock`，未产生可交付安装包。随后改用 Inno Setup，复用同一 Release EXE 和经校验的运行资源。
 
-复测结果：修复后的 Windows PowerShell 5.1 启动脚本校验已完成的真实 GitHub 下载文件，成功安装到默认的 `%LOCALAPPDATA%/Programs/Tell You Why`。再次运行 `start.cmd -NoLaunch` 仅用 0.44 秒确认已安装版本，没有重新下载或安装；这不是 GUI 启动耗时。安装后实际 EXE 的 `--check-pdf` 返回 `ok=true`、`models_ready=true`，资料列表为空、错误列表为空。结果见 `fresh-source-launcher.json` 和 `default-installed-adapter.json`。
+### 中文目录与 Python 原生库
 
-安装后的实际 GUI 已打开“PDF 知识库”，选择 PDF 按钮可用、我的资料为 0，未出现组件缺失错误。截图：`docs/validation/windows-release-0.1.1/installed-pdf-ready.png`。该界面检查没有调用付费模型或导入用户资料。
+中文目录中的文件存在，但 Paddle 读取模型失败。修正时保留 Python 原有 EXE 清单，添加 `activeCodePage=UTF-8`，进程代码页变为 65001，同一路径下真实推理通过。修改只作用于随包 Python，不改变系统区域设置。
 
-最终再次从 GitHub 克隆 `v0.1.1`（`3e5636323e256b1f653f135a5b5f6ed0a45fe556`），未修改下载的源码，直接执行 **`start.cmd`**：退出码 0，已安装版 GUI 正常启动。此轮复用了已安装版本，没有重新下载。证据：`final-source-launch.json`。Release 的两个资产已核对服务端 SHA256，仓库仍为私有。
+### PowerShell 5.1 下载后校验
+
+下载成功后，原脚本无法解析 `Get-FileHash`，校验阶段停止。改用 .NET SHA-256 流式计算；仅当 `.partial` 文件大小与哈希均匹配时复用。修复后安装与重复运行通过，损坏文件仍在安装前被拒绝。
+
+## 已知限制
+
+- 历史检查没有覆盖全新 Windows 虚拟机；缺少 WebView2 时的安装分支仍需验证。
+- 未配置代码签名，升级与更多干净系统场景待完善。
+- 分发验证没有运行真实模型付费调用，也没有测量长期学习效果。
+- 固定发布版不包含 main 全部后续功能，当前源码运行见 [README](../README.md#源码启动)。

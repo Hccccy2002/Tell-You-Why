@@ -32,3 +32,21 @@ src-tauri/pdf-runtime/
 release-artifacts/
 src-tauri/windows-crt/
 /Tell-You-Why_*_windows-x64-full-setup.exe
+
+# Local learning materials and archived corpus
+/*.pdf
+/data/desktop-import.lock
+/data/rag/
+
+# Machine-specific validation artifacts (summaries remain in docs)
+/docs/validation/pdf-environment-20260916/
+/docs/validation/windows-release-0.1.1/
+
+# This application targets Windows
+/src-tauri/icons/android/
+/src-tauri/icons/ios/
+
+# Python caches and TypeScript incremental build state
+**/.pytest_cache/
+**/.ruff_cache/
+*.tsbuildinfo

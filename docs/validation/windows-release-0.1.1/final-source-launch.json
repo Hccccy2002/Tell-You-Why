@@ -1,9 +1,0 @@
-{
-  "ok": true,
-  "sourceCommit": "3e5636323e256b1f653f135a5b5f6ed0a45fe556",
-  "sourceClean": true,
-  "command": ".\\start.cmd",
-  "exit": 0,
-  "installedGuiRunning": true,
-  "exe": "C:\\Users\\test\\AppData\\Local\\Programs\\Tell You Why\\tell-you-why.exe"
-}

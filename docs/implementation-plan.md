@@ -1,6 +1,6 @@
 # Tell You Why P0 MVP 实施计划
 
-> 依据：`Tell You Why - MVP设计方案.md` V0.1（2026-08-26）  
+> 依据：[MVP 设计方案](archive/Tell%20You%20Why%20-%20MVP设计方案.md) V0.1（2026-08-26）\
 > 目标平台：Windows 10/11  
 > 状态更新规则：每个里程碑完成格式检查、静态检查、测试和可启动性核验后，才将对应项标记为“已完成”。
 
@@ -144,7 +144,7 @@
 
 ### 环境盘点（2026-08-26）
 
-- 已完整阅读且保持原样：`Tell You Why - MVP设计方案.md`。
+- 已完整阅读的历史依据现归档为 `docs/archive/Tell You Why - MVP设计方案.md`。
 - 项目根目录尚无代码、`package.json` 或 Rust 工程；将在当前根目录直接初始化。
 - Node.js `v24.19.0`、npm `11.17.0`、Git `2.55.0.windows.3` 可用。
 - PowerShell 脚本策略阻止 `npm.ps1`，后续统一使用 `npm.cmd`，不修改系统策略。
